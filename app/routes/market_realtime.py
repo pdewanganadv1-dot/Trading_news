@@ -28,28 +28,28 @@ async def get_realtime_data(symbol: str):
     trend = "neutral"
 
     sma_trend = "neutral"
-    if indicators['sma']['sma20'] and indicators['sma']['sma50']:
-        if indicators['sma']['sma20'] > indicators['sma']['sma50']:
+    sma = indicators.get('sma', {})
+    if sma.get('sma20') and sma.get('sma50'):
+        if sma['sma20'] > sma['sma50']:
             sma_trend = "bullish"
         else:
             sma_trend = "bearish"
 
     rsi_trend = "neutral"
-    if indicators['rsi']:
-        if indicators['rsi'] > 70:
+    rsi_val = indicators.get('rsi')
+    if rsi_val is not None:
+        if rsi_val > 70:
             rsi_trend = "sell"
-        elif indicators['rsi'] < 30:
+        elif rsi_val < 30:
             rsi_trend = "buy"
-        else:
-            rsi_trend = "neutral"
 
     macd_trend = "neutral"
-    if indicators['macd']['histogram'] > 0:
+    macd = indicators.get('macd', {})
+    if macd.get('histogram', 0) > 0:
         macd_trend = "bullish"
-    elif indicators['macd']['histogram'] < 0:
+    elif macd.get('histogram', 0) < 0:
         macd_trend = "bearish"
 
-    # Overall trend
     bullish_count = sum(1 for t in [sma_trend, rsi_trend, macd_trend] if t in ['bullish', 'buy'])
     if bullish_count >= 2:
         trend = "bullish"
@@ -62,16 +62,16 @@ async def get_realtime_data(symbol: str):
         "price": price_data,
         "indicators": {
             "sma": {
-                "sma20": round(indicators['sma']['sma20'], 2) if indicators['sma']['sma20'] else None,
-                "sma50": round(indicators['sma']['sma50'], 2) if indicators['sma']['sma50'] else None,
-                "sma200": round(indicators['sma']['sma200'], 2) if indicators['sma']['sma200'] else None,
+                "sma20": round(sma['sma20'], 2) if sma.get('sma20') else None,
+                "sma50": round(sma['sma50'], 2) if sma.get('sma50') else None,
+                "sma200": round(sma['sma200'], 2) if sma.get('sma200') else None,
                 "trend": sma_trend
             },
-            "rsi": round(indicators['rsi'], 2) if indicators['rsi'] else None,
+            "rsi": round(rsi_val, 2) if rsi_val is not None else None,
             "rsi_signal": rsi_trend,
-            "macd": indicators['macd'],
+            "macd": macd if macd else {"macd": 0, "signal": 0, "histogram": 0},
             "macd_signal": macd_trend,
-            "bb": indicators['bb']
+            "bb": indicators.get('bb', {"upper": 0, "middle": 0, "lower": 0})
         },
         "trend": trend,
         "timestamp": datetime.now().isoformat()
@@ -108,19 +108,22 @@ async def get_5min_signals(symbol: str):
 @router.get("/signals")
 async def get_all_signals():
     """Get trading signals for all symbols."""
-    symbols = ['btc', 'eth', 'gold', 'silver']
+    symbols = ['btc', 'eth', 'gold', 'silver', 'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank']
     results = {}
 
     for symbol in symbols:
-        price_data = await market_data_service.get_price_data(symbol)
-        if price_data:
-            prices_5m = await market_data_service.get_5min_prices(symbol, 100)
-            signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
-            results[symbol] = {
-                "signal": signal_data['signal'],
-                "confidence": signal_data['confidence'],
-                "price": price_data['price']
-            }
+        try:
+            price_data = await market_data_service.get_price_data(symbol)
+            if price_data:
+                prices_5m = await market_data_service.get_5min_prices(symbol, 100)
+                signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
+                results[symbol] = {
+                    "signal": signal_data['signal'],
+                    "confidence": signal_data['confidence'],
+                    "price": price_data['price']
+                }
+        except Exception:
+            pass
 
     return results
 
@@ -128,11 +131,14 @@ async def get_all_signals():
 @router.get("/realtime")
 async def get_all_realtime():
     """Get real-time data for all supported symbols."""
-    symbols = ['btc', 'eth', 'gold', 'silver']
+    symbols = ['btc', 'eth', 'gold', 'silver', 'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank']
     results = {}
 
     for symbol in symbols:
-        data = await get_realtime_data(symbol)
-        results[symbol] = data
+        try:
+            data = await get_realtime_data(symbol)
+            results[symbol] = data
+        except Exception:
+            pass
 
     return results

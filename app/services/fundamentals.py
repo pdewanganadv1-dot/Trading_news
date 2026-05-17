@@ -3,14 +3,30 @@ import yfinance as yf
 
 
 def get_fundamentals(ticker: str) -> Optional[Dict]:
+    # Try .NS suffix for Indian stocks if not already present
+    if not ticker.endswith(".NS"):
+        try:
+            stock = yf.Ticker(f"{ticker}.NS")
+            info = stock.info
+            if info and info.get("regularMarketPrice") is not None:
+                ticker = f"{ticker}.NS"
+                return _format_fundamentals(ticker, info)
+        except Exception:
+            pass
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
         if not info or info.get("regularMarketPrice") is None:
             return None
+        return _format_fundamentals(ticker, info)
+    except Exception as e:
+        return {"ticker": ticker.upper(), "error": str(e)}
+
+
+def _format_fundamentals(ticker: str, info: dict) -> Dict:
         return {
-            "ticker": ticker.upper(),
-            "name": info.get("longName") or info.get("shortName") or ticker.upper(),
+            "ticker": ticker.upper().replace(".NS", ""),
+            "name": info.get("longName") or info.get("shortName") or ticker.upper().replace(".NS", ""),
             "sector": info.get("sector"),
             "industry": info.get("industry"),
             "market_cap": info.get("marketCap"),
@@ -37,5 +53,3 @@ def get_fundamentals(ticker: str) -> Optional[Dict]:
             "change_pct": info.get("regularMarketChangePercent"),
             "source": "yfinance",
         }
-    except Exception as e:
-        return {"ticker": ticker.upper(), "error": str(e)}

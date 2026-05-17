@@ -927,6 +927,30 @@
                     <span>Silver</span>
                 </button>
             </div>
+
+            <div class="asset-group">
+                <div class="asset-group-title">Indian Stocks (NSE)</div>
+                <button class="asset-btn" onclick="selectAsset('reliance')">
+                    <div class="asset-icon" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);font-size:0.7rem;">RE</div>
+                    <span>Reliance</span>
+                </button>
+                <button class="asset-btn" onclick="selectAsset('tcs')">
+                    <div class="asset-icon" style="background:linear-gradient(135deg,#06b6d4,#0891b2);font-size:0.7rem;">TC</div>
+                    <span>TCS</span>
+                </button>
+                <button class="asset-btn" onclick="selectAsset('hdfcbank')">
+                    <div class="asset-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706);font-size:0.7rem;">HB</div>
+                    <span>HDFC Bank</span>
+                </button>
+                <button class="asset-btn" onclick="selectAsset('infy')">
+                    <div class="asset-icon" style="background:linear-gradient(135deg,#22c55e,#16a34a);font-size:0.7rem;">IN</div>
+                    <span>Infosys</span>
+                </button>
+                <button class="asset-btn" onclick="selectAsset('icicibank')">
+                    <div class="asset-icon" style="background:linear-gradient(135deg,#ec4899,#db2777);font-size:0.7rem;">IB</div>
+                    <span>ICICI Bank</span>
+                </button>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -1166,7 +1190,12 @@
             btc: { name: 'Bitcoin', symbol: 'BTCUSD', title: 'Bitcoin / USD' },
             eth: { name: 'Ethereum', symbol: 'ETHUSD', title: 'Ethereum / USD' },
             gold: { name: 'Gold', symbol: 'XAUUSD', title: 'Gold / USD' },
-            silver: { name: 'Silver', symbol: 'XAGUSD', title: 'Silver / USD' }
+            silver: { name: 'Silver', symbol: 'XAGUSD', title: 'Silver / USD' },
+            reliance: { name: 'Reliance', symbol: 'RELIANCE.NS', title: 'Reliance Industries' },
+            tcs: { name: 'TCS', symbol: 'TCS.NS', title: 'Tata Consultancy Services' },
+            hdfcbank: { name: 'HDFC Bank', symbol: 'HDFCBANK.NS', title: 'HDFC Bank' },
+            infy: { name: 'Infosys', symbol: 'INFY.NS', title: 'Infosys' },
+            icicibank: { name: 'ICICI Bank', symbol: 'ICICIBANK.NS', title: 'ICICI Bank' }
         };
 
         // Initialize on load

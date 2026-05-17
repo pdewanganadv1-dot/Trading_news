@@ -5,6 +5,7 @@ from datetime import datetime
 import math
 import pandas as pd
 from stockstats import wrap
+import yfinance as yf
 
 
 class MarketDataService:
@@ -49,32 +50,51 @@ class MarketDataService:
             print(f"Binance API error: {e}")
 
         # Try CoinGecko for crypto
-        try:
-            if symbol == 'btc':
-                url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true"
-            elif symbol == 'eth':
-                url = "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd&include_24hr_change=true"
-            else:
-                return None
+        if symbol in ('btc', 'eth'):
+            try:
+                url = f"https://api.coingecko.com/api/v3/simple/price?ids={'bitcoin' if symbol == 'btc' else 'ethereum'}&vs_currencies=usd&include_24hr_change=true"
+                response = await self.session.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    coin_id = 'bitcoin' if symbol == 'btc' else 'ethereum'
+                    price = data[coin_id]['usd']
+                    change = data[coin_id]['usd_24h_change']
+                    return {
+                        'symbol': symbol.upper(),
+                        'price': price,
+                        'change': change,
+                        'high': price * 1.02,
+                        'low': price * 0.98,
+                        'volume': 0,
+                        'open': price / (1 + change/100),
+                        'source': 'CoinGecko'
+                    }
+            except Exception as e:
+                print(f"CoinGecko API error: {e}")
 
-            response = await self.session.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                coin_id = 'bitcoin' if symbol == 'btc' else 'ethereum'
-                price = data[coin_id]['usd']
-                change = data[coin_id]['usd_24h_change']
-                return {
-                    'symbol': symbol.upper(),
-                    'price': price,
-                    'change': change,
-                    'high': price * 1.02,
-                    'low': price * 0.98,
-                    'volume': 0,
-                    'open': price / (1 + change/100),
-                    'source': 'CoinGecko'
-                }
+        # Try yfinance for Indian stocks and other non-crypto assets
+        try:
+            ticker = symbol.upper()
+            if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
+                session = yf.Ticker(f"{ticker}.NS")
+                info = session.info
+                price = info.get("regularMarketPrice") or info.get("currentPrice")
+                if price:
+                    prev_close = info.get("previousClose") or price
+                    change = ((price - prev_close) / prev_close) * 100
+                    return {
+                        'symbol': ticker,
+                        'price': price,
+                        'change': round(change, 2),
+                        'high': info.get("regularMarketDayHigh", price),
+                        'low': info.get("regularMarketDayLow", price),
+                        'volume': info.get("regularMarketVolume", 0),
+                        'open': info.get("regularMarketOpen", price),
+                        'source': 'Yahoo Finance (NSE)'
+                    }
+                print(f"Yahoo Finance no price for {ticker}.NS")
         except Exception as e:
-            print(f"CoinGecko API error: {e}")
+            print(f"Yahoo Finance error for {symbol}: {e}")
 
         return None
 
@@ -128,12 +148,30 @@ class MarketDataService:
         except Exception as e:
             print(f"Klines error ({interval}): {e}")
 
+        # Try yfinance for Indian stocks
+        try:
+            ticker = symbol.upper()
+            if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
+                period_map = {'1d': '1mo', '5m': '5d'}
+                yf_period = period_map.get(interval, '1mo')
+                yf_interval = '5m' if interval == '5m' else '1d'
+                data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
+                if not data.empty:
+                    data = data.reset_index()
+                    closes = data['Close'].tolist()
+                    if closes:
+                        return closes[-limit:]
+        except Exception as e:
+            print(f"Yahoo Finance klines error for {symbol}: {e}")
+
         # Fallback: generate realistic mock data
         base_price = 82000 if symbol.lower() == 'btc' else 2340
         if symbol.lower() == 'gold':
             base_price = 3350
         elif symbol.lower() == 'silver':
             base_price = 33
+        else:
+            base_price = 1000
         prices = []
         for i in range(limit):
             variation = (i % 10 - 5) * 0.02

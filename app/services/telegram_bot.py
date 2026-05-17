@@ -51,6 +51,7 @@ def _build_help() -> str:
         "• `remove alert 1` — Remove alert by ID\n"
         "• `/accuracy` — Signal win/loss stats\n"
         "• `social btc` — StockTwits + Reddit social sentiment\n"
+        "• `reliance` / `tcs` / `hdfcbank` / `infy` — Indian stock price + signal\n"
         "• `docker` — Container status\n"
         "• `/help` — This message"
     )
@@ -148,7 +149,7 @@ async def _handle_message(text: str, chat_id: int):
         except Exception as e:
             return await telegram_notifier.send_message(f"❌ Docker error: {e}")
 
-    m = re.match(r'^social\s+(btc|eth|gold|silver|aapl|tsla|nvda|amzn|msft|googl)$', text)
+    m = re.match(r'^social\s+(btc|eth|gold|silver|aapl|tsla|nvda|amzn|msft|googl|reliance|tcs|hdfcbank|infy|icicibank)$', text)
     if m:
         sym = m.group(1).upper()
         stocktwits, reddit = await asyncio.gather(fetch_stocktwits(sym), fetch_reddit(sym))
@@ -194,7 +195,7 @@ async def _handle_message(text: str, chat_id: int):
         )
         return await telegram_notifier.send_message(msg)
 
-    m = re.match(r'^/chart\s+(btc|eth|gold|silver)$', text)
+    m = re.match(r'^/chart\s+(btc|eth|gold|silver|reliance|tcs|hdfcbank|infy|icicibank)$', text)
     if m:
         sym = m.group(1)
         path = await generate_signal_chart(sym)
@@ -202,7 +203,7 @@ async def _handle_message(text: str, chat_id: int):
             return await _send_photo(f"📈 *{sym.upper()} — 5m Chart*", path)
         return await telegram_notifier.send_message(f"Could not generate chart for {sym.upper()}")
 
-    m = re.match(r'^alert\s+(btc|eth|gold|silver)\s+(above|below)\s+([\d.]+)$', text)
+    m = re.match(r'^alert\s+(btc|eth|gold|silver|reliance|tcs|hdfcbank|infy|icicibank)\s+(above|below)\s+([\d.]+)$', text)
     if m:
         global _alert_id_counter
         _alert_id_counter += 1
@@ -237,7 +238,7 @@ async def _handle_message(text: str, chat_id: int):
                 return await telegram_notifier.send_message(f"✅ Alert #{alert_id} removed.")
         return await telegram_notifier.send_message(f"Alert #{alert_id} not found.")
 
-    if text in ('btc', 'eth', 'gold', 'silver'):
+    if text in ('btc', 'eth', 'gold', 'silver', 'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank'):
         try:
             price_data = await market_data_service.get_price_data(text)
             if not price_data:
