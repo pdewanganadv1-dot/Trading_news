@@ -402,6 +402,58 @@
             text-align: right;
         }
 
+        /* Social Sentiment Grid */
+        .social-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            padding: 0.5rem 0;
+        }
+
+        .social-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .social-card h3 {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
+        }
+
+        .social-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0;
+            font-size: 0.8rem;
+        }
+
+        .social-row .label { color: var(--text-secondary); }
+        .social-row .value { font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+        .social-row .value.green { color: var(--accent-green); }
+        .social-row .value.red { color: var(--accent-red); }
+        .social-row .value.gold { color: var(--accent-gold); }
+
+        .social-overall {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 0.75rem;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .social-overall.bullish { border-color: var(--accent-green); color: var(--accent-green); }
+        .social-overall.bearish { border-color: var(--accent-red); color: var(--accent-red); }
+        .social-overall.neutral { border-color: var(--text-secondary); color: var(--text-secondary); }
+
         /* Key News - Graphical Cards */
         .key-news-section {
             margin-bottom: 1.25rem;
@@ -979,6 +1031,22 @@
                 </div>
             </div>
 
+            <!-- Social Sentiment -->
+            <div class="chart-card" id="socialCard">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h2 style="font-size:0.85rem;">🌐 Social Sentiment</h2>
+                        <span class="symbol-badge" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.6rem;" id="socialSource">StockTwits + Reddit</span>
+                    </div>
+                    <div>
+                        <span style="color:var(--accent-cyan);font-size:0.65rem;">● Live</span>
+                    </div>
+                </div>
+                <div class="social-grid" id="socialContent">
+                    <div class="loading">⏳ Loading social data...</div>
+                </div>
+            </div>
+
             <!-- Signal Log -->
             <div class="chart-card">
                 <div class="chart-header">
@@ -1201,10 +1269,11 @@
             newsList.innerHTML = '<div class="loading">⏳ Loading news...</div>';
 
             try {
-                const [newsResp, marketResp, signalResp] = await Promise.all([
+                const [newsResp, marketResp, signalResp, socialResp] = await Promise.all([
                     fetch(`/api/v1/news/live/${asset}`),
                     fetch(`/api/v1/market/realtime/${asset}`),
-                    fetch(`/api/v1/market/signals/${asset}`)
+                    fetch(`/api/v1/market/signals/${asset}`),
+                    fetch(`/api/v1/sentiment/social/${asset}`).catch(() => null)
                 ]);
                 const data = await newsResp.json();
                 const market = await marketResp.json();
@@ -1227,10 +1296,43 @@
                 } else {
                     newsList.innerHTML = '<div class="no-news">Failed to load news</div>';
                 }
+
+                if (socialResp && socialResp.ok) {
+                    const social = await socialResp.json();
+                    updateSocialSentiment(social);
+                }
             } catch (error) {
                 console.error('Error loading news:', error);
                 newsList.innerHTML = '<div class="no-news">Error loading news</div>';
             }
+        }
+
+        function updateSocialSentiment(social) {
+            const el = document.getElementById('socialContent');
+            if (!el) return;
+            const tw = social.stocktwits || {};
+            const rd = social.reddit || {};
+            const totalBull = social.total_bullish || 0;
+            const totalBear = social.total_bearish || 0;
+            const verdict = totalBull > totalBear ? 'BULLISH' : totalBear > totalBull ? 'BEARISH' : 'NEUTRAL';
+            const vClass = verdict.toLowerCase();
+
+            el.innerHTML = `
+                <div class="social-card">
+                    <h3>📱 StockTwits</h3>
+                    <div class="social-row"><span class="label">Bullish</span><span class="value green">${tw.bullish||0}</span></div>
+                    <div class="social-row"><span class="label">Bearish</span><span class="value red">${tw.bearish||0}</span></div>
+                    <div class="social-row"><span class="label">Unlabeled</span><span class="value gold">${tw.unlabeled||0}</span></div>
+                    <div class="social-row"><span class="label">Bullish %</span><span class="value green">${tw.bullish_pct||0}%</span></div>
+                </div>
+                <div class="social-card">
+                    <h3>💬 Reddit</h3>
+                    <div class="social-row"><span class="label">Posts</span><span class="value">${rd.post_count||0}</span></div>
+                    <div class="social-row"><span class="label">Total Score</span><span class="value gold">${rd.total_score||0}</span></div>
+                    ${rd.posts && rd.posts[0] ? `<div class="social-row"><span class="label">Hot Post</span><span class="value" style="font-size:0.7rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${rd.posts[0].title}</span></div>` : ''}
+                </div>
+                <div class="social-overall ${vClass}">📊 Overall: ${verdict}</div>
+            `;
         }
 
         function updateSentiment(sentiment) {
@@ -1500,6 +1602,15 @@
         loadAssetData('btc');
         loadSignalLog();
         setInterval(loadSignalLog, 10000);
+
+        // Social sentiment refresh every 60s
+        async function refreshSocial() {
+            try {
+                const resp = await fetch(`/api/v1/sentiment/social/${currentAsset}`);
+                if (resp.ok) updateSocialSentiment(await resp.json());
+            } catch(e) { console.log('Social refresh error:', e); }
+        }
+        setInterval(refreshSocial, 60000);
     </script>
 </body>
 </html>

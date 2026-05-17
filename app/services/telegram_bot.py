@@ -8,6 +8,7 @@ from app.services.telegram_notifier import telegram_notifier
 from app.services.real_news import real_news_service
 from app.services.chart_generator import generate_signal_chart
 from app.services.accuracy_tracker import get_accuracy_stats
+from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
 import docker
 
 _price_alerts: list = []
@@ -16,7 +17,7 @@ BOT_TOKEN = settings.telegram_bot_token
 CHAT_ID = settings.telegram_chat_id
 
 
-def _build_summary(prices: dict, signals: dict, news_count: int, sentiment: str) -> str:
+def _build_summary(prices: dict, signals: dict, news_count: int, sentiment: str, social_verdict: str = "⚪ N/A") -> str:
     lines = ["📊 *Trading Dashboard Summary*", ""]
     for sym in ['btc', 'eth', 'gold', 'silver']:
         p = prices.get(sym)
@@ -32,6 +33,7 @@ def _build_summary(prices: dict, signals: dict, news_count: int, sentiment: str)
     lines.append("")
     lines.append(f"📰 News analyzed: `{news_count}` articles")
     lines.append(f"📊 Sentiment: `{sentiment.upper()}`")
+    lines.append(f"🌐 Social: {social_verdict}")
     lines.append(f"⏱ Updated: `{datetime.now().strftime('%H:%M:%S')}`")
     lines.append("")
     lines.append("💡 Type /help for commands")
@@ -48,6 +50,7 @@ def _build_help() -> str:
         "• `alerts` — List active alerts\n"
         "• `remove alert 1` — Remove alert by ID\n"
         "• `/accuracy` — Signal win/loss stats\n"
+        "• `social btc` — StockTwits + Reddit social sentiment\n"
         "• `docker` — Container status\n"
         "• `/help` — This message"
     )
@@ -75,7 +78,14 @@ async def _fetch_dashboard_data():
     except Exception:
         news_count = 0
         sentiment = 'neutral'
-    return prices, signals, news_count, sentiment
+    try:
+        stocktwits, reddit = await asyncio.gather(fetch_stocktwits("BTC"), fetch_reddit("BTC"))
+        social_bull = stocktwits.get('bullish',0)
+        social_bear = stocktwits.get('bearish',0)
+        social_verdict = "🟢 Bullish" if social_bull > social_bear else "🔴 Bearish" if social_bear > social_bull else "⚪ Neutral"
+    except Exception:
+        social_verdict = "⚪ N/A"
+    return prices, signals, news_count, sentiment, social_verdict
 
 
 async def _send_photo(caption: str, photo_path: str):
@@ -138,9 +148,37 @@ async def _handle_message(text: str, chat_id: int):
         except Exception as e:
             return await telegram_notifier.send_message(f"❌ Docker error: {e}")
 
+    m = re.match(r'^social\s+(btc|eth|gold|silver|aapl|tsla|nvda|amzn|msft|googl)$', text)
+    if m:
+        sym = m.group(1).upper()
+        stocktwits, reddit = await asyncio.gather(fetch_stocktwits(sym), fetch_reddit(sym))
+        lines = [f"🌐 *Social Sentiment — {sym}*", ""]
+        lines.append(f"📱 *StockTwits*")
+        tw = stocktwits
+        lines.append(f"  🟢 Bullish: `{tw.get('bullish',0)}` ({tw.get('bullish_pct',0)}%)")
+        lines.append(f"  🔴 Bearish: `{tw.get('bearish',0)}` ({tw.get('bearish_pct',0)}%)")
+        lines.append(f"  ⚪ Unlabeled: `{tw.get('unlabeled',0)}`")
+        lines.append("")
+        lines.append(f"💬 *Reddit*")
+        rd = reddit
+        lines.append(f"  Posts found: `{rd.get('post_count',0)}`")
+        lines.append(f"  Total score: `{rd.get('total_score',0)}`")
+        if rd.get('posts'):
+            lines.append(f"  Hot: `{rd['posts'][0]['title']}`" if rd['posts'] else "")
+        lines.append("")
+        total_bull = tw.get('bullish',0) + max(0, rd.get('total_score',0)/10)
+        total_bear = tw.get('bearish',0) + abs(min(0, rd.get('total_score',0)/10))
+        if total_bull > total_bear:
+            lines.append(f"📊 *Overall: BULLISH* 🟢")
+        elif total_bear > total_bull:
+            lines.append(f"📊 *Overall: BEARISH* 🔴")
+        else:
+            lines.append(f"📊 *Overall: NEUTRAL* ⚪")
+        return await telegram_notifier.send_message("\n".join(lines))
+
     if text in ('summary', '/summary'):
-        prices, signals, news_count, sentiment = await _fetch_dashboard_data()
-        msg = _build_summary(prices, signals, news_count, sentiment)
+        prices, signals, news_count, sentiment, social_verdict = await _fetch_dashboard_data()
+        msg = _build_summary(prices, signals, news_count, sentiment, social_verdict)
         return await telegram_notifier.send_message(msg)
 
     if text == '/accuracy':
