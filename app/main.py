@@ -14,6 +14,7 @@ from app.routes.market_realtime import router as market_realtime_router
 from app.routes.websocket import router as websocket_router
 from app.routes.signals_log import router as signals_log_router
 from app.routes.fundamentals import router as fundamentals_router
+from app.routes.nifty100 import router as nifty100_router
 import asyncio
 
 
@@ -69,3 +70,4 @@ app.include_router(market_realtime_router)
 app.include_router(websocket_router)
 app.include_router(signals_log_router)
 app.include_router(fundamentals_router)
+app.include_router(nifty100_router)

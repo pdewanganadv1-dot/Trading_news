@@ -902,7 +902,13 @@
     <div class="main-container">
         <!-- Left Asset Sidebar -->
         <div class="asset-sidebar">
-            <div class="sidebar-title">⚡ Select Asset</div>
+            <div class="sidebar-title">🔍 Search Nifty 100</div>
+            <div class="asset-group" style="padding: 0 0.75rem 0.75rem;">
+                <input type="text" id="niftySearch" placeholder="Type stock name..." oninput="searchNifty(this.value)" style="width:100%;padding:0.5rem;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-primary);color:var(--text-primary);font-size:0.75rem;">
+                <div id="niftyResults" style="display:none;margin-top:0.4rem;max-height:200px;overflow-y:auto;"></div>
+            </div>
+            <hr style="border-color:var(--border-color);margin:0.25rem 0.75rem;">
+            <div class="sidebar-title">⚡ Quick Assets</div>
 
             <div class="asset-group">
                 <div class="asset-group-title">Crypto</div>
@@ -1197,6 +1203,38 @@
             infy: { name: 'Infosys', symbol: 'INFY.NS', title: 'Infosys' },
             icicibank: { name: 'ICICI Bank', symbol: 'ICICIBANK.NS', title: 'ICICI Bank' }
         };
+
+        // Nifty 100 search
+        let searchTimeout;
+        function searchNifty(q) {
+            clearTimeout(searchTimeout);
+            const el = document.getElementById('niftyResults');
+            if (!q || q.length < 1) { el.style.display = 'none'; return; }
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const resp = await fetch(`/api/v1/nifty100/search/${encodeURIComponent(q)}`);
+                    const data = await resp.json();
+                    if (data.length === 0) { el.style.display = 'none'; return; }
+                    el.innerHTML = data.slice(0, 10).map(s =>
+                        `<div class="asset-btn" style="margin:2px 0;" onclick="loadCustomAsset('${s.symbol.toLowerCase()}','${s.name}')">
+                            <span style="font-weight:600;font-size:0.75rem;">${s.symbol}</span>
+                            <span style="color:var(--text-secondary);font-size:0.65rem;margin-left:0.4rem;">${s.name}</span>
+                        </div>`
+                    ).join('');
+                    el.style.display = 'block';
+                } catch(e) { el.style.display = 'none'; }
+            }, 200);
+        }
+
+        function loadCustomAsset(symbol, name) {
+            document.getElementById('niftyResults').style.display = 'none';
+            document.getElementById('niftySearch').value = name || symbol.toUpperCase();
+            currentAsset = symbol;
+            assetConfig[symbol] = { name: name || symbol.toUpperCase(), symbol: symbol.toUpperCase() + '.NS', title: name || symbol.toUpperCase() };
+            document.getElementById('chartTitle').textContent = assetConfig[symbol].title;
+            document.getElementById('chartSymbol').textContent = assetConfig[symbol].symbol;
+            loadAssetData(symbol);
+        }
 
         // Initialize on load
         document.addEventListener('DOMContentLoaded', function() {
