@@ -3,9 +3,9 @@ from typing import Optional
 from app.config import settings
 
 _INDIAN_STOCKS = {
-    'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank', 'tatamotors', 'sbin', 'lt', 'wipro', 'itc',
+    'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank', 'sbin', 'lt', 'wipro', 'itc',
     'bhartiartl', 'maruti', 'nestleind', 'hindunilvr', 'asianpaint', 'sunpharma', 'titan',
-    'bajajfinance', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel', 'cipla', 'ultratech'
+    'bajajfinsv', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel', 'cipla', 'ultracemco'
 }
 
 

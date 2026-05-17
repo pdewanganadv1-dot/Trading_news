@@ -5,18 +5,20 @@ from app.config import settings
 from app.services.market_data_service import market_data_service, TradingSignals
 from app.services.telegram_notifier import telegram_notifier
 from app.services.accuracy_tracker import record_signal, resolve_signals
+from app.services.signal_confirmer import confirm_signal
 
 
 signal_log: List[Dict] = []
 _last_sent: Dict[str, str] = {}
+_CONFIRMED_SENT: Dict[str, str] = {}  # Tracks composite signal sends
 
 # Stocks monitored for trading signals (most liquid Nifty 100)
 _INDIAN_STOCKS = [
     "reliance", "tcs", "hdfcbank", "infy", "icicibank",
-    "tatamotors", "sbin", "lt", "wipro", "itc",
+    "sbin", "lt", "wipro", "itc",
     "bhartiartl", "maruti", "nestleind", "hindunilvr", "asianpaint",
-    "sunpharma", "titan", "bajajfinance", "hcltech", "kotakbank",
-    "axisbank", "ntpc", "tatasteel", "cipla", "ultratech",
+    "sunpharma", "titan", "bajajfinsv", "hcltech", "kotakbank",
+    "axisbank", "ntpc", "tatasteel", "cipla", "ultracemco",
 ]
 
 _MONITORED_SYMBOLS = ['btc', 'eth', 'gold', 'silver'] + _INDIAN_STOCKS
@@ -51,15 +53,31 @@ async def check_and_notify():
                 'notified': False,
             }
 
-            if sig in ('BUY', 'SELL') and conf >= settings.signal_confidence_threshold:
-                last = _last_sent.get(symbol)
-                if last != sig:
-                    ok = await telegram_notifier.send_signal_alert(
-                        symbol, sig, conf, price, signal_data.get('reasons', [])
-                    )
-                    entry['notified'] = ok
-                    if ok:
-                        _last_sent[symbol] = sig
+            # Primary gate: base signal must cross threshold
+            should_alert = sig in ('BUY', 'SELL') and conf >= settings.signal_confidence_threshold
+            if should_alert:
+                # Secondary gate: run multi-conformation check
+                confirmed = await confirm_signal(symbol, sig, conf, signal_data.get('reasons', []), price)
+                comp_sig = confirmed["signal"]
+                comp_conf = confirmed["confidence"]
+                reasons = confirmed["reasons"]
+
+                entry["composite_signal"] = comp_sig
+                entry["composite_confidence"] = comp_conf
+                entry["confirmations"] = confirmed.get("confirmations", [])
+                entry["warnings"] = confirmed.get("warnings", [])
+
+                # Only send if composite agrees and is above threshold
+                if comp_sig == sig and comp_conf >= settings.signal_confidence_threshold * 0.9:
+                    last = _CONFIRMED_SENT.get(symbol)
+                    if last != f"{sig}_{comp_conf}":
+                        display_conf = max(conf, comp_conf)
+                        ok = await telegram_notifier.send_signal_alert(
+                            symbol, sig, display_conf, price, reasons[:3]
+                        )
+                        entry['notified'] = ok
+                        if ok:
+                            _CONFIRMED_SENT[symbol] = f"{sig}_{comp_conf}"
 
             signal_log.insert(0, entry)
             if len(signal_log) > 100:

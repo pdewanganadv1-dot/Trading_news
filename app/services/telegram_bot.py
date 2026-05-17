@@ -21,10 +21,10 @@ CHAT_ID = settings.telegram_chat_id
 
 _TOP_INDIAN = ['reliance', 'tcs', 'infy', 'hdfcbank', 'icicibank']
 _ALL_INDIAN = set(_TOP_INDIAN) | {
-    'tatamotors', 'sbin', 'lt', 'wipro', 'itc', 'bhartiartl', 'maruti',
+    'sbin', 'lt', 'wipro', 'itc', 'bhartiartl', 'maruti',
     'nestleind', 'hindunilvr', 'asianpaint', 'sunpharma', 'titan',
-    'bajajfinance', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel',
-    'cipla', 'ultratech'
+    'bajajfinsv', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel',
+    'cipla', 'ultracemco'
 }
 
 

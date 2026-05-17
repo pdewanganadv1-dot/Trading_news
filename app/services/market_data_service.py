@@ -151,9 +151,8 @@ class MarketDataService:
         try:
             ticker = symbol.upper()
             if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
-                period_map = {'1d': '1mo', '5m': '5d'}
-                yf_period = period_map.get(interval, '1mo')
-                yf_interval = '5m' if interval == '5m' else '1d'
+                interval_map = {'5m': ('5d', '5m'), '15m': ('5d', '15m'), '1h': ('1mo', '1h'), '1d': ('1mo', '1d')}
+                yf_period, yf_interval = interval_map.get(interval, ('1mo', '1d'))
                 data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
                 if not data.empty:
                     data = data.reset_index()
@@ -276,8 +275,9 @@ class TradingSignals:
             weights.append(2)
 
         # SMA Crossover (weight: 3) - Critical for 5min
-        sma9 = indicators['sma'].get('sma9')
-        sma20 = indicators['sma'].get('sma20')
+        sma_data = indicators.get('sma', {})
+        sma9 = sma_data.get('sma9')
+        sma20 = sma_data.get('sma20')
         if sma9 and sma20:
             if sma9 > sma20:
                 signals.append(('BUY', 3))

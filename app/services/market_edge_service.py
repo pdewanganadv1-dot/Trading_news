@@ -6,10 +6,10 @@ from collections import defaultdict
 
 _INDIAN = [
     "reliance", "tcs", "hdfcbank", "infy", "icicibank",
-    "tatamotors", "sbin", "lt", "wipro", "itc",
+    "sbin", "lt", "wipro", "itc",
     "bhartiartl", "maruti", "nestleind", "hindunilvr", "asianpaint",
-    "sunpharma", "titan", "bajajfinance", "hcltech", "kotakbank",
-    "axisbank", "ntpc", "tatasteel", "cipla", "ultratech",
+    "sunpharma", "titan", "bajajfinsv", "hcltech", "kotakbank",
+    "axisbank", "ntpc", "tatasteel", "cipla", "ultracemco",
 ]
 
 _CRYPTO = ["btc", "eth"]
