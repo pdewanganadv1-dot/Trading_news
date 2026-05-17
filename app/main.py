@@ -13,6 +13,7 @@ from app.routes.indicators import router as indicators_router
 from app.routes.market_realtime import router as market_realtime_router
 from app.routes.websocket import router as websocket_router
 from app.routes.signals_log import router as signals_log_router
+from app.routes.fundamentals import router as fundamentals_router
 import asyncio
 
 
@@ -67,3 +68,4 @@ app.include_router(indicators_router)
 app.include_router(market_realtime_router)
 app.include_router(websocket_router)
 app.include_router(signals_log_router)
+app.include_router(fundamentals_router)

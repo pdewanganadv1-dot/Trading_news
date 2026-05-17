@@ -1,6 +1,7 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from enum import Enum
+from app.services.social_sentiment import analyze_social_sentiment
 
 
 class Sentiment(Enum):
@@ -34,8 +35,27 @@ class SentimentAnalysis:
     GOLD_BULLISH = ["geopolitical", "tension", "inflation", "safe-haven", "central bank"]
     GOLD_BEARISH = ["rate hike", "dollar strength", "tapering"]
 
-    def analyze_news_sentiment(self, news_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze sentiment of news items and return aggregated signal."""
+    async def analyze_news_sentiment(self, news_items: List[Dict[str, Any]], symbol: Optional[str] = None) -> Dict[str, Any]:
+        """Analyze sentiment of news items and return aggregated signal, optionally with social sentiment."""
+        result = self._analyze_news_only(news_items)
+
+        if symbol:
+            social = await analyze_social_sentiment(symbol)
+            result["social"] = social
+
+            combined_bullish = result["bullish_count"] + social["total_bullish"]
+            combined_bearish = result["bearish_count"] + social["total_bearish"]
+
+            if combined_bullish > combined_bearish:
+                result["sentiment"] = "bullish"
+            elif combined_bearish > combined_bullish:
+                result["sentiment"] = "bearish"
+            else:
+                result["sentiment"] = "neutral"
+
+        return result
+
+    def _analyze_news_only(self, news_items: List[Dict[str, Any]]) -> Dict[str, Any]:
         if not news_items:
             return {
                 "sentiment": Sentiment.NEUTRAL.value,
@@ -66,7 +86,6 @@ class SentimentAnalysis:
             else:
                 neutral_count += 1
 
-        # Determine overall sentiment
         if bullish_count > bearish_count + 1:
             overall = Sentiment.BULLISH
         elif bearish_count > bullish_count + 1:
@@ -150,13 +169,13 @@ class RealTimeMonitor:
         self._last_update: datetime = datetime.utcnow()
         self._cache: Dict[str, Any] = {}
 
-    def get_market_sentiment(self, news_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Get overall market sentiment."""
-        return self.sentiment_service.analyze_news_sentiment(news_items)
+    async def get_market_sentiment(self, news_items: List[Dict[str, Any]], symbol: str = "BTC") -> Dict[str, Any]:
+        """Get overall market sentiment with social data."""
+        return await self.sentiment_service.analyze_news_sentiment(news_items, symbol)
 
-    def get_symbol_sentiment(self, symbol: str, news_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Get symbol-specific sentiment."""
-        return self.sentiment_service.get_symbol_sentiment(symbol, news_items)
+    async def get_symbol_sentiment(self, symbol: str, news_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Get symbol-specific sentiment with social data."""
+        return await self.sentiment_service.analyze_news_sentiment(news_items, symbol)
 
     def generate_trading_signal(self, sentiment: Dict[str, Any]) -> Dict[str, Any]:
         """Generate trading signal based on sentiment."""

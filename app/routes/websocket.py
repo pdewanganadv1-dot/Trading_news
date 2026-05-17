@@ -127,7 +127,7 @@ async def websocket_sentiment(websocket: WebSocket):
             from app.services.sentiment import sentiment_monitor
 
             news = await real_news_service.get_all_news()
-            sentiment = sentiment_monitor.get_market_sentiment(news)
+            sentiment = await sentiment_monitor.get_market_sentiment(news)
 
             await websocket.send_json({
                 "type": "sentiment",

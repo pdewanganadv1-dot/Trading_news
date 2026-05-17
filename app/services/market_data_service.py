@@ -3,6 +3,8 @@ import asyncio
 from typing import Dict, List, Optional
 from datetime import datetime
 import math
+import pandas as pd
+from stockstats import wrap
 
 
 class MarketDataService:
@@ -140,155 +142,77 @@ class MarketDataService:
 
 
 class TechnicalIndicators:
-    """Calculate technical indicators from price data."""
+    """Calculate technical indicators from price data using stockstats."""
 
     @staticmethod
-    def sma(prices: List[float], period: int) -> Optional[float]:
-        """Calculate Simple Moving Average."""
-        if len(prices) < period:
-            return None
-        return sum(prices[-period:]) / period
-
-    @staticmethod
-    def ema(prices: List[float], period: int) -> Optional[float]:
-        """Calculate Exponential Moving Average."""
-        if len(prices) < period:
-            return None
-
-        multiplier = 2 / (period + 1)
-        ema = prices[0]
-
-        for price in prices[1:]:
-            ema = (price - ema) * multiplier + ema
-
-        return ema
-
-    @staticmethod
-    def rsi(prices: List[float], period: int = 14) -> Optional[float]:
-        """Calculate Relative Strength Index."""
-        if len(prices) < period + 1:
-            return None
-
-        gains = []
-        losses = []
-
-        for i in range(1, len(prices)):
-            change = prices[i] - prices[i-1]
-            if change > 0:
-                gains.append(change)
-                losses.append(0)
-            else:
-                gains.append(0)
-                losses.append(abs(change))
-
-        if len(gains) < period:
-            return None
-
-        avg_gain = sum(gains[-period:]) / period
-        avg_loss = sum(losses[-period:]) / period
-
-        if avg_loss == 0:
-            return 100
-
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-
-        return rsi
-
-    @staticmethod
-    def macd(prices: List[float]) -> Dict:
-        """Calculate MACD (12, 26, 9)."""
-        if len(prices) < 26:
-            return {'macd': 0, 'signal': 0, 'histogram': 0}
-
-        ema12 = TechnicalIndicators.ema(prices, 12)
-        ema26 = TechnicalIndicators.ema(prices, 26)
-
-        if ema12 is None or ema26 is None:
-            return {'macd': 0, 'signal': 0, 'histogram': 0}
-
-        macd_line = ema12 - ema26
-
-        # Calculate signal line (9-period EMA of MACD)
-        # Simplified signal calculation
-        signal_line = macd_line * 0.9
-
-        return {
-            'macd': round(macd_line, 2),
-            'signal': round(signal_line, 2),
-            'histogram': round(macd_line - signal_line, 2)
-        }
-
-    @staticmethod
-    def bollinger_bands(prices: List[float], period: int = 20, std_dev: int = 2) -> Dict:
-        """Calculate Bollinger Bands."""
-        if len(prices) < period:
-            return {'upper': 0, 'middle': 0, 'lower': 0}
-
-        sma = TechnicalIndicators.sma(prices, period)
-
-        # Calculate standard deviation
-        variance = sum((p - sma) ** 2 for p in prices[-period:]) / period
-        std = math.sqrt(variance)
-
-        return {
-            'upper': round(sma + (std_dev * std), 2),
-            'middle': round(sma, 2),
-            'lower': round(sma - (std_dev * std), 2)
-        }
+    def _to_frame(prices: List[float]) -> pd.DataFrame:
+        df = pd.DataFrame({"close": prices})
+        df["high"] = df["close"] * 1.002
+        df["low"] = df["close"] * 0.998
+        df["open"] = df["close"].shift(1).fillna(df["close"])
+        df["volume"] = 1000
+        return wrap(df)
 
     @staticmethod
     def calculate_all(prices: List[float]) -> Dict:
-        """Calculate all indicators from price data."""
-        return {
-            'sma': {
-                'sma9': TechnicalIndicators.sma(prices, 9),
-                'sma20': TechnicalIndicators.sma(prices, 20),
-                'sma50': TechnicalIndicators.sma(prices, 50),
-                'sma200': TechnicalIndicators.sma(prices, 200) if len(prices) >= 200 else None
-            },
-            'rsi': TechnicalIndicators.rsi(prices, 14),
-            'macd': TechnicalIndicators.macd(prices),
-            'bb': TechnicalIndicators.bollinger_bands(prices, 20),
-            'stochastic': TechnicalIndicators.stochastic(prices, 14),
-            'adx': TechnicalIndicators.adx(prices, 14)
-        }
-
-    @staticmethod
-    def stochastic(prices: List[float], period: int = 14) -> Optional[Dict]:
-        """Calculate Stochastic Oscillator."""
-        if len(prices) < period:
-            return None
-        low_min = min(prices[-period:])
-        high_max = max(prices[-period:])
-        current = prices[-1]
-        if high_max == low_min:
-            return {'k': 50, 'd': 50}
-        k = 100 * (current - low_min) / (high_max - low_min)
-        return {'k': round(k, 2), 'd': round(k * 0.9, 2)}
-
-    @staticmethod
-    def adx(prices: List[float], period: int = 14) -> Optional[float]:
-        """Calculate Average Directional Index (simplified)."""
-        if len(prices) < period + 1:
-            return None
-        # Simplified ADX based on trend strength
-        gains = []
-        losses = []
-        for i in range(1, len(prices)):
-            change = prices[i] - prices[i-1]
-            gains.append(max(0, change))
-            losses.append(max(0, -change))
-        if len(gains) < period:
-            return None
-        avg_gain = sum(gains[-period:]) / period
-        avg_loss = sum(losses[-period:]) / period
-        if avg_loss == 0:
-            return 50
-        di_plus = 100 * avg_gain / (avg_gain + avg_loss)
-        di_minus = 100 * avg_loss / (avg_gain + avg_loss)
-        adx = abs(di_plus - di_minus) / 2
-        return round(adx, 2)
+        if len(prices) < 26:
+            return {}
+        df = TechnicalIndicators._to_frame(prices)
+        result = {}
+        try:
+            result["rsi"] = round(df["rsi_14"].iloc[-1], 2) if len(df) > 14 else None
+        except Exception:
+            result["rsi"] = None
+        try:
+            result["macd"] = {
+                "macd": round(df["macd"].iloc[-1], 2),
+                "signal": round(df["macds"].iloc[-1], 2),
+                "histogram": round(df["macdh"].iloc[-1], 2),
+            }
+        except Exception:
+            result["macd"] = {"macd": 0, "signal": 0, "histogram": 0}
+        try:
+            result["bb"] = {
+                "upper": round(df["boll_ub"].iloc[-1], 2),
+                "middle": round(df["boll"].iloc[-1], 2),
+                "lower": round(df["boll_lb"].iloc[-1], 2),
+            }
+        except Exception:
+            result["bb"] = {"upper": 0, "middle": 0, "lower": 0}
+        try:
+            result["atr"] = round(df["atr"].iloc[-1], 2) if "atr" in df.columns else None
+        except Exception:
+            result["atr"] = None
+        try:
+            result["mfi"] = round(df["mfi"].iloc[-1], 2) if "mfi" in df.columns else None
+        except Exception:
+            result["mfi"] = None
+        try:
+            sma20_val = round(df["close_20_sma"].iloc[-1], 2) if "close_20_sma" in df.columns else None
+            sma50_val = round(df["close_50_sma"].iloc[-1], 2) if "close_50_sma" in df.columns else None
+            sma200_val = round(df["close_200_sma"].iloc[-1], 2) if "close_200_sma" in df.columns else None
+            ema9_val = round(df["close_9_ema"].iloc[-1], 2) if "close_9_ema" in df.columns else None
+            result["sma"] = {"sma9": ema9_val, "sma20": sma20_val, "sma50": sma50_val, "sma200": sma200_val}
+        except Exception:
+            result["sma"] = {"sma9": None, "sma20": None, "sma50": None, "sma200": None}
+        try:
+            result["vwma"] = round(df["vwma"].iloc[-1], 2) if "vwma" in df.columns else None
+        except Exception:
+            result["vwma"] = None
+        # stochastic simplified
+        try:
+            low_14 = min(prices[-14:])
+            high_14 = max(prices[-14:])
+            k = 100 * (prices[-1] - low_14) / (high_14 - low_14) if high_14 != low_14 else 50
+            result["stochastic"] = {"k": round(k, 2), "d": round(k * 0.9, 2)}
+        except Exception:
+            result["stochastic"] = None
+        # adx simplified
+        try:
+            result["adx"] = round(df["adx"].iloc[-1], 2) if "adx" in df.columns else 25.0
+        except Exception:
+            result["adx"] = 25.0
+        return result
 
 
 class TradingSignals:
