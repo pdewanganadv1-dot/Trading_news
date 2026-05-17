@@ -2,7 +2,7 @@ import httpx
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, List
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.services.news_service import news_service, alert_service
 from app.services.real_news import real_news_service
 
@@ -314,8 +314,39 @@ async def _fetch_news_for_symbol(symbol: str) -> list:
     return news
 
 
+def _parse_timestamp(item: dict) -> datetime:
+    """Parse timestamps from various formats to offset-naive UTC datetime."""
+    raw = item.get("published_at") or item.get("published_utc") or ""
+    if not raw:
+        return datetime.min
+    cleaned = raw.strip()
+    # Try ISO format with timezone -> convert to naive UTC
+    try:
+        dt = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+        if dt.tzinfo:
+            dt = dt.replace(tzinfo=None) - dt.utcoffset()
+        return dt
+    except (ValueError, AttributeError, TypeError):
+        pass
+    # Try RFC 2822 (e.g. Sun, 17 May 2026 13:36:59 GMT or +0000)
+    months = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+              "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+    try:
+        parts = cleaned.replace(",", "").split()
+        if len(parts) >= 6 and parts[2] in months:
+            day, month, year = int(parts[1]), months[parts[2]], int(parts[3])
+            time_parts = parts[4].split(":")
+            h, m = int(time_parts[0]), int(time_parts[1])
+            s = int(time_parts[2]) if len(time_parts) > 2 else 0
+            # Strip trailing offset tokens (+0000, GMT, etc.)
+            return datetime(year, month, day, h, m, s)
+    except (ValueError, IndexError, KeyError):
+        pass
+    return datetime.min
+
+
 def filter_news_by_symbol(news: list, symbol: str) -> list:
-    """Filter news by specific symbol/asset."""
+    """Filter news by specific symbol/asset; sort by recency + relevance, return top 8."""
     symbol_lower = symbol.lower().replace(".ns", "")
 
     keywords_map = {
@@ -326,22 +357,42 @@ def filter_news_by_symbol(news: list, symbol: str) -> list:
     }
 
     keywords = keywords_map.get(symbol_lower, [symbol_lower])
-    # Add company-specific keywords if available
     company_keywords = _COMPANY_NAMES.get(symbol_lower, [])
     keywords.extend(company_keywords)
 
-    filtered = []
+    cutoff = datetime.utcnow() - timedelta(hours=48)
+
+    scored = []
     seen = set()
     for item in news:
-        text = (item.get("title", "") + " " + item.get("description", "")).lower()
-        if any(k in text for k in keywords):
-            # Dedup by title
-            title = item.get("title", "").strip()
-            if title and title not in seen:
-                seen.add(title)
-                filtered.append(item)
+        title = (item.get("title", "") or "").strip()
+        desc = (item.get("description", "") or "")
+        text = (title + " " + desc).lower()
 
-    return filtered[:15]
+        if not any(k in text for k in keywords):
+            continue
+        if not title or title in seen:
+            continue
+        seen.add(title)
+
+        ts = _parse_timestamp(item)
+        if ts < cutoff:
+            continue
+
+        # Score: title match > description match
+        title_lower = title.lower()
+        score = 0
+        for k in keywords:
+            if k in title_lower:
+                score += 3
+            elif k in desc.lower():
+                score += 1
+
+        scored.append((score, ts, item))
+
+    # Sort by score desc, then timestamp desc
+    scored.sort(key=lambda x: (-x[0], -x[1].timestamp()))
+    return [item for _, _, item in scored[:8]]
 
 
 async def _fetch_google_news(query: str) -> list:
