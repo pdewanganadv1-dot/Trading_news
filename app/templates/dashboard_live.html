@@ -1547,7 +1547,8 @@
 
         function connectWebSockets() {
             // Connect to prices WebSocket
-            priceWs = new WebSocket(`ws://${window.location.host}/ws/prices`);
+            const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            priceWs = new WebSocket(`${wsProto}//${window.location.host}/ws/prices`);
             priceWs.onopen = () => {
                 console.log('Prices WebSocket connected');
                 isConnected = true;
@@ -1567,7 +1568,7 @@
             };
 
             // Connect to sentiment/news WebSocket
-            sentimentWs = new WebSocket(`ws://${window.location.host}/ws/sentiment`);
+            sentimentWs = new WebSocket(`${wsProto}//${window.location.host}/ws/sentiment`);
             sentimentWs.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
                 if (msg.type === 'sentiment') {
@@ -1585,7 +1586,7 @@
             sentimentWs.onerror = (err) => console.error('Sentiment WS error:', err);
             sentimentWs.onclose = () => {
                 setTimeout(() => {
-                    sentimentWs = new WebSocket(`ws://${window.location.host}/ws/sentiment`);
+                    sentimentWs = new WebSocket(`${wsProto}//${window.location.host}/ws/sentiment`);
                 }, 5000);
             };
         }
