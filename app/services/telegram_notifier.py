@@ -2,6 +2,23 @@ import httpx
 from typing import Optional
 from app.config import settings
 
+_INDIAN_STOCKS = {
+    'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank', 'tatamotors', 'sbin', 'lt', 'wipro', 'itc',
+    'bhartiartl', 'maruti', 'nestleind', 'hindunilvr', 'asianpaint', 'sunpharma', 'titan',
+    'bajajfinance', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel', 'cipla', 'ultratech'
+}
+
+
+def _price_fmt(price: float, symbol: str) -> str:
+    s = symbol.lower()
+    if s in _INDIAN_STOCKS:
+        return f'₹{price:,.2f}'
+    if s in ('btc', 'eth'):
+        return f'${price:,.2f}'
+    if price >= 1000:
+        return f'${price:,.2f}'
+    return f'${price:.2f}'
+
 
 class TelegramNotifier:
     def __init__(self):
@@ -25,7 +42,7 @@ class TelegramNotifier:
         emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⚪"}
         msg = (
             f"{emoji.get(signal, '⚡')} *{signal} SIGNAL* for *{symbol.upper()}*\n"
-            f"💰 Price: `${price:,.2f}`\n"
+            f"💰 Price: `{_price_fmt(price, symbol)}`\n"
             f"📊 Confidence: `{confidence*100:.0f}%`\n"
             f"📝 Reasons: `{', '.join(reasons[:3])}`"
         )

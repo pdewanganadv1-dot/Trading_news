@@ -10,7 +10,7 @@ IST = pytz.timezone('Asia/Kolkata')
 
 
 async def send_daily_report():
-    prices, signals, news_count, sentiment = await _fetch_dashboard_data()
+    prices, signals, news_count, sentiment, social_verdict = await _fetch_dashboard_data()
     summary = _build_summary(prices, signals, news_count, sentiment)
 
     accuracy = get_accuracy_stats()

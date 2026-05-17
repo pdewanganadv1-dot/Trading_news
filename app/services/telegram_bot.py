@@ -18,9 +18,24 @@ BOT_TOKEN = settings.telegram_bot_token
 CHAT_ID = settings.telegram_chat_id
 
 
+_TOP_INDIAN = ['reliance', 'tcs', 'infy', 'hdfcbank', 'icicibank']
+_ALL_INDIAN = set(_TOP_INDIAN) | {
+    'tatamotors', 'sbin', 'lt', 'wipro', 'itc', 'bhartiartl', 'maruti',
+    'nestleind', 'hindunilvr', 'asianpaint', 'sunpharma', 'titan',
+    'bajajfinance', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel',
+    'cipla', 'ultratech'
+}
+
+
+def _price_fmt(price: float, sym: str) -> str:
+    if sym in _ALL_INDIAN:
+        return f'₹{price:,.2f}'
+    return f'${price:,.2f}'
+
+
 def _build_summary(prices: dict, signals: dict, news_count: int, sentiment: str, social_verdict: str = "⚪ N/A") -> str:
     lines = ["📊 *Trading Dashboard Summary*", ""]
-    for sym in ['btc', 'eth', 'gold', 'silver']:
+    for sym in ['btc', 'eth', 'gold', 'silver'] + _TOP_INDIAN:
         p = prices.get(sym)
         s = signals.get(sym, {})
         if p:
@@ -28,7 +43,7 @@ def _build_summary(prices: dict, signals: dict, news_count: int, sentiment: str,
             sig = s.get('signal', 'HOLD')
             conf = s.get('confidence', 0)
             lines.append(
-                f"{emoji.get(sig, '⚪')} *{sym.upper()}:* `${p['price']:,.2f}` "
+                f"{emoji.get(sig, '⚪')} *{sym.upper()}:* {_price_fmt(p['price'], sym)} "
                 f"({p.get('change', 0):+.2f}%) — {sig} ({conf*100:.0f}%)"
             )
     lines.append("")
@@ -59,7 +74,7 @@ def _build_help() -> str:
 
 
 async def _fetch_dashboard_data():
-    symbols = ['btc', 'eth', 'gold', 'silver']
+    symbols = ['btc', 'eth', 'gold', 'silver'] + _TOP_INDIAN
     prices = {}
     signals = {}
     for sym in symbols:
@@ -120,10 +135,11 @@ async def _check_price_alerts():
                     alert['active'] = False
                     triggered.append(alert)
             for a in triggered:
+                sym = a['symbol'].lower()
                 msg = (
                     f"🚨 *Price Alert Triggered!*\n"
-                    f"{a['symbol']} {a['direction']} `${a['value']:,.2f}`\n"
-                    f"💰 Current: `${current:,.2f}`"
+                    f"{a['symbol']} {a['direction']} `{_price_fmt(a['value'], sym)}`\n"
+                    f"💰 Current: `{_price_fmt(current, sym)}`"
                 )
                 await telegram_notifier.send_message(msg)
             # Trim inactive alerts
@@ -220,9 +236,10 @@ async def _handle_message(text: str, chat_id: int):
         _price_alerts.append(alert)
         if len(_price_alerts) > _MAX_ALERTS:
             _price_alerts[:] = [a for a in _price_alerts if a['active']][:_MAX_ALERTS]
+        sym_lower = m.group(1).lower()
         return await telegram_notifier.send_message(
             f"✅ *Alert #{alert['id']} Set*\n"
-            f"{alert['symbol']} {alert['direction']} `${alert['value']:,.2f}`"
+            f"{alert['symbol']} {alert['direction']} `{_price_fmt(alert['value'], sym_lower)}`"
         )
 
     if text == 'alerts':
@@ -231,7 +248,8 @@ async def _handle_message(text: str, chat_id: int):
             return await telegram_notifier.send_message("No active price alerts.")
         lines = ["🔔 *Active Price Alerts*", ""]
         for a in active:
-            lines.append(f"`#{a['id']}` — {a['symbol']} {a['direction']} `${a['value']:,.2f}`")
+            sym_lower = a['symbol'].lower()
+            lines.append(f"`#{a['id']}` — {a['symbol']} {a['direction']} `{_price_fmt(a['value'], sym_lower)}`")
         return await telegram_notifier.send_message("\n".join(lines))
 
     m = re.match(r'^remove\s+alert\s+(\d+)$', text)
@@ -254,7 +272,7 @@ async def _handle_message(text: str, chat_id: int):
             sig = signal_data['signal']
             msg = (
                 f"{emoji.get(sig, '⚪')} *{text.upper()}*\n"
-                f"💰 Price: `${price_data['price']:,.2f}`\n"
+                f"💰 Price: `{_price_fmt(price_data['price'], text)}`\n"
                 f"📊 Change: `{price_data.get('change', 0):+.2f}%`\n"
                 f"📈 Signal: *{sig}* ({signal_data['confidence']*100:.0f}%)\n"
                 f"📝 {', '.join(signal_data.get('reasons', [])[:2])}"

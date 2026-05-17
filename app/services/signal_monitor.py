@@ -10,17 +10,29 @@ from app.services.accuracy_tracker import record_signal, resolve_signals
 signal_log: List[Dict] = []
 _last_sent: Dict[str, str] = {}
 
+# Stocks monitored for trading signals (most liquid Nifty 100)
+_INDIAN_STOCKS = [
+    "reliance", "tcs", "hdfcbank", "infy", "icicibank",
+    "tatamotors", "sbin", "lt", "wipro", "itc",
+    "bhartiartl", "maruti", "nestleind", "hindunilvr", "asianpaint",
+    "sunpharma", "titan", "bajajfinance", "hcltech", "kotakbank",
+    "axisbank", "ntpc", "tatasteel", "cipla", "ultratech",
+]
+
+_MONITORED_SYMBOLS = ['btc', 'eth', 'gold', 'silver'] + _INDIAN_STOCKS
+
 
 async def check_and_notify():
-    symbols = ['btc', 'eth', 'gold', 'silver']
-
-    for symbol in symbols:
+    for symbol in _MONITORED_SYMBOLS:
         try:
             price_data = await market_data_service.get_price_data(symbol)
             if not price_data:
                 continue
 
             prices_5m = await market_data_service.get_5min_prices(symbol, 100)
+            if not prices_5m or len(prices_5m) < 20:
+                continue  # Not enough data for a signal
+
             signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
 
             sig = signal_data['signal']

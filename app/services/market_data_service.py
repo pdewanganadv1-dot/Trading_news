@@ -163,14 +163,11 @@ class MarketDataService:
         except Exception as e:
             print(f"Yahoo Finance klines error for {symbol}: {e}")
 
-        # Fallback: generate realistic mock data
-        base_price = 82000 if symbol.lower() == 'btc' else 2340
-        if symbol.lower() == 'gold':
-            base_price = 3350
-        elif symbol.lower() == 'silver':
-            base_price = 33
-        else:
-            base_price = 1000
+        # Fallback: mock data only for known crypto/metals
+        base_prices = {'btc': 82000, 'eth': 2340, 'gold': 3350, 'silver': 33}
+        base_price = base_prices.get(symbol.lower())
+        if base_price is None:
+            return []  # No mock data for unknown symbols — skip signal
         prices = []
         for i in range(limit):
             variation = (i % 10 - 5) * 0.02
