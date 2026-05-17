@@ -130,8 +130,35 @@ class RealNewsService:
 
         return news[:15]
 
+    async def get_stock_news_from_yfinance(self, ticker: str) -> List[Dict]:
+        """Fetch ticker-specific news from Yahoo Finance."""
+        try:
+            import yfinance as yf
+            stock = yf.Ticker(ticker)
+            news = stock.news
+            if not news:
+                return []
+            items = []
+            for item in news[:10]:
+                title = item.get("title", "")
+                link = item.get("link", "")
+                desc = item.get("summary", "")[:200] if item.get("summary") else ""
+                pub = datetime.fromtimestamp(item.get("providerPublishTime", 0)).isoformat() if item.get("providerPublishTime") else ""
+                items.append({
+                    "title": title,
+                    "description": desc,
+                    "url": link,
+                    "source": "Yahoo Finance",
+                    "published_at": pub,
+                    "category": "stocks"
+                })
+            return items
+        except Exception as e:
+            print(f"YFinance news error for {ticker}: {e}")
+            return []
+
     async def get_stocks_news(self) -> List[Dict]:
-        """Fetch stocks/market news from multiple sources."""
+        """Fetch stocks/market news from global + Indian sources."""
         news = []
         sources = [
             ("YahooFinance", "https://finance.yahoo.com/news/rssindex"),
@@ -140,6 +167,12 @@ class RealNewsService:
             ("Reuters", "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best"),
             ("Bloomberg", "https://feeds.bloomberg.com/markets/news.rss"),
             ("SeekingAlpha", "https://seekingalpha.com/feed.xml"),
+            # Indian stock news sources
+            ("EconomicTimes", "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms"),
+            ("Moneycontrol", "https://www.moneycontrol.com/rss/business.xml"),
+            ("NDTVProfit", "https://feeds.feedburner.com/ndtvprofit-latest"),
+            ("BusinessStandard", "https://www.business-standard.com/rss/markets-101.rss"),
+            ("Livemint", "https://www.livemint.com/rss/markets"),
         ]
 
         tasks = [self._fetch_rss(url, name) for name, url in sources]
@@ -149,7 +182,7 @@ class RealNewsService:
             if isinstance(result, list):
                 news.extend(result)
 
-        return news[:15]
+        return news[:25]
 
     async def get_commodities_news(self) -> List[Dict]:
         """Fetch commodities news (oil, gas, etc.) from multiple sources."""

@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Query, HTTPException
 from typing import Optional, List
 from pydantic import BaseModel
@@ -232,9 +233,90 @@ async def get_live_metals_news():
         return {"status": "error", "message": str(e), "news": []}
 
 
+# Company name mappings for better news filtering
+_COMPANY_NAMES = {
+    "reliance": ["reliance", "reliance industries", "ril", "reliance industries ltd", "mukesh ambani"],
+    "tcs": ["tcs", "tata consultancy", "tata consultancy services", "tcs ltd"],
+    "hdfcbank": ["hdfc bank", "hdfcbank", "hdfc"],
+    "infy": ["infosys", "infy", "infosys ltd", "nandan nilekani"],
+    "icicibank": ["icici bank", "icicibank", "icici"],
+    "tatamotors": ["tata motors", "tatamotors", "jaguar", "land rover", "tata ev"],
+    "sbin": ["sbi", "state bank of india", "sbin"],
+    "lt": ["larsen & toubro", "larsen and toubro", "l&t", "lt"],
+    "wipro": ["wipro", "wipro ltd"],
+    "itc": ["itc", "itc ltd", "itc hotels"],
+    "bhartiartl": ["airtel", "bharti airtel", "bhartiartl"],
+    "maruti": ["maruti", "maruti suzuki", "maruti suzuki india"],
+    "nestleind": ["nestle", "nestle india", "nestlend"],
+    "hindunilvr": ["hindustan unilever", "hul", "hindunilvr"],
+    "asianpaint": ["asian paints", "asianpaint"],
+    "sunpharma": ["sun pharma", "sun pharmaceutical", "sunpharma"],
+    "titan": ["titan", "titan company", "titan watches"],
+    "bajajfinance": ["bajaj finance", "bajajfinance"],
+    "hcltech": ["hcl", "hcl tech", "hcl technologies", "hcltech"],
+    "kotakbank": ["kotak", "kotak mahindra", "kotakbank"],
+    "axisbank": ["axis bank", "axisbank"],
+    "m&m": ["mahindra", "mahindra & mahindra", "m&m", "mahindra and mahindra"],
+    "powergrid": ["power grid", "powergrid"],
+    "ntpc": ["ntpc", "ntpc ltd"],
+    "coalindia": ["coal india", "coalindia"],
+    "bpcl": ["bpcl", "bharat petroleum"],
+    "hindalco": ["hindalco", "hindalco industries"],
+    "jswsteel": ["jsw steel", "jswsteel"],
+    "tatasteel": ["tata steel", "tatasteel"],
+    "ultratech": ["ultratech", "ultratech cement", "ultratech"],
+    "grasim": ["grasim", "grasim industries"],
+    "divislab": ["divi's", "divis lab", "divis laboratories"],
+    "cipla": ["cipla", "cipla ltd"],
+    "drreddy": ["dr reddy", "dr. reddy", "drreddy"],
+    "hero moto": ["hero motocorp", "hero moto", "hero"],
+    "eichermot": ["eicher", "eicher motors", "royal enfield"],
+    "bajaj-auto": ["bajaj auto", "bajaj-auto"],
+    "techm": ["tech mahindra", "techm"],
+    "tata power": ["tata power", "tatapower"],
+    "adani": ["adani", "adani group", "gautam adani"],
+    "zomato": ["zomato", "zomato ltd", "blinkit"],
+    "hal": ["hal", "hindustan aeronautics", "h.a.l."],
+    "irfc": ["irfc", "indian railway finance"],
+    "irctc": ["irctc", "indian railway catering"],
+    "lici": ["lic", "lic india", "lici"],
+    "zyduslife": ["zydus", "zydus life", "zydus lifesciences"],
+}
+
+
+async def _fetch_news_for_symbol(symbol: str) -> list:
+    """Dynamically fetch relevant news based on symbol type."""
+    symbol_lower = symbol.lower()
+    symbol_base = symbol_lower.replace(".ns", "")
+
+    news = []
+
+    if symbol_base in ("btc", "eth"):
+        news = await real_news_service.get_crypto_news()
+    elif symbol_base in ("gold", "silver", "xau", "xag"):
+        news = await real_news_service.get_metals_news()
+    else:
+        # Indian stocks → stock market RSS + Indian news RSS + Google News query
+        stock_news = await real_news_service.get_stocks_news()
+        news.extend(stock_news)
+        forex_news = await real_news_service.get_forex_news()
+        news.extend(forex_news[:5])
+        commodities_news = await real_news_service.get_commodities_news()
+        news.extend(commodities_news[:5])
+        # yfinance ticker-specific news (may return empty for Indian stocks)
+        yf_news = await real_news_service.get_stock_news_from_yfinance(f"{symbol_base.upper()}.NS")
+        news.extend(yf_news)
+        # Google News as fallback — use company name if available
+        company_name = _COMPANY_NAMES.get(symbol_base, [symbol_base])[0]
+        google_news = await _fetch_google_news(company_name)
+        news.extend(google_news)
+
+    return news
+
+
 def filter_news_by_symbol(news: list, symbol: str) -> list:
     """Filter news by specific symbol/asset."""
-    symbol_lower = symbol.lower()
+    symbol_lower = symbol.lower().replace(".ns", "")
 
     keywords_map = {
         "btc": ["bitcoin", "btc", "satoshi", "halving", "btcusd", "xbt"],
@@ -244,28 +326,65 @@ def filter_news_by_symbol(news: list, symbol: str) -> list:
     }
 
     keywords = keywords_map.get(symbol_lower, [symbol_lower])
+    # Add company-specific keywords if available
+    company_keywords = _COMPANY_NAMES.get(symbol_lower, [])
+    keywords.extend(company_keywords)
 
     filtered = []
+    seen = set()
     for item in news:
         text = (item.get("title", "") + " " + item.get("description", "")).lower()
         if any(k in text for k in keywords):
-            filtered.append(item)
+            # Dedup by title
+            title = item.get("title", "").strip()
+            if title and title not in seen:
+                seen.add(title)
+                filtered.append(item)
 
     return filtered[:15]
 
 
+async def _fetch_google_news(query: str) -> list:
+    """Fetch news from Google News RSS for a search query."""
+    try:
+        url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN"
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code != 200:
+                return []
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(resp.text)
+            items = []
+            for item in root.iter("item"):
+                title = item.findtext("title", "")
+                link = item.findtext("link", "")
+                desc = item.findtext("description", "")[:200] if item.findtext("description") else ""
+                pub = item.findtext("pubDate", "")
+                source = ""
+                source_el = item.find("source")
+                if source_el is not None:
+                    source = source_el.text or ""
+                items.append({
+                    "title": title,
+                    "description": desc,
+                    "url": link,
+                    "source": source or "Google News",
+                    "published_at": pub,
+                    "category": "stocks"
+                })
+            return items[:10]
+    except Exception as e:
+        print(f"Google News error for {query}: {e}")
+        return []
+
+
 @router.get("/live/{symbol}")
 async def get_live_symbol_news(symbol: str):
-    """Get live news for specific symbol (btc, eth, gold, silver)."""
+    """Get live news for specific symbol — automatically fetches relevant sources."""
     try:
-        # Get all crypto and metals news
-        crypto_news = await real_news_service.get_crypto_news()
-        metals_news = await real_news_service.get_metals_news()
-
-        all_news = crypto_news + metals_news
+        all_news = await _fetch_news_for_symbol(symbol)
         filtered_news = filter_news_by_symbol(all_news, symbol)
 
-        # Get sentiment for filtered news
         sentiment = real_news_service.get_market_sentiment(filtered_news)
 
         return {
