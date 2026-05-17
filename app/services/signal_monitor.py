@@ -69,14 +69,46 @@ async def check_and_notify():
             print(f"Signal monitor error for {symbol}: {e}")
 
 
+_last_edge_alert: Dict[str, float] = {}
+
+
+async def _edge_scan():
+    """Periodic edge scan — alerts on high-score stocks."""
+    try:
+        from app.services.market_edge_service import scan_all_stocks
+        results = await scan_all_stocks()
+        for r in results[:5]:  # Top 5
+            score = r.get("score", 0)
+            sym = r.get("symbol", "").lower()
+            if score >= 8:
+                last = _last_edge_alert.get(sym, 0)
+                if datetime.now().timestamp() - last > 3600 * 4:  # Max once per 4h
+                    signals = "; ".join(r.get("signals", []))
+                    msg = (
+                        f"🔥 *EDGE ALERT: {sym.upper()}* (Score: {score}/10)\n"
+                        f"💰 Price: `{r.get('price', '?')}`\n"
+                        f"📊 Vol: `{r.get('vol_ratio', '?')}x avg` | RSI: `{r.get('rsi', '?')}`\n"
+                        f"🎯 {signals}"
+                    )
+                    await telegram_notifier.send_message(msg)
+                    _last_edge_alert[sym] = datetime.now().timestamp()
+    except Exception as e:
+        print(f"Edge scan error: {e}")
+
+
 async def signal_monitor_loop():
     resolve_counter = 0
+    edge_counter = 0
     while True:
         await check_and_notify()
         resolve_counter += 1
+        edge_counter += 1
         if resolve_counter >= 30:
             resolve_counter = 0
             await resolve_signals()
+        if edge_counter >= 15:  # Edge scan every ~30 min
+            edge_counter = 0
+            _ = asyncio.create_task(_edge_scan())
         await asyncio.sleep(settings.signal_check_interval_seconds)
 
 

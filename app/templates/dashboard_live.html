@@ -1077,6 +1077,22 @@
                 </div>
             </div>
 
+            <!-- Edge Scores -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h2 style="font-size:0.85rem;">🔥 Market Edge</h2>
+                        <span class="symbol-badge" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.6rem;" id="edgeCount">Loading...</span>
+                    </div>
+                    <div>
+                        <span style="color:var(--accent-green);font-size:0.65rem;">● Auto-scan</span>
+                    </div>
+                </div>
+                <div id="edgeContent" style="padding:0.5rem;">
+                    <div class="loading">⏳ Scanning...</div>
+                </div>
+            </div>
+
             <!-- Signal Log -->
             <div class="chart-card">
                 <div class="chart-header">
@@ -1709,6 +1725,35 @@
             newsRefreshInterval = setInterval(refreshNews, 60000);
         }
         startNewsRefresh();
+
+        // Edge scores
+        async function loadEdgeScores() {
+            try {
+                const resp = await fetch('/api/v1/edge/scan');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const el = document.getElementById('edgeContent');
+                const countEl = document.getElementById('edgeCount');
+                if (!el) return;
+                if (data.status !== 'success') { el.innerHTML = '<div class="no-news">No data</div>'; return; }
+                const top = data.results.slice(0, 10);
+                countEl.textContent = `${data.count} stocks`;
+                el.innerHTML = top.map(r => {
+                    const score = r.score || 0;
+                    const bar = '🟩'.repeat(Math.round(score/2)) + '⬜'.repeat(5 - Math.round(score/2));
+                    const sigs = (r.signals || []).slice(0, 2).join(' ');
+                    return `<div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px solid var(--border-color);font-size:0.65rem;">
+                        <span><b>${r.symbol}</b> ${r.price ? '$'+r.price : ''}</span>
+                        <span>${bar} ${score}/10</span>
+                        <span style="color:var(--text-secondary)">${sigs}</span>
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                console.log('Edge load error:', e);
+            }
+        }
+        loadEdgeScores();
+        setInterval(loadEdgeScores, 300000); // every 5 min
     </script>
 </body>
 </html>

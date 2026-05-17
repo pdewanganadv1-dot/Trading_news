@@ -9,6 +9,7 @@ from app.services.real_news import real_news_service
 from app.services.chart_generator import generate_signal_chart
 from app.services.accuracy_tracker import get_accuracy_stats
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
+from app.services.market_edge_service import scan_all_stocks, scan_stock, get_market_breadth, get_fii_dii_summary, set_fii_dii
 import docker
 
 _price_alerts: list = []
@@ -68,6 +69,11 @@ def _build_help() -> str:
         "• `/accuracy` — Signal win/loss stats\n"
         "• `social btc` — StockTwits + Reddit social sentiment\n"
         "• `reliance` / `tcs` / `hdfcbank` / `infy` — Indian stock price + signal\n"
+        "• `edges` — Top 10 stocks by edge score\n"
+        "• `edge reload` — Edge score for specific stock\n"
+        "• `breadth` — Market breadth (Nifty 100 above SMA20)\n"
+        "• `fiidii` — FII/DII institutional flow\n"
+        "• `setfiidii 1000 800 900 700` — Update FII/DII manually\n"
         "• `docker` — Container status\n"
         "• `/help` — This message"
     )
@@ -211,6 +217,79 @@ async def _handle_message(text: str, chat_id: int):
             f"❌ Losses: `{stats['losses']}`\n"
             f"🎯 Win Rate: *{stats['win_rate']}%*\n"
             f"💰 Avg PnL: `{stats['avg_pnl']}%`"
+        )
+        return await telegram_notifier.send_message(msg)
+
+    if text == 'edges':
+        results = await scan_all_stocks()
+        top = results[:10]
+        lines = ["🔥 *Market Edge: Top 10*", ""]
+        for r in top:
+            signals = " | ".join(r.get("signals", [])[:2])
+            lines.append(
+                f"`{r['symbol']:<12}` Score: `{r['score']}/10` "
+                f"Vol: `{r.get('vol_ratio', '-')}x` "
+                f"{signals}"
+            )
+        return await telegram_notifier.send_message("\n".join(lines))
+
+    if text == 'breadth':
+        b = await get_market_breadth()
+        bar_len = 20
+        filled = int(b['pct_above'] / 100 * bar_len)
+        bar = "🟩" * filled + "⬜" * (bar_len - filled)
+        msg = (
+            f"📊 *Market Breadth*\n\n"
+            f"Stocks above 20d SMA: `{b['above_sma20']}/{b['total']}`\n"
+            f"`{bar}`\n"
+            f"*{b['pct_above']}%* of Nifty 100 above SMA20\n\n"
+            f"📌 >70% = Overbought | <30% = Oversold"
+        )
+        return await telegram_notifier.send_message(msg)
+
+    if text in ('fiidii', '/fiidii'):
+        d = await get_fii_dii_summary()
+        msg = (
+            f"🏦 *FII / DII Flow*\n\n"
+            f"📅 Date: `{d.get('date', 'N/A')}`\n\n"
+            f"*FII*\n"
+            f"  Buy:  `{d.get('fii_buy', '?')}`\n"
+            f"  Sell: `{d.get('fii_sell', '?')}`\n"
+            f"  Net:  `{d.get('fii_net', '?')}`\n\n"
+            f"*DII*\n"
+            f"  Buy:  `{d.get('dii_buy', '?')}`\n"
+            f"  Sell: `{d.get('dii_sell', '?')}`\n"
+            f"  Net:  `{d.get('dii_net', '?')}`\n\n"
+            f"💡 Use `setfiidii buy sell buy sell` to update"
+        )
+        return await telegram_notifier.send_message(msg)
+
+    m = re.match(r'^setfiidii\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)$', text)
+    if m:
+        fii_b, fii_s, dii_b, dii_s = float(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4))
+        d = set_fii_dii(fii_b, fii_s, dii_b, dii_s)
+        net_fii = d['fii_net']
+        emoji = "🟢" if net_fii > 0 else "🔴"
+        return await telegram_notifier.send_message(
+            f"✅ *FII/DII Updated*\n\n"
+            f"{emoji} FII Net: `{net_fii:+,.2f}` Cr\n"
+            f"{'🟢' if d['dii_net'] > 0 else '🔴'} DII Net: `{d['dii_net']:+,.2f}` Cr"
+        )
+
+    m = re.match(r'^edge\s+(\w+)$', text)
+    if m:
+        sym = m.group(1).lower()
+        r = scan_stock(sym)
+        if r.get("error"):
+            return await telegram_notifier.send_message(f"No edge data for {sym.upper()}")
+        signals = "\n".join(f"  • {s}" for s in r.get("signals", []))
+        msg = (
+            f"🔍 *Edge Scan — {r['symbol']}*\n\n"
+            f"💰 Price: `{r.get('price', '?')}` ({r.get('change_pct', 0):+.2f}%)\n"
+            f"📊 Score: `{r['score']}/10`\n"
+            f"📈 Vol Ratio: `{r.get('vol_ratio', '?')}x` | RSI: `{r.get('rsi', '?')}`\n"
+            f"📉 Streak: `{r.get('streak_days', 0)}d {r.get('streak', 'flat')}`\n"
+            f"{signals}"
         )
         return await telegram_notifier.send_message(msg)
 
