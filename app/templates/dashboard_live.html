@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradingview Dashboard - Live News</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0f0f14;
+            --bg-secondary: #18181f;
+            --bg-card: #1e1e28;
+            --bg-card-hover: #252530;
+            --border-color: #2a2a3a;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8888a0;
+            --accent-blue: #4f8cff;
+            --accent-cyan: #38bdf8;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-gold: #fbbf24;
+            --accent-purple: #a78bfa;
+            --gradient-blue: linear-gradient(135deg, #4f8cff, #38bdf8);
+            --gradient-green: linear-gradient(135deg, #34d399, #10b981);
+            --gradient-red: linear-gradient(135deg, #f87171, #ef4444);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image:
+                radial-gradient(ellipse at 10% 10%, rgba(79, 140, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(ellipse at 90% 90%, rgba(167, 139, 250, 0.08) 0%, transparent 40%);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(180deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+        }
+
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--gradient-blue);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            font-family: 'Space Grotesk', sans-serif;
+            box-shadow: 0 4px 15px rgba(79, 140, 255, 0.4);
+        }
+
+        .logo h1 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+
+        .header-right { display: flex; align-items: center; gap: 1.5rem; }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--accent-green);
+            font-weight: 500;
+        }
+
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--accent-green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+
+        .last-update {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .refresh-btn {
+            background: var(--gradient-blue);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(79, 140, 255, 0.3);
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 140, 255, 0.5);
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 220px 1fr 340px;
+            gap: 0;
+            min-height: calc(100vh - 72px);
+        }
+
+        /* Left Sidebar */
+        .asset-sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding: 1.5rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .sidebar-title {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+            font-weight: 600;
+        }
+
+        .asset-group { margin-bottom: 1rem; }
+
+        .asset-group-title {
+            font-size: 0.65rem;
+            color: var(--accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 0.5rem;
+            padding-left: 0.5rem;
+            font-weight: 600;
+        }
+
+        .asset-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 0.75rem 0.9rem;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.25s;
+            background: transparent;
+            color: var(--text-secondary);
+            text-align: left;
+        }
+
+        .asset-btn:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+
+        .asset-btn.active {
+            background: var(--bg-card);
+            border: 1px solid var(--accent-blue);
+            color: var(--text-primary);
+            box-shadow: 0 0 20px rgba(79, 140, 255, 0.2);
+        }
+
+        .asset-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .asset-icon.btc { background: linear-gradient(135deg, #f7931a, #ff9500); }
+        .asset-icon.eth { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+        .asset-icon.gold { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+        .asset-icon.silver { background: linear-gradient(135deg, #94a3b8, #64748b); }
+
+        /* Main Content */
+        .main-content {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            overflow-y: auto;
+        }
+
+        .chart-card, .news-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .chart-title-group { display: flex; align-items: center; gap: 0.75rem; }
+
+        .chart-title-group h2 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .symbol-badge {
+            background: rgba(79, 140, 255, 0.15);
+            color: var(--accent-blue);
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .timeframe-tabs { display: flex; gap: 0.25rem; background: var(--bg-secondary); padding: 0.25rem; border-radius: 10px; }
+        .timeframe-tabs button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.4rem 0.7rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .timeframe-tabs button:hover { color: var(--text-primary); }
+        .timeframe-tabs button.active { background: var(--accent-blue); color: white; }
+
+        .chart-wrapper { height: 260px; position: relative; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 1rem; }
+
+        .stat-item {
+            text-align: center;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* News Card */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+
+        .card-title {
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .news-count {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background: var(--bg-secondary);
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+        }
+
+        /* Sentiment Section */
+        .sentiment-section { margin-bottom: 1.5rem; }
+
+        /* Sentiment Percentage Boxes */
+        .sentiment-overview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .sentiment-box {
+            text-align: center;
+            padding: 1rem;
+            border-radius: 14px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .sentiment-box.bullish { border-color: var(--accent-green); background: rgba(52, 211, 153, 0.1); }
+        .sentiment-box.bearish { border-color: var(--accent-red); background: rgba(248, 113, 113, 0.1); }
+        .sentiment-box.neutral { border-color: var(--text-secondary); }
+
+        .sentiment-box-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.4rem;
+        }
+
+        .sentiment-box-value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .sentiment-box.bullish .sentiment-box-value { color: var(--accent-green); }
+        .sentiment-box.bearish .sentiment-box-value { color: var(--accent-red); }
+
+        /* Sentiment Bar */
+        .sentiment-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .sentiment-bar-label-text {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            width: 70px;
+            font-weight: 500;
+        }
+
+        .sentiment-bar-track {
+            flex: 1;
+            height: 10px;
+            background: var(--bg-primary);
+            border-radius: 5px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .sentiment-bar-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+
+        .sentiment-bar-fill.bullish { background: var(--gradient-green); }
+        .sentiment-bar-fill.bearish { background: var(--gradient-red); }
+        .sentiment-bar-fill.neutral { background: linear-gradient(135deg, #94a3b8, #64748b); }
+
+        .sentiment-bar-value {
+            font-size: 0.8rem;
+            font-weight: 600;
+            width: 65px;
+            text-align: right;
+        }
+
+        /* Key News - Graphical Cards */
+        .key-news-section {
+            margin-bottom: 1.25rem;
+        }
+
+        .key-news-title {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .key-news-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--accent-green);
+            border-radius: 2px;
+        }
+
+        .key-news-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+
+        .key-news-item {
+            padding: 0.75rem;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            background: rgba(52, 211, 153, 0.1);
+            border: 1px solid rgba(52, 211, 153, 0.2);
+            border-left: 3px solid var(--accent-green);
+            line-height: 1.4;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .key-news-item:hover {
+            background: rgba(52, 211, 153, 0.15);
+            transform: translateX(3px);
+        }
+
+        /* News List */
+        .news-list { max-height: 350px; overflow-y: auto; }
+
+        .news-item {
+            padding: 0.85rem;
+            border-radius: 12px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.25s;
+            border-left: 3px solid transparent;
+            background: var(--bg-secondary);
+        }
+
+        .news-item:hover {
+            background: var(--bg-card-hover);
+            transform: translateX(4px);
+        }
+
+        .news-item.bullish { border-left-color: var(--accent-green); }
+        .news-item.bearish { border-left-color: var(--accent-red); }
+        .news-item.neutral { border-left-color: var(--text-secondary); }
+
+        .news-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+            line-height: 1.4;
+        }
+
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .news-source {
+            color: var(--accent-blue);
+            font-weight: 500;
+        }
+
+        /* Right Sidebar */
+        .right-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1.5rem;
+            border-left: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+        }
+
+        .sidebar-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1.25rem;
+        }
+
+        .sidebar-card-title {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        /* Price Display */
+        .price-display { text-align: center; padding: 0.5rem 0; }
+
+        .current-price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-family: 'Space Grotesk', sans-serif;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .price-change {
+            font-size: 1rem;
+            margin-top: 0.25rem;
+            font-weight: 600;
+        }
+
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+
+        /* Signal Badge - More Graphical */
+        .signal-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 0;
+        }
+
+        .signal-badge {
+            padding: 0.9rem 2.5rem;
+            border-radius: 16px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-family: 'Space Grotesk', sans-serif;
+            letter-spacing: 3px;
+        }
+
+        .signal-badge.buy {
+            background: linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(16, 185, 129, 0.1));
+            color: var(--accent-green);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 25px rgba(52, 211, 153, 0.3);
+        }
+
+        .signal-badge.sell {
+            background: linear-gradient(135deg, rgba(248, 113, 113, 0.2), rgba(239, 68, 68, 0.1));
+            color: var(--accent-red);
+            border: 2px solid var(--accent-red);
+            box-shadow: 0 0 25px rgba(248, 113, 113, 0.3);
+        }
+
+        .signal-badge.hold {
+            background: linear-gradient(135deg, rgba(148, 163, 184, 0.2), rgba(100, 116, 139, 0.1));
+            color: var(--text-secondary);
+            border: 2px solid var(--text-secondary);
+        }
+
+        .signal-reason {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* Stats with Icons */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .stat-box {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-box-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-box-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .stat-box-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-top: 0.25rem;
+        }
+
+        .stat-box.bullish .stat-box-value { color: var(--accent-green); }
+        .stat-box.bearish .stat-box-value { color: var(--accent-red); }
+        .stat-box.neutral .stat-box-value { color: var(--text-secondary); }
+        .stat-box.total .stat-box-value { color: var(--accent-blue); }
+
+        /* Watchlist */
+        .watchlist { max-height: 150px; overflow-y: auto; }
+
+        .watchlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 0.75rem;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 0.35rem;
+            transition: all 0.2s;
+            background: var(--bg-secondary);
+        }
+
+        .watchlist-item:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .symbol-info { display: flex; align-items: center; gap: 0.5rem; }
+
+        .symbol-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .price-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .price-change-small {
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        /* Technical Indicators Panel - (moved to new section below) */
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--accent-blue);
+            font-size: 0.9rem;
+        }
+
+        .no-news {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* Signal Hero */
+        .signal-hero {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+        .signal-hero > div {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .signal-label {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+        }
+        .signal-hero-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .signal-hero-badge {
+            font-size: 1.4rem;
+            font-weight: 800;
+            padding: 0.4rem 1.2rem;
+            border-radius: 12px;
+            letter-spacing: 2px;
+            font-family: 'Space Grotesk', sans-serif;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+        .signal-hero-badge.signal-buy {
+            background: rgba(52, 211, 153, 0.2);
+            color: var(--accent-green);
+            border: 2px solid var(--accent-green);
+            box-shadow: 0 0 25px rgba(52, 211, 153, 0.3);
+        }
+        .signal-hero-badge.signal-sell {
+            background: rgba(248, 113, 113, 0.2);
+            color: var(--accent-red);
+            border: 2px solid var(--accent-red);
+            box-shadow: 0 0 25px rgba(248, 113, 113, 0.3);
+        }
+        .signal-hero-badge.signal-hold {
+            background: rgba(148, 163, 184, 0.15);
+            color: var(--text-secondary);
+            border: 2px solid var(--text-secondary);
+        }
+        .indicator-section-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        .indicator-updated {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .indicator-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.6rem;
+        }
+        .indicator-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.6rem 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+        .indicator-item:hover {
+            border-color: var(--accent-blue);
+            background: var(--bg-card);
+        }
+        .indicator-name {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .indicator-value {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .indicator-signal {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            min-width: 55px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+        .indicator-signal.buy, .indicator-signal.oversold {
+            background: rgba(52, 211, 153, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+        .indicator-signal.sell, .indicator-signal.overbought {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+        .indicator-signal.neutral {
+            background: rgba(136, 136, 160, 0.15);
+            color: var(--text-secondary);
+            border: 1px solid rgba(136, 136, 160, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">TV</div>
+            <h1>Tradingview Dashboard</h1>
+        </div>
+        <div class="header-right">
+            <div class="live-indicator">
+                <div class="live-dot"></div>
+                <span>LIVE</span>
+            </div>
+            <div class="last-update" id="lastUpdate">Updated: --:--:--</div>
+            <button class="refresh-btn" onclick="loadAssetData(currentAsset)">↻ Refresh</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Left Asset Sidebar -->
+        <div class="asset-sidebar">
+            <div class="sidebar-title">⚡ Select Asset</div>
+
+            <div class="asset-group">
+                <div class="asset-group-title">Crypto</div>
+                <button class="asset-btn active" onclick="selectAsset('btc')">
+                    <div class="asset-icon btc">₿</div>
+                    <span>Bitcoin</span>
+                </button>
+                <button class="asset-btn" onclick="selectAsset('eth')">
+                    <div class="asset-icon eth">Ξ</div>
+                    <span>Ethereum</span>
+                </button>
+            </div>
+
+            <div class="asset-group">
+                <div class="asset-group-title">Metals</div>
+                <button class="asset-btn" onclick="selectAsset('gold')">
+                    <div class="asset-icon gold">Au</div>
+                    <span>Gold</span>
+                </button>
+                <button class="asset-btn" onclick="selectAsset('silver')">
+                    <div class="asset-icon silver">Ag</div>
+                    <span>Silver</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Market Data Panel -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h2 id="chartTitle">Bitcoin / USD</h2>
+                        <span class="symbol-badge" id="chartSymbol">BTCUSD</span>
+                        <span class="symbol-badge" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.6rem;margin-left:0.5rem;" id="dataSource">Binance</span>
+                    </div>
+                    <div class="timeframe-tabs">
+                        <span style="color:var(--text-secondary);font-size:0.7rem;" id="dataTimestamp">--</span>
+                    </div>
+                </div>
+
+                <!-- Trading Signal Hero -->
+                <div class="signal-hero">
+                    <div class="signal-left">
+                        <span class="signal-label">TRADING SIGNAL</span>
+                        <span id="mainSignalBadge" class="signal-hero-badge">--</span>
+                    </div>
+                    <div class="signal-center">
+                        <span class="signal-label">CONFIDENCE</span>
+                        <span id="mainSignalConf" class="signal-hero-value">--</span>
+                    </div>
+                    <div class="signal-right">
+                        <span class="signal-label">TREND</span>
+                        <span id="indicatorTrend" class="signal-hero-value" style="font-size:1rem;">--</span>
+                    </div>
+                </div>
+
+                <!-- Technical Indicators Grid -->
+                <div class="indicator-panel">
+                    <div class="indicator-section-title">
+                        <span>📊 Technical Indicators</span>
+                        <span class="indicator-updated" id="dataTimestamp">--</span>
+                    </div>
+                    <div class="indicator-grid">
+                        <div class="indicator-item"><div class="indicator-name">RSI (14)</div><div class="indicator-value" id="indRsi">--</div><div class="indicator-signal" id="indRsiSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">SMA 20</div><div class="indicator-value" id="indSma20">--</div><div class="indicator-signal" id="indSma20Signal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">SMA 50</div><div class="indicator-value" id="indSma50">--</div><div class="indicator-signal" id="indSma50Signal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">SMA 200</div><div class="indicator-value" id="indSma200">--</div><div class="indicator-signal" id="indSma200Signal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">MACD</div><div class="indicator-value" id="indMacd">--</div><div class="indicator-signal" id="indMacdSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">MACD Sig</div><div class="indicator-value" id="indMacdSig">--</div><div class="indicator-signal" id="indMacdSigSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">MACD Hist</div><div class="indicator-value" id="indMacdHist">--</div><div class="indicator-signal" id="indMacdHistSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">BB Upper</div><div class="indicator-value" id="indBbUpper">--</div><div class="indicator-signal" id="indBbUpperSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">BB Mid</div><div class="indicator-value" id="indBbMid">--</div><div class="indicator-signal" id="indBbMidSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">BB Lower</div><div class="indicator-value" id="indBbLower">--</div><div class="indicator-signal" id="indBbLowerSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">Stoch %K</div><div class="indicator-value" id="indStochK">--</div><div class="indicator-signal" id="indStochKSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">Stoch %D</div><div class="indicator-value" id="indStochD">--</div><div class="indicator-signal" id="indStochDSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">ADX</div><div class="indicator-value" id="indAdx">--</div><div class="indicator-signal" id="indAdxSignal">--</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- News Card with Graphical Sentiment -->
+            <div class="news-card">
+                <div class="card-header">
+                    <span class="card-title">📰 Live News Feed</span>
+                    <span class="news-count" id="newsCount">0 articles</span>
+                </div>
+
+                <!-- Sentiment Display -->
+                <div class="sentiment-section" id="sentimentSection">
+                    <!-- Percentage Boxes -->
+                    <div class="sentiment-overview">
+                        <div class="sentiment-box bullish">
+                            <div class="sentiment-box-label">Bullish</div>
+                            <div class="sentiment-box-value" id="bullishPct">--%</div>
+                        </div>
+                        <div class="sentiment-box neutral">
+                            <div class="sentiment-box-label">Neutral</div>
+                            <div class="sentiment-box-value" id="neutralPct">--%</div>
+                        </div>
+                        <div class="sentiment-box bearish">
+                            <div class="sentiment-box-label">Bearish</div>
+                            <div class="sentiment-box-value" id="bearishPct">--%</div>
+                        </div>
+                    </div>
+
+                    <!-- Sentiment Bar -->
+                    <div class="sentiment-bar">
+                        <span class="sentiment-bar-label-text">Overall:</span>
+                        <div class="sentiment-bar-track">
+                            <div class="sentiment-bar-fill bullish" id="barBullish" style="width: 0%"></div>
+                            <div class="sentiment-bar-fill neutral" id="barNeutral" style="width: 0%"></div>
+                            <div class="sentiment-bar-fill bearish" id="barBearish" style="width: 0%"></div>
+                        </div>
+                        <span class="sentiment-bar-value" id="sentimentLabel">--</span>
+                    </div>
+
+                    <div class="key-news-section" id="keyNewsSection" style="display: none;">
+                        <div class="key-news-title">🔥 Key Bullish Headlines</div>
+                        <div class="key-news-grid" id="keyNewsList"></div>
+                    </div>
+                </div>
+
+                <div class="news-list" id="newsList">
+                    <div class="loading">⏳ Loading news...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="right-sidebar">
+            <div class="sidebar-card">
+                <div class="sidebar-card-title">💰 Current Price</div>
+                <div class="price-display">
+                    <div class="current-price" id="currentPrice">$--</div>
+                    <div class="price-change" id="priceChange">--</div>
+                </div>
+                <div class="signal-display">
+                    <div class="signal-badge" id="signalBadge">--</div>
+                    <div class="signal-reason">Based on news sentiment analysis</div>
+                </div>
+            </div>
+
+            <div class="sidebar-card">
+                <div class="sidebar-card-title">📊 Quick Stats</div>
+                <div class="stats-grid">
+                    <div class="stat-box total">
+                        <div class="stat-box-icon">📰</div>
+                        <div class="stat-box-value" id="totalArticles">--</div>
+                        <div class="stat-box-label">Articles</div>
+                    </div>
+                    <div class="stat-box bullish">
+                        <div class="stat-box-icon">📈</div>
+                        <div class="stat-box-value" id="bullishCount">--</div>
+                        <div class="stat-box-label">Bullish</div>
+                    </div>
+                    <div class="stat-box bearish">
+                        <div class="stat-box-icon">📉</div>
+                        <div class="stat-box-value" id="bearishCount">--</div>
+                        <div class="stat-box-label">Bearish</div>
+                    </div>
+                    <div class="stat-box neutral">
+                        <div class="stat-box-icon">➡️</div>
+                        <div class="stat-box-value" id="neutralCount">--</div>
+                        <div class="stat-box-label">Neutral</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-card">
+                <div class="sidebar-card-title">👀 Watchlist</div>
+                <div class="watchlist">
+                    <div class="watchlist-item" onclick="selectAsset('btc')">
+                        <div class="symbol-info">
+                            <div class="asset-icon btc" style="width: 28px; height: 28px; font-size: 0.7rem;">₿</div>
+                            <span class="symbol-name">Bitcoin</span>
+                        </div>
+                        <div>
+                            <div class="price-value" id="watchBtc">$--</div>
+                            <div class="price-change-small positive" id="watchBtcChange">--</div>
+                        </div>
+                    </div>
+                    <div class="watchlist-item" onclick="selectAsset('eth')">
+                        <div class="symbol-info">
+                            <div class="asset-icon eth" style="width: 28px; height: 28px; font-size: 0.7rem;">Ξ</div>
+                            <span class="symbol-name">Ethereum</span>
+                        </div>
+                        <div>
+                            <div class="price-value" id="watchEth">$--</div>
+                            <div class="price-change-small positive" id="watchEthChange">--</div>
+                        </div>
+                    </div>
+                    <div class="watchlist-item" onclick="selectAsset('gold')">
+                        <div class="symbol-info">
+                            <div class="asset-icon gold" style="width: 28px; height: 28px; font-size: 0.7rem;">Au</div>
+                            <span class="symbol-name">Gold</span>
+                        </div>
+                        <div>
+                            <div class="price-value" id="watchGold">$--</div>
+                            <div class="price-change-small positive" id="watchGoldChange">--</div>
+                        </div>
+                    </div>
+                    <div class="watchlist-item" onclick="selectAsset('silver')">
+                        <div class="symbol-info">
+                            <div class="asset-icon silver" style="width: 28px; height: 28px; font-size: 0.7rem;">Ag</div>
+                            <span class="symbol-name">Silver</span>
+                        </div>
+                        <div>
+                            <div class="price-value" id="watchSilver">$--</div>
+                            <div class="price-change-small positive" id="watchSilverChange">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let livePriceData = {};
+        let currentAsset = 'btc';
+
+        const assetConfig = {
+            btc: { name: 'Bitcoin', symbol: 'BTCUSD', title: 'Bitcoin / USD' },
+            eth: { name: 'Ethereum', symbol: 'ETHUSD', title: 'Ethereum / USD' },
+            gold: { name: 'Gold', symbol: 'XAUUSD', title: 'Gold / USD' },
+            silver: { name: 'Silver', symbol: 'XAGUSD', title: 'Silver / USD' }
+        };
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            initPrices();
+        });
+
+        async function initPrices() {
+            await loadAssetData(currentAsset);
+        }
+
+        function refreshFromMarketData(asset, market) {
+            const p = market.price;
+            const ind = market.indicators;
+            const ts = market.timestamp;
+
+            livePriceData[asset] = { price: p.price, change: p.change || 0, high: p.high, low: p.low, volume: p.volume };
+
+            document.getElementById('dataSource').textContent = p.source || 'API';
+            document.getElementById('dataTimestamp').textContent = ts ? new Date(ts).toLocaleString() : '--';
+
+            // Indicators
+            if (ind) {
+                // RSI
+                if (ind.rsi) {
+                    document.getElementById('indRsi').textContent = ind.rsi.toFixed(1);
+                    const el = document.getElementById('indRsiSignal');
+                    if (ind.rsi > 70) { el.textContent = 'OVERBOUGHT'; el.className = 'indicator-signal overbought'; }
+                    else if (ind.rsi < 30) { el.textContent = 'OVERSOLD'; el.className = 'indicator-signal oversold'; }
+                    else { el.textContent = 'NEUTRAL'; el.className = 'indicator-signal neutral'; }
+                }
+                // SMA
+                if (ind.sma) {
+                    const fillSMA = (id, val, price) => {
+                        document.getElementById(id).textContent = val ? '$' + Number(val).toLocaleString() : '--';
+                        const sig = document.getElementById(id + 'Signal');
+                        if (val && price) {
+                            if (val > price) { sig.textContent = 'ABOVE'; sig.className = 'indicator-signal sell'; }
+                            else { sig.textContent = 'BELOW'; sig.className = 'indicator-signal buy'; }
+                        } else { sig.textContent = '--'; sig.className = 'indicator-signal neutral'; }
+                    };
+                    fillSMA('indSma20', ind.sma.sma20, p.price);
+                    fillSMA('indSma50', ind.sma.sma50, p.price);
+                    if (ind.sma.sma200) fillSMA('indSma200', ind.sma.sma200, p.price);
+                }
+                // MACD
+                if (ind.macd) {
+                    document.getElementById('indMacd').textContent = ind.macd.macd ? ind.macd.macd.toFixed(2) : '--';
+                    document.getElementById('indMacdSig').textContent = ind.macd.signal ? ind.macd.signal.toFixed(2) : '--';
+                    document.getElementById('indMacdHist').textContent = ind.macd.histogram ? ind.macd.histogram.toFixed(2) : '--';
+                    ['indMacdSignal', 'indMacdSigSignal', 'indMacdHistSignal'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (ind.macd.histogram > 0) { el.textContent = 'BULLISH'; el.className = 'indicator-signal buy'; }
+                        else { el.textContent = 'BEARISH'; el.className = 'indicator-signal sell'; }
+                    });
+                }
+                // Bollinger Bands
+                if (ind.bb) {
+                    document.getElementById('indBbUpper').textContent = '$' + Number(ind.bb.upper).toLocaleString();
+                    document.getElementById('indBbMid').textContent = '$' + Number(ind.bb.middle).toLocaleString();
+                    document.getElementById('indBbLower').textContent = '$' + Number(ind.bb.lower).toLocaleString();
+                    const bbSig = document.getElementById('indBbUpperSignal');
+                    if (p.price > ind.bb.upper) { bbSig.textContent = 'BREAK UP'; bbSig.className = 'indicator-signal overbought'; }
+                    else if (p.price < ind.bb.lower) { bbSig.textContent = 'BREAK DN'; bbSig.className = 'indicator-signal oversold'; }
+                    else { bbSig.textContent = 'INSIDE'; bbSig.className = 'indicator-signal neutral'; }
+                }
+                // Trend
+                document.getElementById('indicatorTrend').textContent = 'Trend: ' + (market.trend || 'neutral').toUpperCase();
+            }
+        }
+
+        function refreshSignals(asset, signalData) {
+            if (!signalData) return;
+            const badge = document.getElementById('mainSignalBadge');
+            const conf = document.getElementById('mainSignalConf');
+
+            let text = signalData.signal || 'HOLD';
+            badge.textContent = text + (signalData.confidence ? ' (' + (signalData.confidence * 100).toFixed(0) + '%)' : '');
+            badge.className = 'signal-hero-badge signal-' + text.toLowerCase();
+            conf.textContent = signalData.confidence ? (signalData.confidence * 100).toFixed(0) + '%' : '--';
+        }
+
+        function selectAsset(asset) {
+            currentAsset = asset;
+
+            document.querySelectorAll('.asset-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.asset-btn').classList.add('active');
+
+            const config = assetConfig[asset];
+            document.getElementById('chartTitle').textContent = config.title;
+            document.getElementById('chartSymbol').textContent = config.symbol;
+
+            loadAssetData(asset);
+        }
+
+        async function loadAssetData(asset) {
+            const newsList = document.getElementById('newsList');
+            newsList.innerHTML = '<div class="loading">⏳ Loading news...</div>';
+
+            try {
+                const [newsResp, marketResp, signalResp] = await Promise.all([
+                    fetch(`/api/v1/news/live/${asset}`),
+                    fetch(`/api/v1/market/realtime/${asset}`),
+                    fetch(`/api/v1/market/signals/${asset}`)
+                ]);
+                const data = await newsResp.json();
+                const market = await marketResp.json();
+                const signal = await signalResp.json();
+
+                if (market.status === 'success') {
+                    refreshFromMarketData(asset, market);
+                }
+                if (signal.status === 'success') {
+                    refreshSignals(asset, signal);
+                }
+
+                if (data.status === 'success') {
+                    updateSentiment(data.sentiment);
+                    updateNews(data.news);
+                    updatePriceDisplay(asset, data.sentiment);
+
+                    const now = new Date();
+                    document.getElementById('lastUpdate').textContent = `Updated: ${now.toLocaleTimeString()}`;
+                } else {
+                    newsList.innerHTML = '<div class="no-news">Failed to load news</div>';
+                }
+            } catch (error) {
+                console.error('Error loading news:', error);
+                newsList.innerHTML = '<div class="no-news">Error loading news</div>';
+            }
+        }
+
+        function updateSentiment(sentiment) {
+            const bullish = sentiment.bullish_pct || 0;
+            const bearish = sentiment.bearish_pct || 0;
+            const neutral = sentiment.neutral_pct || 0;
+
+            // Update percentage boxes
+            document.getElementById('bullishPct').textContent = bullish + '%';
+            document.getElementById('neutralPct').textContent = neutral + '%';
+            document.getElementById('bearishPct').textContent = bearish + '%';
+
+            // Update bar
+            document.getElementById('barBullish').style.width = bullish + '%';
+            document.getElementById('barNeutral').style.width = neutral + '%';
+            document.getElementById('barBearish').style.width = bearish + '%';
+
+            // Update overall label
+            let label = 'NEUTRAL';
+            let color = 'var(--text-secondary)';
+            if (sentiment.sentiment === 'bullish') {
+                label = 'BULLISH';
+                color = 'var(--accent-green)';
+            } else if (sentiment.sentiment === 'bearish') {
+                label = 'BEARISH';
+                color = 'var(--accent-red)';
+            }
+
+            const labelEl = document.getElementById('sentimentLabel');
+            labelEl.textContent = label;
+            labelEl.style.color = color;
+
+            // Update stats
+            document.getElementById('totalArticles').textContent = sentiment.total_articles || 0;
+            document.getElementById('bullishCount').textContent = sentiment.bullish_count || 0;
+            document.getElementById('bearishCount').textContent = sentiment.bearish_count || 0;
+            document.getElementById('neutralCount').textContent = sentiment.neutral_count || 0;
+
+            // Key news
+            const keyNewsSection = document.getElementById('keyNewsSection');
+            const keyNewsList = document.getElementById('keyNewsList');
+            if (sentiment.key_bullish && sentiment.key_bullish.length > 0) {
+                keyNewsSection.style.display = 'block';
+                keyNewsList.innerHTML = sentiment.key_bullish.slice(0, 4).map(news =>
+                    `<div class="key-news-item">${news.length > 80 ? news.substring(0, 80) + '...' : news}</div>`
+                ).join('');
+            } else {
+                keyNewsSection.style.display = 'none';
+            }
+        }
+
+        function updateNews(news) {
+            const newsList = document.getElementById('newsList');
+            document.getElementById('newsCount').textContent = news.length + ' articles';
+
+            if (news.length === 0) {
+                newsList.innerHTML = '<div class="no-news">No news found for this asset</div>';
+                return;
+            }
+
+            newsList.innerHTML = news.map(item => {
+                let sentiment = 'neutral';
+                const text = (item.title + ' ' + (item.description || '')).toLowerCase();
+                const bullishWords = ['surge', 'soar', 'rally', 'gain', 'jump', 'rise', 'higher', 'bullish', 'record', 'boom', 'breakout'];
+                const bearishWords = ['fall', 'drop', 'crash', 'plunge', 'decline', 'bearish', 'dump', 'weak', 'loss', 'hack'];
+
+                if (bullishWords.some(w => text.includes(w))) sentiment = 'bullish';
+                else if (bearishWords.some(w => text.includes(w))) sentiment = 'bearish';
+
+                const time = item.published_at ? new Date(item.published_at).toLocaleTimeString() : '--';
+
+                return `
+                    <div class="news-item ${sentiment}" onclick="window.open('${item.url}', '_blank')">
+                        <div class="news-title">${item.title}</div>
+                        <div class="news-meta">
+                            <span class="news-source">${item.source}</span>
+                            <span>${time}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updatePriceDisplay(asset, sentiment) {
+            const prices = livePriceData[asset];
+            if (!prices) return;
+            document.getElementById('currentPrice').textContent = '$' + prices.price.toLocaleString();
+
+            const changeEl = document.getElementById('priceChange');
+            changeEl.textContent = (prices.change >= 0 ? '+' : '') + prices.change.toFixed(2) + '%';
+            changeEl.className = 'price-change ' + (prices.change >= 0 ? 'positive' : 'negative');
+
+            // Signal
+            const signalEl = document.getElementById('signalBadge');
+            let signal = 'HOLD';
+            let signalClass = 'hold';
+
+            if (sentiment.sentiment === 'bullish') {
+                signal = 'BUY';
+                signalClass = 'buy';
+            } else if (sentiment.sentiment === 'bearish') {
+                signal = 'SELL';
+                signalClass = 'sell';
+            }
+
+            signalEl.textContent = signal;
+            signalEl.className = 'signal-badge ' + signalClass;
+
+            // Update watchlist
+            ['btc', 'eth', 'gold', 'silver'].forEach(sym => {
+                const p = livePriceData[sym];
+                if (!p) return;
+                document.getElementById('watch' + sym.charAt(0).toUpperCase() + sym.slice(1)).textContent = '$' + p.price.toLocaleString();
+                const changeEl = document.getElementById('watch' + sym.charAt(0).toUpperCase() + sym.slice(1) + 'Change');
+                changeEl.textContent = (p.change >= 0 ? '+' : '') + p.change.toFixed(2) + '%';
+                changeEl.className = 'price-change-small ' + (p.change >= 0 ? 'positive' : 'negative');
+            });
+        }
+
+        // WebSocket connections for real-time updates
+        let priceWs = null;
+        let sentimentWs = null;
+        let isConnected = false;
+
+        function connectWebSockets() {
+            // Connect to prices WebSocket
+            priceWs = new WebSocket(`ws://${window.location.host}/ws/prices`);
+            priceWs.onopen = () => {
+                console.log('Prices WebSocket connected');
+                isConnected = true;
+                document.getElementById('lastUpdate').textContent = 'Connected (Live)';
+            };
+            priceWs.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'prices') {
+                    updatePrices(msg.data, msg.signals, msg.indicators);
+                }
+            };
+            priceWs.onerror = (err) => console.error('Price WS error:', err);
+            priceWs.onclose = () => {
+                console.log('Price WS closed, reconnecting...');
+                isConnected = false;
+                setTimeout(connectWebSockets, 5000);
+            };
+
+            // Connect to sentiment/news WebSocket
+            sentimentWs = new WebSocket(`ws://${window.location.host}/ws/sentiment`);
+            sentimentWs.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'sentiment') {
+                    updateSentiment(msg.data.sentiment);
+                    const signal = msg.data.trading_signal;
+                    document.getElementById('signalText').textContent = signal.signal;
+                    const signalEl = document.getElementById('signalBadge');
+                    let signalClass = 'neutral';
+                    if (signal.signal === 'BUY') signalClass = 'bullish';
+                    else if (signal.signal === 'SELL') signalClass = 'bearish';
+                    signalEl.textContent = signal.signal;
+                    signalEl.className = 'signal-badge ' + signalClass;
+                }
+            };
+            sentimentWs.onerror = (err) => console.error('Sentiment WS error:', err);
+            sentimentWs.onclose = () => {
+                setTimeout(() => {
+                    sentimentWs = new WebSocket(`ws://${window.location.host}/ws/sentiment`);
+                }, 5000);
+            };
+        }
+
+        function updatePrices(prices, signals, indicators) {
+            const now = new Date();
+
+            ['btc', 'eth', 'gold', 'silver'].forEach(sym => {
+                if (prices[sym]) {
+                    livePriceData[sym] = prices[sym];
+                    // Update watchlist
+                    document.getElementById('watch' + sym.charAt(0).toUpperCase() + sym.slice(1)).textContent = '$' + prices[sym].price.toLocaleString();
+                    const changeEl = document.getElementById('watch' + sym.charAt(0).toUpperCase() + sym.slice(1) + 'Change');
+                    changeEl.textContent = (prices[sym].change >= 0 ? '+' : '') + prices[sym].change.toFixed(2) + '%';
+                    changeEl.className = 'price-change-small ' + (prices[sym].change >= 0 ? 'positive' : 'negative');
+
+                    // Store price for watchlist
+                }
+            });
+
+            // Update signals on main panel
+            if (signals && signals[currentAsset]) {
+                const sigData = signals[currentAsset];
+                const badge = document.getElementById('mainSignalBadge');
+                badge.textContent = sigData.signal + (sigData.confidence ? ' (' + (sigData.confidence * 100).toFixed(0) + '%)' : '');
+                badge.className = 'signal-hero-badge signal-' + sigData.signal.toLowerCase();
+                document.getElementById('mainSignalConf').textContent = sigData.confidence ? (sigData.confidence * 100).toFixed(0) + '%' : '--';
+            }
+
+            document.getElementById('lastUpdate').textContent = `Updated: ${now.toLocaleTimeString()}`;
+        }
+
+        // Connect WebSockets on load
+        connectWebSockets();
+
+        // Fallback: Polling every 10 seconds if WebSocket fails
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/v1/market/signals');
+                const data = await response.json();
+                // Build price data structure
+                const pollPrices = {};
+                const signals = {};
+                for (const [sym, d] of Object.entries(data)) {
+                    pollPrices[sym] = { price: d.price, change: 0 };
+                    signals[sym] = { signal: d.signal, confidence: d.confidence };
+                }
+                // Also get indicators
+                const indicators = {};
+                for (const sym of ['btc', 'eth', 'gold', 'silver']) {
+                    try {
+                        const indResp = await fetch(`/api/v1/market/signals/${sym}`);
+                        const indData = await indResp.json();
+                        indicators[sym] = indData.indicators;
+                    } catch(e) {}
+                }
+                updatePrices(pollPrices, signals, indicators);
+            } catch(e) {
+                console.log('Polling fallback error:', e);
+            }
+        }, 10000);
+
+        // Initial load
+        loadAssetData('btc');
+    </script>
+</body>
+</html>

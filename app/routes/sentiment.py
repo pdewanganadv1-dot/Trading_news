@@ -1,0 +1,69 @@
+from fastapi import APIRouter, Query
+from typing import Optional
+from app.services.sentiment import sentiment_monitor
+from app.services.news_service import news_service
+
+router = APIRouter(prefix="/api/v1/sentiment", tags=["sentiment"])
+
+
+@router.get("/market")
+async def get_market_sentiment():
+    """Get overall market sentiment based on latest news."""
+    news = await news_service.get_market_news()
+    sentiment = sentiment_monitor.get_market_sentiment([
+        {"title": n.title, "description": n.description, "symbols": n.symbols}
+        for n in news
+    ])
+    signal = sentiment_monitor.generate_trading_signal(sentiment)
+    return {
+        "sentiment": sentiment,
+        "trading_signal": signal
+    }
+
+
+@router.get("/symbol/{symbol}")
+async def get_symbol_sentiment(symbol: str):
+    """Get sentiment for a specific symbol."""
+    news = await news_service.get_symbol_news(symbol)
+    sentiment = sentiment_monitor.get_symbol_sentiment(symbol, [
+        {"title": n.title, "description": n.description, "symbols": n.symbols}
+        for n in news
+    ])
+    signal = sentiment_monitor.generate_trading_signal(sentiment)
+    return {
+        "symbol": symbol,
+        "sentiment": sentiment,
+        "trading_signal": signal
+    }
+
+
+@router.get("/crypto")
+async def get_crypto_sentiment():
+    """Get crypto market sentiment."""
+    news = await news_service.get_crypto_news()
+    sentiment = sentiment_monitor.get_market_sentiment([
+        {"title": n.title, "description": n.description, "symbols": n.symbols}
+        for n in news
+    ])
+    signal = sentiment_monitor.generate_trading_signal(sentiment)
+    return {
+        "market": "crypto",
+        "sentiment": sentiment,
+        "trading_signal": signal
+    }
+
+
+@router.get("/commodities")
+async def get_commodities_sentiment():
+    """Get commodities market sentiment (gold, silver)."""
+    news = await news_service.get_commodities_news()
+    sentiment = sentiment_monitor.get_market_sentiment([
+        {"title": n.title, "description": n.description, "symbols": n.symbols}
+        for n in news
+    ])
+    signal = sentiment_monitor.generate_trading_signal(sentiment)
+    return {
+        "market": "commodities",
+        "sentiment": sentiment,
+        "trading_signal": signal
+    }

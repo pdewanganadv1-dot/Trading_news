@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradingview Dashboard - Real-Time News & Sentiment</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2332;
+            --border-color: #2d3748;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-gold: #f59e0b;
+            --accent-silver: #a1a1aa;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(180deg, #1a2332 0%, #111827 100%);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+        .logo h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--accent-green);
+        }
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .last-update { font-size: 0.7rem; color: var(--text-secondary); }
+        .search-box { display: flex; gap: 0.5rem; align-items: center; }
+        .search-box input {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            color: var(--text-primary);
+            border-radius: 8px;
+            width: 180px;
+            font-size: 0.85rem;
+        }
+        .search-box button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .main-content { padding: 1.25rem; display: grid; grid-template-columns: 1fr 380px; gap: 1rem; }
+        .left-column { display: flex; flex-direction: column; gap: 1rem; }
+        .chart-card, .news-card, .sidebar-card, .sentiment-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.25rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .chart-title-group { display: flex; align-items: center; gap: 0.75rem; }
+        .chart-title-group h2 { font-size: 1rem; font-weight: 600; }
+        .symbol-badge {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+        .timeframe-tabs { display: flex; gap: 0.2rem; background: var(--bg-secondary); padding: 0.2rem; border-radius: 8px; }
+        .timeframe-tabs button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .timeframe-tabs button.active { background: var(--accent-blue); color: white; }
+        .chart-wrapper { height: 260px; position: relative; }
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 0.75rem; }
+        .stat-item { text-align: center; padding: 0.5rem; background: var(--bg-secondary); border-radius: 8px; }
+        .stat-label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; }
+        .stat-value { font-size: 0.9rem; font-weight: 600; margin-top: 0.2rem; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .card-title { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Sentiment Section */
+        .sentiment-section { margin-bottom: 1rem; }
+        .sentiment-overview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .sentiment-box {
+            text-align: center;
+            padding: 0.75rem;
+            border-radius: 10px;
+            background: var(--bg-secondary);
+        }
+        .sentiment-box.bullish { border: 1px solid var(--accent-green); }
+        .sentiment-box.bearish { border: 1px solid var(--accent-red); }
+        .sentiment-box.neutral { border: 1px solid var(--text-secondary); }
+        .sentiment-box-label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem; }
+        .sentiment-box-value { font-size: 1.25rem; font-weight: 700; }
+        .sentiment-box.bullish .sentiment-box-value { color: var(--accent-green); }
+        .sentiment-box.bearish .sentiment-box-value { color: var(--accent-red); }
+        .sentiment-box.neutral .sentiment-box-value { color: var(--text-secondary); }
+
+        .sentiment-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+        .sentiment-label { font-size: 0.7rem; color: var(--text-secondary); min-width: 100px; }
+        .sentiment-track { flex: 1; height: 8px; background: var(--bg-primary); border-radius: 4px; overflow: hidden; display: flex; }
+        .sentiment-fill { height: 100%; transition: width 0.5s ease; }
+        .sentiment-fill.bullish { background: var(--accent-green); }
+        .sentiment-fill.bearish { background: var(--accent-red); }
+        .sentiment-fill.neutral { background: var(--text-secondary); }
+        .sentiment-value { font-size: 0.75rem; font-weight: 600; min-width: 60px; text-align: right; }
+
+        .key-news-section { margin-top: 1rem; }
+        .key-news-title { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+        .key-news-title::before { content: '★'; color: var(--accent-gold); }
+        .key-news-item {
+            padding: 0.6rem;
+            border-radius: 8px;
+            margin-bottom: 0.4rem;
+            font-size: 0.75rem;
+            border-left: 3px solid;
+        }
+        .key-news-item.bullish { background: rgba(16, 185, 129, 0.1); border-left-color: var(--accent-green); }
+        .key-news-item.bearish { background: rgba(239, 68, 68, 0.1); border-left-color: var(--accent-red); }
+
+        .news-tabs { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+        .news-tab {
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .news-tab.active { background: var(--accent-blue); color: white; }
+        .news-list { max-height: 220px; overflow-y: auto; }
+        .news-item {
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.4rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .news-item:hover { background: var(--bg-secondary); }
+        .news-item.crypto { border-left-color: #f7931a; }
+        .news-item.gold { border-left-color: #f59e0b; }
+        .news-item.silver { border-left-color: #a1a1aa; }
+        .news-item.forex { border-left-color: #3b82f6; }
+        .news-title { font-size: 0.8rem; font-weight: 500; margin-bottom: 0.3rem; line-height: 1.4; }
+        .news-meta { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--text-secondary); }
+        .news-source { color: var(--accent-blue); }
+
+        .sidebar { display: flex; flex-direction: column; gap: 0.75rem; }
+        .price-display { text-align: center; padding: 0.75rem 0; }
+        .current-price { font-size: 2rem; font-weight: 700; background: linear-gradient(90deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .price-change { font-size: 0.9rem; margin-top: 0.4rem; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .signal-display { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0.75rem 0; }
+        .signal-badge {
+            padding: 0.6rem 1.5rem;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .signal-badge.buy { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .signal-badge.sell { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .signal-badge.hold { background: rgba(161, 161, 170, 0.2); color: var(--accent-silver); border: 1px solid var(--accent-silver); }
+        .signal-reason { font-size: 0.65rem; color: var(--text-secondary); text-align: center; max-width: 200px; }
+        .watchlist { max-height: 140px; overflow-y: auto; }
+        .watchlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 0.2rem;
+        }
+        .watchlist-item:hover { background: var(--bg-secondary); }
+        .symbol-info { display: flex; align-items: center; gap: 0.4rem; }
+        .symbol-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+        }
+        .symbol-icon.crypto { background: linear-gradient(135deg, #f7931a, #ff6b35); color: white; }
+        .symbol-icon.gold { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; }
+        .symbol-icon.silver { background: linear-gradient(135deg, #a1a1aa, #71717a); color: white; }
+        .symbol-icon.stock { background: linear-gradient(135deg, #10b981, #059669); color: white; }
+        .symbol-icon.forex { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
+        .symbol-name { font-size: 0.75rem; font-weight: 500; }
+        .price-value { font-size: 0.8rem; font-weight: 600; }
+        .price-change-small { font-size: 0.65rem; }
+        .commodities-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; }
+        .commodity-card {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 0.6rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .commodity-card:hover { transform: translateY(-2px); }
+        .commodity-name { font-size: 0.75rem; color: var(--text-secondary); }
+        .commodity-price { font-size: 0.85rem; font-weight: 600; margin-top: 0.2rem; }
+        .commodity-change { font-size: 0.65rem; margin-top: 0.1rem; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">TV</div>
+            <h1>Tradingview Dashboard</h1>
+        </div>
+        <div class="header-right">
+            <div class="live-indicator"><div class="live-dot"></div>LIVE</div>
+            <div class="last-update" id="lastUpdate">Updated: --</div>
+            <button onclick="refreshNews()" style="background:#238636;color:white;border:none;padding:0.4rem 0.75rem;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:500;">⟳ Refresh</button>
+            <div class="search-box">
+                <input type="text" id="symbolInput" placeholder="Symbol..." value="BTCUSD">
+                <button onclick="loadChart()">Analyze</button>
+            </div>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="left-column">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h2 id="chartTitle">Bitcoin / USD</h2>
+                        <span class="symbol-badge" id="symbolBadge">BTCUSD</span>
+                    </div>
+                    <div class="timeframe-tabs">
+                        <button onclick="setTimeframe('1m')">1M</button>
+                        <button onclick="setTimeframe('15m')">15M</button>
+                        <button onclick="setTimeframe('1h')" class="active">1H</button>
+                        <button onclick="setTimeframe('4h')">4H</button>
+                        <button onclick="setTimeframe('1D')">1D</button>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="priceChart"></canvas>
+                </div>
+                <div class="stats-row">
+                    <div class="stat-item"><div class="stat-label">Open</div><div class="stat-value" id="statOpen">--</div></div>
+                    <div class="stat-item"><div class="stat-label">High</div><div class="stat-value" id="statHigh">--</div></div>
+                    <div class="stat-item"><div class="stat-label">Low</div><div class="stat-value" id="statLow">--</div></div>
+                    <div class="stat-item"><div class="stat-label">Volume</div><div class="stat-value" id="statVolume">--</div></div>
+                </div>
+            </div>
+            <div class="news-card">
+                <div class="card-header">
+                    <span class="card-title">Live News & Sentiment Analysis</span>
+                </div>
+                <div class="sentiment-section">
+                    <div class="sentiment-overview">
+                        <div class="sentiment-box bullish">
+                            <div class="sentiment-box-label">Bullish</div>
+                            <div class="sentiment-box-value" id="bullishPct">--%</div>
+                        </div>
+                        <div class="sentiment-box neutral">
+                            <div class="sentiment-box-label">Neutral</div>
+                            <div class="sentiment-box-value" id="neutralPct">--%</div>
+                        </div>
+                        <div class="sentiment-box bearish">
+                            <div class="sentiment-box-label">Bearish</div>
+                            <div class="sentiment-box-value" id="bearishPct">--%</div>
+                        </div>
+                    </div>
+                    <div class="sentiment-bar">
+                        <span class="sentiment-label">Overall Sentiment:</span>
+                        <div class="sentiment-track">
+                            <div class="sentiment-fill bullish" id="sentimentBar" style="width: 33%"></div>
+                            <div class="sentiment-fill neutral" id="neutralBar" style="width: 33%"></div>
+                            <div class="sentiment-fill bearish" id="bearishBar" style="width: 33%"></div>
+                        </div>
+                        <span class="sentiment-value" id="sentimentValue">--</span>
+                    </div>
+                    <div class="key-news-section">
+                        <div class="key-news-title">Key News Driving Sentiment</div>
+                        <div id="keyNewsList"></div>
+                    </div>
+                </div>
+                <div class="news-tabs">
+                    <button class="news-tab active" onclick="loadNews('all')">All</button>
+                    <button class="news-tab" onclick="loadNews('crypto')">Crypto</button>
+                    <button class="news-tab" onclick="loadNews('commodities')">Metals</button>
+                    <button class="news-tab" onclick="loadNews('forex')">Forex</button>
+                </div>
+                <div class="news-list" id="newsList"></div>
+            </div>
+        </div>
+        <div class="sidebar">
+            <div class="sidebar-card">
+                <div class="card-header"><span class="card-title">Current Price</span></div>
+                <div class="price-display">
+                    <div class="current-price" id="currentPrice">$67,432.50</div>
+                    <div class="price-change positive" id="priceChange">+2.34%</div>
+                </div>
+                <div class="signal-display">
+                    <div class="signal-badge buy" id="tradingSignal">BUY</div>
+                    <div class="signal-reason" id="signalReason">Based on news sentiment</div>
+                </div>
+            </div>
+            <div class="sidebar-card">
+                <div class="card-header"><span class="card-title">Watchlist</span></div>
+                <div class="watchlist" id="watchlist">
+                    <div class="watchlist-item" onclick="setSymbol('BTCUSD')">
+                        <div class="symbol-info"><div class="symbol-icon crypto">₿</div><span class="symbol-name">Bitcoin</span></div>
+                        <div><div class="price-value">$67,432</div><div class="price-change-small positive">+2.34%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('ETHUSD')">
+                        <div class="symbol-info"><div class="symbol-icon crypto">Ξ</div><span class="symbol-name">Ethereum</span></div>
+                        <div><div class="price-value">$3,521</div><div class="price-change-small positive">+1.85%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('XAUUSD')">
+                        <div class="symbol-info"><div class="symbol-icon gold">Au</div><span class="symbol-name">Gold</span></div>
+                        <div><div class="price-value">$2,342</div><div class="price-change-small positive">+0.45%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('XAGUSD')">
+                        <div class="symbol-info"><div class="symbol-icon silver">Ag</div><span class="symbol-name">Silver</span></div>
+                        <div><div class="price-value">$28.45</div><div class="price-change-small negative">-0.32%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('EURUSD')">
+                        <div class="symbol-info"><div class="symbol-icon forex">€</div><span class="symbol-name">EUR/USD</span></div>
+                        <div><div class="price-value">1.0823</div><div class="price-change-small negative">-0.12%</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="sidebar-card">
+                <div class="card-header"><span class="card-title">Precious Metals</span></div>
+                <div class="commodities-grid">
+                    <div class="commodity-card" onclick="setSymbol('XAUUSD')">
+                        <div class="commodity-name">Gold</div>
+                        <div class="commodity-price">$2,342.80</div>
+                        <div class="commodity-change positive">+0.45%</div>
+                    </div>
+                    <div class="commodity-card" onclick="setSymbol('XAGUSD')">
+                        <div class="commodity-name">Silver</div>
+                        <div class="commodity-price">$28.45</div>
+                        <div class="commodity-change negative">-0.32%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let chart = null;
+        let currentTimeframe = '1h';
+        let currentCategory = 'all';
+        let currentNews = [];
+        const API_URL = 'http://localhost:8000';
+
+        const symbolData = {
+            'BTCUSD': { name: 'Bitcoin / USD', basePrice: 67000, icon: 'crypto', prefix: '$' },
+            'ETHUSD': { name: 'Ethereum / USD', basePrice: 3500, icon: 'crypto', prefix: '$' },
+            'XAUUSD': { name: 'Gold / USD', basePrice: 2340, icon: 'gold', prefix: '$' },
+            'XAGUSD': { name: 'Silver / USD', basePrice: 28.5, icon: 'silver', prefix: '$' },
+            'EURUSD': { name: 'Euro / USD', basePrice: 1.08, icon: 'forex', prefix: '' }
+        };
+
+        const bullishKeywords = ["surge", "surges", "soar", "rally", "gain", "gains", "rise", "high", "growth", "bullish", "positive", "record", "strong", "institutional", "adoption"];
+        const bearishKeywords = ["fall", "drop", "crash", "plunge", "decline", "bearish", "negative", "risk", "fear", "volatile", "dump", "weak", "sell"];
+
+        function analyzeSentiment(news) {
+            let bullish = 0, bearish = 0, neutral = 0;
+            const keyNews = { bullish: [], bearish: [] };
+
+            news.forEach(item => {
+                const text = (item.title + ' ' + item.description).toLowerCase();
+                const hasBullish = bullishKeywords.some(k => text.includes(k));
+                const hasBearish = bearishKeywords.some(k => text.includes(k));
+
+                if (hasBullish && !hasBearish) {
+                    bullish++;
+                    if (keyNews.bullish.length < 2) keyNews.bullish.push(item.title);
+                } else if (hasBearish && !hasBullish) {
+                    bearish++;
+                    if (keyNews.bearish.length < 2) keyNews.bearish.push(item.title);
+                } else {
+                    neutral++;
+                }
+            });
+
+            const total = bullish + bearish + neutral || 1;
+            return {
+                bullish: Math.round(bullish / total * 100),
+                bearish: Math.round(bearish / total * 100),
+                neutral: Math.round(neutral / total * 100),
+                keyNews: keyNews
+            };
+        }
+
+        function setSymbol(symbol) {
+            document.getElementById('symbolInput').value = symbol;
+            loadChart();
+            loadSentiment(symbol);
+        }
+
+        function setTimeframe(tf) {
+            currentTimeframe = tf;
+            document.querySelectorAll('.timeframe-tabs button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            loadChart();
+        }
+
+        function updateLastUpdate() {
+            document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+        }
+
+        function showUpdating() {
+            document.getElementById('lastUpdate').textContent = '⟳ Updating...';
+        }
+
+        function updateSentimentDisplay(sentiment) {
+            document.getElementById('bullishPct').textContent = sentiment.bullish + '%';
+            document.getElementById('bearishPct').textContent = sentiment.bearish + '%';
+            document.getElementById('neutralPct').textContent = sentiment.neutral + '%';
+
+            document.getElementById('bullishBar').style.width = sentiment.bullish + '%';
+            document.getElementById('neutralBar').style.width = sentiment.neutral + '%';
+            document.getElementById('bearishBar').style.width = sentiment.bearish + '%';
+
+            const overall = sentiment.bullish > sentiment.bearish ? 'BULLISH' : sentiment.bearish > sentiment.bullish ? 'BEARISH' : 'NEUTRAL';
+            document.getElementById('sentimentValue').textContent = overall;
+            document.getElementById('sentimentValue').style.color = overall === 'BULLISH' ? '#10b981' : overall === 'BEARISH' ? '#ef4444' : '#94a3b8';
+
+            // Key news
+            const keyNewsList = document.getElementById('keyNewsList');
+            let keyHtml = '';
+            sentiment.keyNews.bullish.forEach(n => {
+                keyHtml += `<div class="key-news-item bullish">📈 ${n}</div>`;
+            });
+            sentiment.keyNews.bearish.forEach(n => {
+                keyHtml += `<div class="key-news-item bearish">📉 ${n}</div>`;
+            });
+            keyNewsList.innerHTML = keyHtml || '<div style="font-size:0.7rem;color:#94a3b8;">Analyzing news...</div>';
+        }
+
+        function loadSentiment(symbol) {
+            fetch(API_URL + '/api/v1/sentiment/symbol/' + symbol)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.trading_signal) {
+                        const signal = data.trading_signal;
+                        const signalEl = document.getElementById('tradingSignal');
+                        signalEl.textContent = signal.signal;
+                        signalEl.className = 'signal-badge ' + signal.signal.toLowerCase();
+                        document.getElementById('signalReason').textContent = signal.reason || 'Based on news analysis';
+                    }
+                })
+                .catch(err => console.error('Sentiment error:', err));
+
+            // Also get news for local sentiment analysis
+            let endpoint = '/api/v1/news';
+            if (currentCategory === 'crypto') endpoint = '/api/v1/news/crypto';
+            else if (currentCategory === 'commodities') endpoint = '/api/v1/news/commodities';
+            else if (currentCategory === 'forex') endpoint = '/api/v1/news/forex';
+
+            fetch(API_URL + endpoint)
+                .then(res => res.json())
+                .then(news => {
+                    const sentiment = analyzeSentiment(news);
+                    updateSentimentDisplay(sentiment);
+                })
+                .catch(err => console.error('News sentiment error:', err));
+        }
+
+        function loadNews(category) {
+            currentCategory = category;
+            document.querySelectorAll('.news-tab').forEach(tab => tab.classList.remove('active'));
+            if (event && event.target) event.target.classList.add('active');
+
+            const newsList = document.getElementById('newsList');
+            newsList.innerHTML = '<div style="text-align:center;padding:0.75rem;color:#94a3b8;">⟳ Fetching live news...</div>';
+            showUpdating();
+            console.log('Loading news for category:', category);
+
+            let endpoint = '/api/v1/news/live/crypto';
+            if (category === 'all') endpoint = '/api/v1/news/live/crypto';
+            else if (category === 'crypto') endpoint = '/api/v1/news/live/crypto';
+            else if (category === 'commodities') endpoint = '/api/v1/news/live/metals';
+            else if (category === 'forex') endpoint = '/api/v1/news/forex';
+
+            console.log('Fetching from:', API_URL + endpoint);
+
+            fetch(API_URL + endpoint)
+                .then(res => {
+                    console.log('Response status:', res.status);
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Data received:', data);
+                    let news = [];
+                    if (data.news) news = data.news;
+                    else if (Array.isArray(data)) news = data;
+
+                    if (!news || news.length === 0) {
+                        newsList.innerHTML = '<div style="text-align:center;padding:0.75rem;color:#94a3b8;">No live news available</div>';
+                        return;
+                    }
+
+                    currentNews = news;
+                    newsList.innerHTML = news.slice(0, 8).map(item => {
+                        const source = item.source || 'Unknown';
+                        let categoryClass = 'stock';
+                        if (source.toLowerCase().includes('crypto')) categoryClass = 'crypto';
+                        else if (source.toLowerCase().includes('gold') || source.toLowerCase().includes('silver') || source.toLowerCase().includes('kitco')) categoryClass = 'gold';
+                        else if (source.toLowerCase().includes('forex')) categoryClass = 'forex';
+
+                        let timeStr = '--';
+                        if (item.published_at) {
+                            const d = new Date(item.published_at);
+                            if (!isNaN(d)) timeStr = d.toLocaleTimeString();
+                        }
+
+                        return `
+                            <div class="news-item ${categoryClass}">
+                                <div class="news-title">${item.title}</div>
+                                <div class="news-meta">
+                                    <span class="news-source">${source}</span>
+                                    <span>${timeStr}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Analyze sentiment and update display
+                    const sentiment = analyzeSentiment(news);
+                    updateSentimentDisplay(sentiment);
+                    updateLastUpdate();
+                })
+                .catch(err => {
+                    console.error('News error:', err);
+                    newsList.innerHTML = '<div style="text-align:center;padding:0.75rem;color:#94a3b8;">Failed to load - check console</div>';
+                });
+        }
+
+        function generateMockData(basePrice) {
+            const data = [];
+            let price = basePrice;
+            const now = Date.now();
+            const points = currentTimeframe === '1m' ? 60 : currentTimeframe === '15m' ? 48 : currentTimeframe === '1h' ? 100 : currentTimeframe === '4h' ? 48 : 30;
+            const volatility = basePrice * 0.02;
+            for (let i = points; i >= 0; i--) {
+                price += (Math.random() - 0.5) * volatility;
+                data.push({ time: new Date(now - i * (currentTimeframe === '1m' ? 60000 : currentTimeframe === '15m' ? 900000 : currentTimeframe === '1h' ? 3600000 : currentTimeframe === '4h' ? 14400000 : 86400000)), price: price });
+            }
+            return data;
+        }
+
+        function loadChart() {
+            const symbol = document.getElementById('symbolInput').value.toUpperCase();
+            const info = symbolData[symbol] || { name: symbol, basePrice: 100, icon: 'stock', prefix: '$' };
+            document.getElementById('chartTitle').textContent = info.name;
+            document.getElementById('symbolBadge').textContent = symbol;
+            const data = generateMockData(info.basePrice);
+            const currentPrice = data[data.length - 1].price;
+            const previousPrice = data[0].price;
+            const change = currentPrice - previousPrice;
+            const changePercent = (change / previousPrice * 100);
+            const isPositive = change >= 0;
+            document.getElementById('currentPrice').textContent = info.prefix + currentPrice.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0, maximumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            document.getElementById('priceChange').innerHTML = (isPositive ? '+' : '') + changePercent.toFixed(2) + '%';
+            document.getElementById('priceChange').className = 'price-change ' + (isPositive ? 'positive' : 'negative');
+            const high = Math.max(...data.map(d => d.price));
+            const low = Math.min(...data.map(d => d.price));
+            document.getElementById('statOpen').textContent = info.prefix + previousPrice.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            document.getElementById('statHigh').textContent = info.prefix + high.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            document.getElementById('statLow').textContent = info.prefix + low.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            document.getElementById('statVolume').textContent = (Math.floor(Math.random() * 10 + 1)) + 'M';
+            if (chart) chart.destroy();
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 260);
+            gradient.addColorStop(0, isPositive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: data.map(d => d.time.toLocaleTimeString()), datasets: [{ label: 'Price', data: data.map(d => d.price), borderColor: isPositive ? '#10b981' : '#ef4444', backgroundColor: gradient, fill: true, tension: 0.4, pointRadius: 0, borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { color: '#2d3748' }, ticks: { color: '#94a3b8' } } } }
+            });
+        }
+
+        // Auto-refresh every 10 seconds for live updates
+        setInterval(() => {
+            loadNews(currentCategory);
+        }, 10000);
+
+        loadChart();
+        loadNews('all');
+
+        function refreshNews() {
+            showUpdating();
+            loadNews(currentCategory);
+        }
+    </script>
+</body>
+</html>

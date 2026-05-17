@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradingview Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-card: #1a2332;
+            --border-color: #2d3748;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-gold: #f59e0b;
+            --accent-silver: #a1a1aa;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(180deg, #1a2332 0%, #111827 100%);
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+        .logo h1 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .search-box { display: flex; gap: 0.5rem; align-items: center; }
+        .search-box input {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 0.625rem 1rem;
+            color: var(--text-primary);
+            border-radius: 8px;
+            width: 200px;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .search-box input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+        .search-box button {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border: none;
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .search-box button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4); }
+        .main-content { padding: 1.5rem; display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
+        .chart-section { display: flex; flex-direction: column; gap: 1rem; }
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .chart-title-group { display: flex; align-items: center; gap: 0.75rem; }
+        .chart-title-group h2 { font-size: 1.1rem; font-weight: 600; }
+        .symbol-badge {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .timeframe-tabs { display: flex; gap: 0.25rem; background: var(--bg-secondary); padding: 0.25rem; border-radius: 8px; }
+        .timeframe-tabs button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .timeframe-tabs button.active { background: var(--accent-blue); color: white; }
+        .chart-wrapper { height: 350px; position: relative; }
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem; }
+        .stat-item { text-align: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 10px; }
+        .stat-label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 1rem; font-weight: 600; margin-top: 0.25rem; }
+        .sidebar { display: flex; flex-direction: column; gap: 1rem; }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.25rem;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .card-title { font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .price-display { text-align: center; padding: 1rem 0; }
+        .current-price { font-size: 2.5rem; font-weight: 700; background: linear-gradient(90deg, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .price-change { font-size: 1rem; margin-top: 0.5rem; display: flex; justify-content: center; align-items: center; gap: 0.5rem; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .signal-display { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem 0; }
+        .signal-badge {
+            padding: 0.75rem 2rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .signal-badge.buy { background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .signal-badge.sell { background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .signal-badge.hold { background: linear-gradient(135deg, rgba(161, 161, 170, 0.2) 0%, rgba(161, 161, 170, 0.1) 100%); color: var(--accent-silver); border: 1px solid var(--accent-silver); }
+        .watchlist { max-height: 280px; overflow-y: auto; }
+        .watchlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.875rem 0.75rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 0.25rem;
+        }
+        .watchlist-item:hover { background: var(--bg-secondary); }
+        .watchlist-item.active { background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent-blue); }
+        .symbol-info { display: flex; align-items: center; gap: 0.75rem; }
+        .symbol-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+        .symbol-icon.crypto { background: linear-gradient(135deg, #f7931a 0%, #ff6b35 100%); color: white; }
+        .symbol-icon.gold { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .symbol-icon.silver { background: linear-gradient(135deg, #a1a1aa 0%, #71717a 100%); color: white; }
+        .symbol-icon.stock { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; }
+        .symbol-icon.forex { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+        .symbol-name { font-weight: 500; font-size: 0.9rem; }
+        .symbol-ticker { font-size: 0.75rem; color: var(--text-secondary); }
+        .symbol-price { text-align: right; }
+        .price-value { font-weight: 600; font-size: 0.95rem; }
+        .price-change-small { font-size: 0.75rem; margin-top: 0.125rem; }
+        .commodities-section { margin-top: 1rem; }
+        .commodities-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 0.75rem; }
+        .commodity-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .commodity-card:hover { border-color: var(--border-color); transform: translateY(-2px); }
+        .commodity-card.active { border-color: var(--accent-gold); background: rgba(245, 158, 11, 0.1); }
+        .commodity-header { display: flex; justify-content: space-between; align-items: center; }
+        .commodity-name { font-size: 0.85rem; color: var(--text-secondary); }
+        .commodity-icon { font-size: 1.25rem; }
+        .commodity-price { font-size: 1.1rem; font-weight: 600; margin-top: 0.5rem; }
+        .commodity-change { font-size: 0.75rem; margin-top: 0.25rem; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <div class="logo-icon">TV</div>
+            <h1>Tradingview Dashboard</h1>
+        </div>
+        <div class="search-box">
+            <input type="text" id="symbolInput" placeholder="Search symbol..." value="BTCUSD">
+            <button onclick="loadChart()">Analyze</button>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="chart-section">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h2 id="chartTitle">Bitcoin / USD</h2>
+                        <span class="symbol-badge" id="symbolBadge">BTCUSD</span>
+                    </div>
+                    <div class="timeframe-tabs">
+                        <button onclick="setTimeframe('1m')">1M</button>
+                        <button onclick="setTimeframe('15m')">15M</button>
+                        <button onclick="setTimeframe('1h')" class="active">1H</button>
+                        <button onclick="setTimeframe('4h')">4H</button>
+                        <button onclick="setTimeframe('1D')">1D</button>
+                    </div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="priceChart"></canvas>
+                </div>
+                <div class="stats-row">
+                    <div class="stat-item"><div class="stat-label">Open</div><div class="stat-value" id="statOpen">--</div></div>
+                    <div class="stat-item"><div class="stat-label">High</div><div class="stat-value" id="statHigh">--</div></div>
+                    <div class="stat-item"><div class="stat-label">Low</div><div class="stat-value" id="statLow">--</div></div>
+                    <div class="stat-item"><div class="stat-label">Volume</div><div class="stat-value" id="statVolume">--</div></div>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar">
+            <div class="card">
+                <div class="card-header"><span class="card-title">Current Price</span></div>
+                <div class="price-display">
+                    <div class="current-price" id="currentPrice">$67,432.50</div>
+                    <div class="price-change positive" id="priceChange">
+                        <span>+2.34%</span>
+                    </div>
+                </div>
+                <div class="signal-display">
+                    <div class="signal-badge buy" id="tradingSignal">BUY</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header"><span class="card-title">Watchlist</span></div>
+                <div class="watchlist" id="watchlist">
+                    <div class="watchlist-item" onclick="setSymbol('BTCUSD')">
+                        <div class="symbol-info"><div class="symbol-icon crypto">₿</div><div><div class="symbol-name">Bitcoin</div><div class="symbol-ticker">BTCUSD</div></div></div>
+                        <div class="symbol-price"><div class="price-value">$67,432</div><div class="price-change-small positive">+2.34%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('ETHUSD')">
+                        <div class="symbol-info"><div class="symbol-icon crypto">Ξ</div><div><div class="symbol-name">Ethereum</div><div class="symbol-ticker">ETHUSD</div></div></div>
+                        <div class="symbol-price"><div class="price-value">$3,521</div><div class="price-change-small positive">+1.85%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('XAUUSD')">
+                        <div class="symbol-info"><div class="symbol-icon gold">Au</div><div><div class="symbol-name">Gold</div><div class="symbol-ticker">XAUUSD</div></div></div>
+                        <div class="symbol-price"><div class="price-value">$2,342.80</div><div class="price-change-small positive">+0.45%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('XAGUSD')">
+                        <div class="symbol-info"><div class="symbol-icon silver">Ag</div><div><div class="symbol-name">Silver</div><div class="symbol-ticker">XAGUSD</div></div></div>
+                        <div class="symbol-price"><div class="price-value">$28.45</div><div class="price-change-small negative">-0.32%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('AAPL')">
+                        <div class="symbol-info"><div class="symbol-icon stock">A</div><div><div class="symbol-name">Apple Inc</div><div class="symbol-ticker">NASDAQ</div></div></div>
+                        <div class="symbol-price"><div class="price-value">$189.45</div><div class="price-change-small positive">+0.78%</div></div>
+                    </div>
+                    <div class="watchlist-item" onclick="setSymbol('EURUSD')">
+                        <div class="symbol-info"><div class="symbol-icon forex">€</div><div><div class="symbol-name">Euro / Dollar</div><div class="symbol-ticker">FX</div></div></div>
+                        <div class="symbol-price"><div class="price-value">1.0823</div><div class="price-change-small negative">-0.12%</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card commodities-section">
+                <div class="card-header"><span class="card-title">Precious Metals</span></div>
+                <div class="commodities-grid">
+                    <div class="commodity-card" onclick="setSymbol('XAUUSD')">
+                        <div class="commodity-header"><span class="commodity-name">Gold</span><span class="commodity-icon">🥇</span></div>
+                        <div class="commodity-price">$2,342.80</div>
+                        <div class="commodity-change positive">+0.45%</div>
+                    </div>
+                    <div class="commodity-card" onclick="setSymbol('XAGUSD')">
+                        <div class="commodity-header"><span class="commodity-name">Silver</span><span class="commodity-icon">🥈</span></div>
+                        <div class="commodity-price">$28.45</div>
+                        <div class="commodity-change negative">-0.32%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let chart = null;
+        let currentTimeframe = '1h';
+        const API_URL = 'http://localhost:8000';
+
+        const symbolData = {
+            'BTCUSD': { name: 'Bitcoin / USD', basePrice: 67000, icon: 'crypto', prefix: '$' },
+            'ETHUSD': { name: 'Ethereum / USD', basePrice: 3500, icon: 'crypto', prefix: '$' },
+            'XAUUSD': { name: 'Gold / USD', basePrice: 2340, icon: 'gold', prefix: '$' },
+            'XAGUSD': { name: 'Silver / USD', basePrice: 28.5, icon: 'silver', prefix: '$' },
+            'AAPL': { name: 'Apple Inc', basePrice: 189, icon: 'stock', prefix: '$' },
+            'EURUSD': { name: 'Euro / USD', basePrice: 1.08, icon: 'forex', prefix: '' }
+        };
+
+        function setSymbol(symbol) {
+            document.getElementById('symbolInput').value = symbol;
+            loadChart();
+            document.querySelectorAll('.watchlist-item').forEach(item => item.classList.remove('active'));
+            event.target.closest('.watchlist-item')?.classList.add('active');
+        }
+
+        function setTimeframe(tf) {
+            currentTimeframe = tf;
+            document.querySelectorAll('.timeframe-tabs button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            loadChart();
+        }
+
+        function generateMockData(basePrice) {
+            const data = [];
+            let price = basePrice;
+            const now = Date.now();
+            const points = currentTimeframe === '1m' ? 60 : currentTimeframe === '15m' ? 48 : currentTimeframe === '1h' ? 100 : currentTimeframe === '4h' ? 48 : 30;
+            const volatility = basePrice * 0.02;
+            for (let i = points; i >= 0; i--) {
+                price += (Math.random() - 0.5) * volatility;
+                data.push({ time: new Date(now - i * (currentTimeframe === '1m' ? 60000 : currentTimeframe === '15m' ? 900000 : currentTimeframe === '1h' ? 3600000 : currentTimeframe === '4h' ? 14400000 : 86400000)), price: price });
+            }
+            return data;
+        }
+
+        function loadChart() {
+            const symbol = document.getElementById('symbolInput').value.toUpperCase();
+            const info = symbolData[symbol] || { name: symbol, basePrice: 100, icon: 'stock', prefix: '$' };
+
+            document.getElementById('chartTitle').textContent = info.name;
+            document.getElementById('symbolBadge').textContent = symbol;
+
+            const data = generateMockData(info.basePrice);
+            const currentPrice = data[data.length - 1].price;
+            const previousPrice = data[0].price;
+            const change = currentPrice - previousPrice;
+            const changePercent = (change / previousPrice * 100);
+
+            const isPositive = change >= 0;
+            document.getElementById('currentPrice').textContent = info.prefix + currentPrice.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0, maximumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            const changeEl = document.getElementById('priceChange');
+            changeEl.innerHTML = `<span>${isPositive ? '+' : ''}${changePercent.toFixed(2)}%</span>`;
+            changeEl.className = `price-change ${isPositive ? 'positive' : 'negative'}`;
+
+            const high = Math.max(...data.map(d => d.price));
+            const low = Math.min(...data.map(d => d.price));
+            const volume = Math.floor(Math.random() * 10000000 + 1000000);
+            document.getElementById('statOpen').textContent = info.prefix + previousPrice.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            document.getElementById('statHigh').textContent = info.prefix + high.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            document.getElementById('statLow').textContent = info.prefix + low.toLocaleString(undefined, { minimumFractionDigits: info.basePrice < 100 ? 2 : 0 });
+            document.getElementById('statVolume').textContent = (volume / 1000000).toFixed(2) + 'M';
+
+            const signals = ['BUY', 'SELL', 'HOLD'];
+            const weights = [0.3, 0.3, 0.4];
+            const rand = Math.random();
+            let signal = 'HOLD';
+            if (rand < weights[0]) signal = 'BUY';
+            else if (rand < weights[0] + weights[1]) signal = 'SELL';
+            const signalEl = document.getElementById('tradingSignal');
+            signalEl.textContent = signal;
+            signalEl.className = `signal-badge ${signal.toLowerCase()}`;
+
+            if (chart) chart.destroy();
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 350);
+            gradient.addColorStop(0, isPositive ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.time.toLocaleTimeString()),
+                    datasets: [{
+                        label: 'Price',
+                        data: data.map(d => d.price),
+                        borderColor: isPositive ? '#10b981' : '#ef4444',
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { grid: { color: '#2d3748' }, ticks: { color: '#94a3b8' } }
+                    },
+                    interaction: { intersect: false, mode: 'index' }
+                }
+            });
+        }
+
+        loadChart();
+    </script>
+</body>
+</html>
