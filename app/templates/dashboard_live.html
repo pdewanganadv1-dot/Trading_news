@@ -806,6 +806,29 @@
             color: var(--text-secondary);
             border: 1px solid rgba(136, 136, 160, 0.2);
         }
+
+        /* Signal Log */
+        #signalLogList { max-height: 300px; overflow-y: auto; }
+        .signal-log-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.5rem 0.75rem; margin-bottom: 0.3rem;
+            background: var(--bg-secondary); border-radius: 8px;
+            border-left: 3px solid var(--text-secondary);
+            font-size: 0.75rem;
+        }
+        .signal-log-item.buy { border-left-color: var(--accent-green); }
+        .signal-log-item.sell { border-left-color: var(--accent-red); }
+        .signal-log-item.hold { border-left-color: var(--text-secondary); }
+        .signal-log-symbol { font-weight: 600; color: var(--text-primary); min-width: 50px; }
+        .signal-log-sig { font-weight: 700; min-width: 50px; text-align: center; }
+        .signal-log-sig.buy { color: var(--accent-green); }
+        .signal-log-sig.sell { color: var(--accent-red); }
+        .signal-log-price { color: var(--text-secondary); min-width: 70px; text-align: right; }
+        .signal-log-conf { min-width: 40px; text-align: center; font-weight: 600; }
+        .signal-log-time { font-size: 0.6rem; color: var(--text-secondary); min-width: 60px; text-align: right; }
+        .signal-log-notified { font-size: 0.6rem; min-width: 50px; text-align: center; }
+        .signal-log-notified.yes { color: var(--accent-green); }
+        .signal-log-notified.no { color: var(--text-secondary); }
     </style>
 </head>
 <body>
@@ -955,6 +978,22 @@
                     <div class="loading">⏳ Loading news...</div>
                 </div>
             </div>
+
+            <!-- Signal Log -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h2 style="font-size:0.85rem;">📡 Signal Alert Log</h2>
+                        <span class="symbol-badge" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.6rem;" id="signalLogCount">0 signals</span>
+                    </div>
+                    <div>
+                        <span style="color:var(--accent-green);font-size:0.65rem;">● Active Monitor</span>
+                    </div>
+                </div>
+                <div id="signalLogList">
+                    <div class="no-news">No signals yet. Waiting for high-confidence alerts...</div>
+                </div>
+            </div>
         </div>
 
         <!-- Right Sidebar -->
@@ -993,6 +1032,11 @@
                         <div class="stat-box-icon">➡️</div>
                         <div class="stat-box-value" id="neutralCount">--</div>
                         <div class="stat-box-label">Neutral</div>
+                    </div>
+                    <div class="stat-box total">
+                        <div class="stat-box-icon">🪙</div>
+                        <div class="stat-box-value" id="signalAlertCount">0</div>
+                        <div class="stat-box-label">Alerts Sent</div>
                     </div>
                 </div>
             </div>
@@ -1414,8 +1458,48 @@
             }
         }, 10000);
 
+        // Signal log polling
+        async function loadSignalLog() {
+            try {
+                const resp = await fetch('/api/v1/signals/log?limit=50');
+                const data = await resp.json();
+                if (data.status !== 'success') return;
+
+                const list = document.getElementById('signalLogList');
+                const sigs = data.signals;
+
+                document.getElementById('signalLogCount').textContent = sigs.length + ' signals';
+
+                let alerted = sigs.filter(s => s.notified).length;
+                document.getElementById('signalAlertCount').textContent = alerted;
+
+                if (sigs.length === 0) {
+                    list.innerHTML = '<div class="no-news">No signals yet. Waiting for high-confidence alerts...</div>';
+                    return;
+                }
+
+                list.innerHTML = sigs.map(s => {
+                    const cls = s.signal.toLowerCase();
+                    const notified = s.notified ? '✅' : '—';
+                    const time = s.timestamp ? new Date(s.timestamp + 'Z').toLocaleTimeString() : '--';
+                    return `<div class="signal-log-item ${cls}">
+                        <span class="signal-log-symbol">${s.symbol}</span>
+                        <span class="signal-log-sig ${cls}">${s.signal}</span>
+                        <span class="signal-log-price">$${Number(s.price).toLocaleString()}</span>
+                        <span class="signal-log-conf">${(s.confidence * 100).toFixed(0)}%</span>
+                        <span class="signal-log-notified ${s.notified ? 'yes' : 'no'}">${notified}</span>
+                        <span class="signal-log-time">${time}</span>
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                console.log('Signal log error:', e);
+            }
+        }
+
         // Initial load
         loadAssetData('btc');
+        loadSignalLog();
+        setInterval(loadSignalLog, 10000);
     </script>
 </body>
 </html>

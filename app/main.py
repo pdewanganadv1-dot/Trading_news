@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
@@ -11,11 +12,23 @@ from app.routes.debug import router as debug_router
 from app.routes.indicators import router as indicators_router
 from app.routes.market_realtime import router as market_realtime_router
 from app.routes.websocket import router as websocket_router
+from app.routes.signals_log import router as signals_log_router
+import asyncio
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.services.signal_monitor import signal_monitor_loop
+    task = asyncio.create_task(signal_monitor_loop())
+    yield
+    task.cancel()
+
 
 app = FastAPI(
     title="Tradingview Integration API",
     description="Full-stack Tradingview integration for all markets",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -26,13 +39,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def root():
     return {"status": "online", "service": "Tradingview Integration API"}
 
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
 
 app.include_router(market_router)
 app.include_router(trading_router)
@@ -44,3 +60,4 @@ app.include_router(debug_router)
 app.include_router(indicators_router)
 app.include_router(market_realtime_router)
 app.include_router(websocket_router)
+app.include_router(signals_log_router)
