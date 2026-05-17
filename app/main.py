@@ -19,9 +19,12 @@ import asyncio
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.services.signal_monitor import signal_monitor_loop
-    task = asyncio.create_task(signal_monitor_loop())
+    from app.services.telegram_bot import telegram_poll_loop
+    task1 = asyncio.create_task(signal_monitor_loop())
+    task2 = asyncio.create_task(telegram_poll_loop())
     yield
-    task.cancel()
+    task1.cancel()
+    task2.cancel()
 
 
 app = FastAPI(
