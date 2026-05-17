@@ -360,7 +360,7 @@ def filter_news_by_symbol(news: list, symbol: str) -> list:
     company_keywords = _COMPANY_NAMES.get(symbol_lower, [])
     keywords.extend(company_keywords)
 
-    cutoff = datetime.utcnow() - timedelta(hours=48)
+    cutoff = datetime.utcnow() - timedelta(hours=168)
 
     scored = []
     seen = set()

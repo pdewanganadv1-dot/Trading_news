@@ -89,16 +89,10 @@ class RealNewsService:
         return news[:25]
 
     async def get_metals_news(self) -> List[Dict]:
-        """Fetch precious metals news (gold, silver) from multiple sources."""
+        """Fetch precious metals news (gold, silver) from multiple sources + Google News."""
         news = []
         sources = [
-            ("Kitco", "https://www.kitco.com/rss/newsatest.rss"),
-            ("GoldBroker", "https://www.goldbroker.com/feed"),
             ("SilverDoctors", "https://www.silverdoctors.com/feed/"),
-            ("Gold-Eagle", "https://www.gold-eagle.com/rss"),
-            ("SchiffGold", "https://schiffgold.com/feed/"),
-            ("MisesInstitute", "https://mises.org/rss/latest.xml"),
-            ("CaseyResearch", "https://caseyresearch.com/feed/"),
         ]
 
         tasks = [self._fetch_rss(url, name) for name, url in sources]
@@ -108,7 +102,40 @@ class RealNewsService:
             if isinstance(result, list):
                 news.extend(result)
 
-        return news[:20]
+        # Supplement with Google News RSS for fresh metals news
+        for query in ["gold+price", "silver+price", "precious+metals"]:
+            url = f"https://news.google.com/rss/search?q={query}&hl=en-US&gl=US"
+            try:
+                resp = await self.session.get(url, timeout=10)
+                if resp.status_code == 200:
+                    import xml.etree.ElementTree as ET
+                    root = ET.fromstring(resp.text)
+                    for item in root.iter("item"):
+                        title = item.findtext("title", "")
+                        link = item.findtext("link", "")
+                        desc = item.findtext("description", "")[:200] if item.findtext("description") else ""
+                        pub = item.findtext("pubDate", "")
+                        source = item.findtext("source", "") or "Google News"
+                        news.append({
+                            "title": title,
+                            "description": desc,
+                            "url": link,
+                            "source": source,
+                            "published_at": pub,
+                            "category": "metals"
+                        })
+            except Exception as e:
+                print(f"Google News metals error: {e}")
+
+        # Dedup by title
+        seen = set()
+        unique = []
+        for n in news:
+            t = n.get("title", "").strip()
+            if t and t not in seen:
+                seen.add(t)
+                unique.append(n)
+        return unique[:50]
 
     async def get_forex_news(self) -> List[Dict]:
         """Fetch forex news from multiple sources."""
