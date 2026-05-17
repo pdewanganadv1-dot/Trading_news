@@ -210,27 +210,27 @@ async def _handle_message(text: str, chat_id: int):
 
 
 async def telegram_poll_loop():
-    client = httpx.AsyncClient(timeout=10)
     offset = 0
     check_counter = 0
 
     while True:
         try:
-            resp = await client.post(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates",
-                json={"offset": offset, "timeout": 10},
-            )
-            data = resp.json()
-            if data.get("ok"):
-                for update in data.get("result", []):
-                    update_id = update["update_id"]
-                    if update_id >= offset:
-                        offset = update_id + 1
-                    msg = update.get("message", {})
-                    text = msg.get("text", "")
-                    chat_id = msg.get("chat", {}).get("id", "")
-                    if text and str(chat_id) == CHAT_ID:
-                        await _handle_message(text, chat_id)
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates",
+                    json={"offset": offset, "timeout": 10},
+                )
+                data = resp.json()
+                if data.get("ok"):
+                    for update in data.get("result", []):
+                        update_id = update["update_id"]
+                        if update_id >= offset:
+                            offset = update_id + 1
+                        msg = update.get("message", {})
+                        text = msg.get("text", "")
+                        chat_id = msg.get("chat", {}).get("id", "")
+                        if text and str(chat_id) == CHAT_ID:
+                            await _handle_message(text, chat_id)
 
             check_counter += 1
             if check_counter >= 10:
@@ -238,6 +238,8 @@ async def telegram_poll_loop():
                 await _check_price_alerts()
 
         except Exception as e:
-            print(f"Telegram poll error: {e}")
+            import traceback
+            print(f"Telegram poll error ({type(e).__name__}): {e}")
+            traceback.print_exc()
 
         await asyncio.sleep(3)

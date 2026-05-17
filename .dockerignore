@@ -9,3 +9,4 @@ signals/
 stock_data/
 .gitignore
 .dockerignore
+signals.db
