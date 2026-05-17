@@ -63,7 +63,8 @@ def _build_help() -> str:
         "📊 *Market Data*\n"
         "• `btc` / `eth` / `gold` / `silver` — Price, signal & chart\n"
         "• `reliance` / `tcs` / `hdfcbank` / `infy` / `icicibank` — Indian stock price + signal + chart\n"
-        "• `summary` — Dashboard overview for all tracked assets\n\n"
+        "• `summary` — Dashboard overview for all tracked assets\n"
+        "• `stocks` — List all monitored assets by category\n\n"
         "🔥 *Edge Scanner*\n"
         "• `edges` — Top 10 stocks ranked by edge score (0-10)\n"
         "• `edge <symbol>` — Edge scan for any stock (e.g. `edge reliance`)\n"
@@ -213,6 +214,21 @@ async def _handle_message(text: str, chat_id: int):
         prices, signals, news_count, sentiment, social_verdict = await _fetch_dashboard_data()
         msg = _build_summary(prices, signals, news_count, sentiment, social_verdict)
         return await telegram_notifier.send_message(msg)
+
+    if text in ('stocks', '/stocks', 'list', '/list'):
+        from app.services.signal_monitor import _MONITORED_SYMBOLS
+        crypto = [s.upper() for s in _MONITORED_SYMBOLS if s in ('btc', 'eth')]
+        metals = [s.upper() for s in _MONITORED_SYMBOLS if s in ('gold', 'silver')]
+        indian = [s.upper() for s in _MONITORED_SYMBOLS if s not in ('btc', 'eth', 'gold', 'silver')]
+        lines = ["📋 *Tracked Assets*\n"]
+        lines.append(f"*Crypto ({len(crypto)})*")
+        lines.append("`" + ", ".join(crypto) + "`\n")
+        lines.append(f"*Metals ({len(metals)})*")
+        lines.append("`" + ", ".join(metals) + "`\n")
+        lines.append(f"*Nifty 100 Stocks ({len(indian)})*")
+        lines.append("`" + ", ".join(indian) + "`\n")
+        lines.append("💡 Type any symbol to get price + signal")
+        return await telegram_notifier.send_message("\n".join(lines))
 
     if text == '/accuracy':
         stats = get_accuracy_stats()
