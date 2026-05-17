@@ -9,3 +9,6 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 alembic==1.13.1
 python-multipart==0.0.6
+mplfinance>=0.12.10
+pandas>=2.0.0
+pytz>=2023.3

@@ -4,6 +4,7 @@ from typing import List, Dict
 from app.config import settings
 from app.services.market_data_service import market_data_service, TradingSignals
 from app.services.telegram_notifier import telegram_notifier
+from app.services.accuracy_tracker import record_signal, resolve_signals
 
 
 signal_log: List[Dict] = []
@@ -25,6 +26,8 @@ async def check_and_notify():
             sig = signal_data['signal']
             conf = signal_data['confidence']
             price = price_data['price']
+
+            await record_signal(symbol, sig, conf, price, signal_data.get('reasons', []))
 
             entry = {
                 'symbol': symbol.upper(),
@@ -55,8 +58,13 @@ async def check_and_notify():
 
 
 async def signal_monitor_loop():
+    resolve_counter = 0
     while True:
         await check_and_notify()
+        resolve_counter += 1
+        if resolve_counter >= 30:
+            resolve_counter = 0
+            await resolve_signals()
         await asyncio.sleep(settings.signal_check_interval_seconds)
 
 

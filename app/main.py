@@ -20,11 +20,14 @@ import asyncio
 async def lifespan(app: FastAPI):
     from app.services.signal_monitor import signal_monitor_loop
     from app.services.telegram_bot import telegram_poll_loop
+    from app.services.daily_report import daily_report_loop
     task1 = asyncio.create_task(signal_monitor_loop())
     task2 = asyncio.create_task(telegram_poll_loop())
+    task3 = asyncio.create_task(daily_report_loop())
     yield
     task1.cancel()
     task2.cancel()
+    task3.cancel()
 
 
 app = FastAPI(
