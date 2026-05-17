@@ -6,6 +6,8 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-7424796820:AAFwug5i-Q1CoAe-4qkIHfRPLdwAysFc-pY}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-5163568145}

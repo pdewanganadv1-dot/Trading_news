@@ -8,6 +8,7 @@ from app.services.telegram_notifier import telegram_notifier
 from app.services.real_news import real_news_service
 from app.services.chart_generator import generate_signal_chart
 from app.services.accuracy_tracker import get_accuracy_stats
+import docker
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -47,6 +48,7 @@ def _build_help() -> str:
         "• `alerts` — List active alerts\n"
         "• `remove alert 1` — Remove alert by ID\n"
         "• `/accuracy` — Signal win/loss stats\n"
+        "• `docker` — Container status\n"
         "• `/help` — This message"
     )
 
@@ -121,6 +123,20 @@ async def _handle_message(text: str, chat_id: int):
 
     if text in ('/start', '/help'):
         return await telegram_notifier.send_message(_build_help())
+
+    if text in ('docker', '/docker'):
+        try:
+            client = docker.from_env()
+            containers = client.containers.list(all=True)
+            lines = ["🐳 *Docker Status*", ""]
+            for c in containers:
+                status = c.status
+                emoji = "🟢" if status == "running" else "🔴" if status == "exited" else "⚪"
+                name = c.name
+                lines.append(f"{emoji} `{name}` — {status}")
+            return await telegram_notifier.send_message("\n".join(lines))
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Docker error: {e}")
 
     if text in ('summary', '/summary'):
         prices, signals, news_count, sentiment = await _fetch_dashboard_data()
