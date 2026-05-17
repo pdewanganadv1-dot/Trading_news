@@ -9,6 +9,9 @@ import re
 class RealNewsService:
     """Service for fetching real news from multiple sources."""
 
+    _cache: Dict = {}
+    _cache_ttl = 45  # seconds
+
     def __init__(self):
         self.session = httpx.AsyncClient(
             timeout=30.0,
@@ -17,10 +20,18 @@ class RealNewsService:
         )
 
     async def get_all_news(self) -> List[Dict]:
+        now = datetime.now().timestamp()
+        if self._cache.get("all_news") and (now - self._cache.get("all_news_ts", 0)) < self._cache_ttl:
+            return self._cache["all_news"]
+        news = await self._fetch_all_news()
+        self._cache["all_news"] = news
+        self._cache["all_news_ts"] = now
+        return news
+
+    async def _fetch_all_news(self) -> List[Dict]:
         """Fetch news from ALL sources across all categories."""
         all_news = []
 
-        # Run all fetches concurrently
         results = await asyncio.gather(
             self.get_crypto_news(),
             self.get_metals_news(),
@@ -34,10 +45,9 @@ class RealNewsService:
             if isinstance(result, list):
                 all_news.extend(result)
 
-        # Sort by time (newest first)
         all_news.sort(key=lambda x: x.get('published_at', ''), reverse=True)
 
-        return all_news[:50]  # Return top 50
+        return all_news[:50]
 
     async def get_crypto_news(self) -> List[Dict]:
         """Fetch crypto news from multiple sources."""

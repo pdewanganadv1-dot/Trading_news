@@ -1,5 +1,4 @@
-from fastapi import APIRouter, Query
-from typing import Optional
+from fastapi import APIRouter
 from app.services.sentiment import sentiment_monitor
 from app.services.news_service import news_service
 from app.services.social_sentiment import analyze_social_sentiment

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 import json
 from datetime import datetime
 import os
@@ -189,20 +189,16 @@ async def debug_news_standalone():
     return HTMLResponse(content=html)
 
 
-@router.get("/dashboard/v2", response_class=HTMLResponse)
+@router.get("/dashboard/v2")
 async def dashboard_v2():
-    """New asset-specific dashboard with sidebar menu."""
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_live.html")
-    with open(path, 'r') as f:
-        return HTMLResponse(content=f.read())
+    return FileResponse(path)
 
 
-@router.get("/dashboard/unified", response_class=HTMLResponse)
+@router.get("/dashboard/unified")
 async def dashboard_unified():
-    """Unified dashboard - News + Technical Indicators merged."""
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_unified.html")
-    with open(path, 'r') as f:
-        return HTMLResponse(content=f.read())
+    return FileResponse(path)
 
 
 @router.get("/dashboard/live", response_class=HTMLResponse)

@@ -2,7 +2,6 @@ import httpx
 import asyncio
 from typing import Dict, List, Optional
 from datetime import datetime
-import math
 import pandas as pd
 from stockstats import wrap
 import yfinance as yf

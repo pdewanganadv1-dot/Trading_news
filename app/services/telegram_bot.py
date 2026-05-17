@@ -13,6 +13,7 @@ import docker
 
 _price_alerts: list = []
 _alert_id_counter = 0
+_MAX_ALERTS = 50
 BOT_TOKEN = settings.telegram_bot_token
 CHAT_ID = settings.telegram_chat_id
 
@@ -125,6 +126,8 @@ async def _check_price_alerts():
                     f"💰 Current: `${current:,.2f}`"
                 )
                 await telegram_notifier.send_message(msg)
+            # Trim inactive alerts
+            _price_alerts[:] = [a for a in _price_alerts if a['active']]
         except Exception:
             pass
 
@@ -215,6 +218,8 @@ async def _handle_message(text: str, chat_id: int):
             'active': True,
         }
         _price_alerts.append(alert)
+        if len(_price_alerts) > _MAX_ALERTS:
+            _price_alerts[:] = [a for a in _price_alerts if a['active']][:_MAX_ALERTS]
         return await telegram_notifier.send_message(
             f"✅ *Alert #{alert['id']} Set*\n"
             f"{alert['symbol']} {alert['direction']} `${alert['value']:,.2f}`"
