@@ -1725,13 +1725,21 @@
                     pollPrices[sym] = { price: d.price, change: 0 };
                     signals[sym] = { signal: d.signal, confidence: d.confidence };
                 }
-                // Also get indicators
+                // Also get indicators + MTF for current asset
                 const indicators = {};
                 for (const sym of ['btc', 'eth', 'gold', 'silver']) {
                     try {
                         const indResp = await fetch(`/api/v1/market/signals/${sym}`);
                         const indData = await indResp.json();
                         indicators[sym] = indData.indicators;
+                    } catch(e) {}
+                }
+                // Refresh MTF for current asset
+                if (currentAsset) {
+                    try {
+                        const mtfResp = await fetch(`/api/v1/market/signals/${currentAsset}`);
+                        const mtfData = await mtfResp.json();
+                        if (mtfData.mtf) refreshMTF(mtfData);
                     } catch(e) {}
                 }
                 updatePrices(pollPrices, signals, indicators);
