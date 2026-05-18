@@ -15,7 +15,8 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 7. **Fixed event loop blocking**: Wrapped `yf.Ticker().info` and `yf.download()` in `asyncio.to_thread()` + `asyncio.wait_for(15s)` — prevents yfinance from blocking the server (was causing health check failures)
 8. **Cached `/realtime` endpoint**: Same pattern as /signals — `_realtime_cache` populated by bg loop
 9. **Removed duplicates**: `itc` and `tcs` were in both Nifty 50 and Next 50 lists (123 unique symbols now)
-10. **Health endpoint**: Now returns cache stats (symbols cached, ages, fill %) for easy debugging
+10. **Health endpoint**: Now returns cache stats (symbols cached, ages, fill %, started_at) for easy debugging
+11. **Fixed `_cache_start` scope bug**: Added `global` keyword — Python was shadowing module variable with local assignment
 11. **Telegram bot**: `@Signal_alpha267_bot` working (chat_id: 5163568145, polling loop 3s)
 12. **Fixed circular import**: `_INDIAN_STOCKS` hardcoded in `telegram_notifier.py`
 13. **Pinned yfinance==0.2.65** in requirements.txt
@@ -24,7 +25,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: 57eff10
+- **Git commit HEAD**: ad3cefe
 
 ### Known Issues
 1. **Groq quota**: 100K tokens/day free tier — exhausted. Only calls LLM for BUY/SELL ≥ 50% confidence. Resets ~24h cycle.
