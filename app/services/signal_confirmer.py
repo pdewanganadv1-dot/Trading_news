@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from app.services.market_data_service import market_data_service, TechnicalIndicators, TradingSignals
 from app.services.market_edge_service import scan_stock, get_market_breadth, get_fii_dii_summary
-from app.services.signal_monitor import _INDIAN_STOCKS
 from app.services.real_news import real_news_service
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
 
@@ -186,7 +185,8 @@ async def confirm_signal(
             warnings.append(f"Social sentiment conflicts ({social_direction})")
 
     # 6. Combined FII + DII institutional flow (Indian stocks only)
-    is_indian = symbol_lower in _INDIAN_STOCKS
+    from app.services.signal_monitor import _INDIAN_STOCKS as _is_set
+    is_indian = symbol_lower in _is_set
     if is_indian:
         try:
             fiidii = await get_fii_dii_summary()
