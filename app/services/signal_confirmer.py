@@ -3,7 +3,8 @@ import numpy as np
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from app.services.market_data_service import market_data_service, TechnicalIndicators, TradingSignals
-from app.services.market_edge_service import scan_stock, get_market_breadth
+from app.services.market_edge_service import scan_stock, get_market_breadth, get_fii_dii_summary
+from app.services.signal_monitor import _INDIAN_STOCKS
 from app.services.real_news import real_news_service
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
 
@@ -183,6 +184,30 @@ async def confirm_signal(
         else:
             score -= 1
             warnings.append(f"Social sentiment conflicts ({social_direction})")
+
+    # 6. FII/DII flow (Indian stocks only)
+    is_indian = symbol_lower in _INDIAN_STOCKS
+    if is_indian:
+        try:
+            fiidii = await get_fii_dii_summary()
+            fii_net = fiidii.get("fii_net")
+            if fii_net is not None:
+                max_score += 2
+                fii_bullish = fii_net > 0
+                if base_signal == "BUY" and fii_bullish:
+                    score += 2
+                    confirmations.append(f"FII buying (+₹{fii_net:+,.0f}Cr)")
+                elif base_signal == "SELL" and not fii_bullish:
+                    score += 2
+                    confirmations.append(f"FII selling (₹{fii_net:+,.0f}Cr)")
+                elif base_signal == "BUY" and not fii_bullish:
+                    score -= 1
+                    warnings.append(f"FII selling despite BUY signal")
+                elif base_signal == "SELL" and fii_bullish:
+                    score -= 1
+                    warnings.append(f"FII buying despite SELL signal")
+        except Exception as e:
+            print(f"FII/DII check error for {symbol}: {e}")
 
     # --- Final composite ---
     if max_score == 0:
