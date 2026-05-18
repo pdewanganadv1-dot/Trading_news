@@ -81,26 +81,70 @@ async def get_realtime_data(symbol: str):
 @router.get("/signals/{symbol}")
 async def get_5min_signals(symbol: str):
     """Get trading signals based on 5-minute timeframe data."""
-    # Get current price
     price_data = await market_data_service.get_price_data(symbol)
     if not price_data:
         return {"status": "error", "message": "Could not fetch price data"}
 
-    # Get 5-minute interval prices
-    prices_5m = await market_data_service.get_5min_prices(symbol, 100)
+    price = price_data['price']
 
-    # Generate signals
-    signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
+    # Fetch multi-timeframe prices
+    p5 = await market_data_service.get_5min_prices(symbol, 100)
+    p15 = await market_data_service._get_klines(symbol, '15m', 60)
+    p1h = await market_data_service._get_klines(symbol, '1h', 48)
+    p1d = await market_data_service.get_historical_prices(symbol, 60)
+
+    # Generate signals + indicators for each timeframe
+    sig5 = TradingSignals.generate_signal(p5, price) if p5 and len(p5) >= 20 else None
+    sig15 = TradingSignals.generate_signal(p15, price) if p15 and len(p15) >= 20 else None
+    sig1h = TradingSignals.generate_signal(p1h, price) if p1h and len(p1h) >= 20 else None
+    daily_price = p1d[-1] if p1d and len(p1d) > 0 else price
+    sig1d = TradingSignals.generate_signal(p1d, daily_price) if p1d and len(p1d) >= 20 else None
+
+    def _pick(sig, key):
+        return sig.get(key) if sig else None
+
+    mtf = {
+        "5m": {
+            "signal": _pick(sig5, "signal"),
+            "confidence": _pick(sig5, "confidence"),
+            "supertrend": _pick(_pick(sig5, "indicators"), "supertrend"),
+            "ichimoku": _pick(_pick(sig5, "indicators"), "ichimoku"),
+            "rsi": _pick(_pick(sig5, "indicators"), "rsi"),
+            "macd": _pick(_pick(sig5, "indicators"), "macd"),
+        },
+        "15m": {
+            "signal": _pick(sig15, "signal"),
+            "confidence": _pick(sig15, "confidence"),
+            "supertrend": _pick(_pick(sig15, "indicators"), "supertrend"),
+            "ichimoku": _pick(_pick(sig15, "indicators"), "ichimoku"),
+            "rsi": _pick(_pick(sig15, "indicators"), "rsi"),
+        },
+        "1h": {
+            "signal": _pick(sig1h, "signal"),
+            "confidence": _pick(sig1h, "confidence"),
+            "supertrend": _pick(_pick(sig1h, "indicators"), "supertrend"),
+            "ichimoku": _pick(_pick(sig1h, "indicators"), "ichimoku"),
+            "rsi": _pick(_pick(sig1h, "indicators"), "rsi"),
+        },
+        "1d": {
+            "signal": _pick(sig1d, "signal"),
+            "confidence": _pick(sig1d, "confidence"),
+            "supertrend": _pick(_pick(sig1d, "indicators"), "supertrend"),
+            "ichimoku": _pick(_pick(sig1d, "indicators"), "ichimoku"),
+            "rsi": _pick(_pick(sig1d, "indicators"), "rsi"),
+        },
+    }
 
     return {
         "status": "success",
         "symbol": symbol.upper(),
         "timeframe": "5m",
-        "current_price": price_data['price'],
-        "signal": signal_data['signal'],
-        "confidence": signal_data['confidence'],
-        "reasons": signal_data['reasons'],
-        "indicators": signal_data['indicators'],
+        "current_price": price,
+        "mtf": mtf,
+        "signal": _pick(sig5, "signal"),
+        "confidence": _pick(sig5, "confidence"),
+        "reasons": _pick(sig5, "reasons"),
+        "indicators": _pick(sig5, "indicators"),
         "timestamp": datetime.now().isoformat()
     }
 

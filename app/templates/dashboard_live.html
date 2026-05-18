@@ -1014,6 +1014,30 @@
                         <div class="indicator-item"><div class="indicator-name">Ichimoku</div><div class="indicator-value" id="indIchimoku">--</div><div class="indicator-signal" id="indIchimokuSignal">--</div></div>
                     </div>
                 </div>
+
+                <!-- Multi-Timeframe Trend Table -->
+                <div class="indicator-panel">
+                    <div class="indicator-section-title">
+                        <span>⏱ Multi-Timeframe Trends</span>
+                        <span id="mtfTimestamp" class="indicator-updated">--</span>
+                    </div>
+                    <div style="overflow-x:auto;font-size:0.7rem;">
+                        <table style="width:100%;border-collapse:collapse;text-align:center;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border-color);color:var(--text-secondary);">
+                                    <th style="padding:0.4rem">TF</th>
+                                    <th style="padding:0.4rem">Signal</th>
+                                    <th style="padding:0.4rem">SuperTrend</th>
+                                    <th style="padding:0.4rem">Ichimoku</th>
+                                    <th style="padding:0.4rem">RSI</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mtfBody">
+                                <tr><td colspan="5" style="padding:1rem;color:var(--text-secondary)">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- News Card with Graphical Sentiment -->
@@ -1352,6 +1376,33 @@
             conf.textContent = signalData.confidence ? (signalData.confidence * 100).toFixed(0) + '%' : '--';
         }
 
+        function refreshMTF(signalData) {
+            const mtf = signalData.mtf;
+            const tbody = document.getElementById('mtfBody');
+            if (!mtf || !tbody) return;
+            const tfOrder = ['5m', '15m', '1h', '1d'];
+            const rows = tfOrder.map(tf => {
+                const d = mtf[tf];
+                if (!d) return `<tr><td>${tf}</td><td colspan="4" style="color:var(--text-secondary)">--</td></tr>`;
+                const sig = d.signal || 'HOLD';
+                const sigEmoji = sig === 'BUY' ? '🟢' : sig === 'SELL' ? '🔴' : '⚪';
+                const st = d.supertrend || {};
+                const stText = st.trend ? (st.trend === 'bullish' ? '🟢' : '🔴') + ' ' + st.trend.toUpperCase() : '--';
+                const ichi = d.ichimoku || {};
+                const ichiText = ichi.signal ? (ichi.signal === 'bullish' ? '🟢' : '🔴') + ' ' + ichi.signal.toUpperCase() : '--';
+                const rsi = d.rsi != null ? d.rsi.toFixed(1) : '--';
+                return `<tr style="border-bottom:1px solid var(--border-color);">
+                    <td style="padding:0.3rem;font-weight:600">${tf}</td>
+                    <td style="padding:0.3rem">${sigEmoji} ${sig}</td>
+                    <td style="padding:0.3rem">${stText}</td>
+                    <td style="padding:0.3rem">${ichiText}</td>
+                    <td style="padding:0.3rem">${rsi}</td>
+                </tr>`;
+            }).join('');
+            tbody.innerHTML = rows;
+            document.getElementById('mtfTimestamp').textContent = new Date().toLocaleTimeString();
+        }
+
         function selectAsset(asset) {
             currentAsset = asset;
 
@@ -1392,6 +1443,7 @@
                 }
                 if (signal.status === 'success') {
                     refreshSignals(asset, signal);
+                    refreshMTF(signal);
                 }
 
                 if (data.status === 'success') {
