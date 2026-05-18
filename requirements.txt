@@ -1,5 +1,6 @@
 fastapi==0.109.0
 numpy>=1.26.0
+nselib>=2.5.0
 uvicorn[standard]==0.27.0
 python-dotenv==1.0.0
 sqlalchemy==2.0.25

@@ -420,80 +420,28 @@ _LAST_FII_DII = {
 
 _FII_DII_HISTORY: List[Dict] = []
 _MAX_HISTORY = 30
-_NSE_COOKIE_CACHE: Dict = {"cookie": None, "ts": 0}
-
-
-async def _get_nse_cookie() -> str:
-    now_ts = datetime.now().timestamp()
-    if _NSE_COOKIE_CACHE["cookie"] and (now_ts - _NSE_COOKIE_CACHE["ts"]) < 3600:
-        return _NSE_COOKIE_CACHE["cookie"]
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
-            resp = await c.get(
-                "https://www.nseindia.com",
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "en-US,en;q=0.9",
-                },
-            )
-            cookie = resp.headers.get("set-cookie", "")
-            if cookie:
-                _NSE_COOKIE_CACHE["cookie"] = cookie
-                _NSE_COOKIE_CACHE["ts"] = now_ts
-            return cookie
-    except Exception as e:
-        print(f"NSE cookie fetch error: {e}")
-        return ""
-
-
 async def _try_fetch_fii_dii():
-    """Attempt to auto-fetch FII/DII data from NSE with cookie handling."""
+    """Fetch FII/DII data using nselib library."""
     try:
-        import httpx
-        cookie = await _get_nse_cookie()
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.nseindia.com/",
-        }
-        if cookie:
-            headers["Cookie"] = cookie
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
-            resp = await c.get(
-                "https://www.nseindia.com/api/cot?index=FII",
-                headers=headers,
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                return {
-                    "fii_buy": data.get("cat1Buy", 0) or data.get("fiiBuy", 0),
-                    "fii_sell": data.get("cat1Sell", 0) or data.get("fiiSell", 0),
-                    "fii_net": data.get("cat1Net", 0) or data.get("fiiNet", 0),
-                    "dii_buy": data.get("cat2Buy", 0) or data.get("diiBuy", 0),
-                    "dii_sell": data.get("cat2Sell", 0) or data.get("diiSell", 0),
-                    "dii_net": data.get("cat2Net", 0) or data.get("diiNet", 0),
-                    "date": data.get("date", datetime.now().strftime("%Y-%m-%d")),
-                }
-            resp2 = await c.get(
-                "https://www.nseindia.com/api/fiidii",
-                headers=headers,
-            )
-            if resp2.status_code == 200:
-                data2 = resp2.json()
-                return {
-                    "fii_buy": data2.get("FIIBuy", 0),
-                    "fii_sell": data2.get("FIISell", 0),
-                    "fii_net": data2.get("FIINet", 0),
-                    "dii_buy": data2.get("DIIBuy", 0),
-                    "dii_sell": data2.get("DIISell", 0),
-                    "dii_net": data2.get("DIINet", 0),
-                    "date": data2.get("date", datetime.now().strftime("%Y-%m-%d")),
-                }
+        from nselib import capital_market
+        data = capital_market.fii_dii_trading_activity()
+        if data and not data.empty:
+            row = data.iloc[-1]
+            fii_buy = float(row.get("FII_Buy", 0) or 0)
+            fii_sell = float(row.get("FII_Sell", 0) or 0)
+            dii_buy = float(row.get("DII_Buy", 0) or 0)
+            dii_sell = float(row.get("DII_Sell", 0) or 0)
+            return {
+                "fii_buy": fii_buy,
+                "fii_sell": fii_sell,
+                "fii_net": round(fii_buy - fii_sell, 2),
+                "dii_buy": dii_buy,
+                "dii_sell": dii_sell,
+                "dii_net": round(dii_buy - dii_sell, 2),
+                "date": str(row.name) if hasattr(row, "name") else datetime.now().strftime("%Y-%m-%d"),
+            }
     except Exception as e:
-        print(f"NSE FII/DII fetch error: {e}")
+        print(f"nselib FII/DII fetch error: {e}")
     return None
 
 
