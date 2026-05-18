@@ -25,17 +25,26 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: 488ea1b
+- **Git commit HEAD**: bb64069
 
 ### Latest Session (May 18, 2026)
 
 **Done**:
 1. **Fixed circular import**: `signal_confirmer.py` imported `_INDIAN_STOCKS` from `signal_monitor.py`, but `signal_monitor.py` already imported `confirm_signal` from `signal_confirmer.py`. Fixed with lazy import inside the function instead of top-level import.
 2. **FII/DII card on main dashboard**: Added institutional flow card in `dashboard_live.html` between Market Edge and Signal Log sections. Shows FII net, DII net, combined signal (bullish/bearish/neutral), trend arrows, and "India Only" badge. Fetches from `/api/v1/edge/fiidii` + `/fiidii/trend`, refreshes every 2 min.
+3. **Efficiency overhaul (7 fixes)**:
+   - **Critical**: Pass pre-fetched 5m prices into `confirm_signal` + skip 1d MTF (saves 4 yfinance calls per confirmed signal)
+   - **Critical**: Parallel signal processing — Indian stocks processed in batches of 5 (12min full cycle → ~3min)
+   - **Critical**: Rate limiting (1.5s) + 5min TTL cache for `scan_all_stocks` in edge scanner
+   - **Medium**: Market-hours awareness — signal loop skips weekends/nights outside 9am-4pm IST (66% fewer useless cycles)
+   - **Medium**: News sentiment parallel processing for all 29 stocks; increased news cache TTL 45s→300s
+   - **Medium**: `_fetch_dashboard_data` reads from `_signal_cache`/`_realtime_cache` before live-fetching (saves ~15s on Telegram summary)
+   - **Low**: Lazy import `docker` in telegram_bot.py (no crash if Docker unavailable)
+   - Removed stale `GEMINI_API_KEY` from `.env` (Pydantic v2 validation error)
 
 ### Known Issues
 1. **Groq quota**: 100K tokens/day free tier — exhausted. Only calls LLM for BUY/SELL ≥ 50% confidence. Resets ~24h cycle.
-2. **Yahoo rate limit**: 2s sequential delay makes cache fill slow (~8 min for 123 stocks). Acceptable since bg loop runs every 600s.
+2. **Yahoo rate limit**: 2s per-call delay still applies but parallelism (batch of 5) reduces effective wall-clock time.
 
 ### Key Files
 | File | Purpose |
