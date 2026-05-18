@@ -185,27 +185,28 @@ async def confirm_signal(
             score -= 1
             warnings.append(f"Social sentiment conflicts ({social_direction})")
 
-    # 6. FII/DII flow (Indian stocks only)
+    # 6. Combined FII + DII institutional flow (Indian stocks only)
     is_indian = symbol_lower in _INDIAN_STOCKS
     if is_indian:
         try:
             fiidii = await get_fii_dii_summary()
             fii_net = fiidii.get("fii_net")
-            if fii_net is not None:
+            dii_net = fiidii.get("dii_net")
+            if fii_net is not None and dii_net is not None:
                 max_score += 2
-                fii_bullish = fii_net > 0
-                if base_signal == "BUY" and fii_bullish:
+                total_inst = fii_net + dii_net
+                inst_bullish = total_inst > 0
+                direction = "BUY" if inst_bullish else "SELL"
+                if base_signal == direction:
                     score += 2
-                    confirmations.append(f"FII buying (+₹{fii_net:+,.0f}Cr)")
-                elif base_signal == "SELL" and not fii_bullish:
-                    score += 2
-                    confirmations.append(f"FII selling (₹{fii_net:+,.0f}Cr)")
-                elif base_signal == "BUY" and not fii_bullish:
+                    confirmations.append(
+                        f"FII+DII net {direction} ({total_inst:+,.0f}Cr)"
+                    )
+                else:
                     score -= 1
-                    warnings.append(f"FII selling despite BUY signal")
-                elif base_signal == "SELL" and fii_bullish:
-                    score -= 1
-                    warnings.append(f"FII buying despite SELL signal")
+                    warnings.append(
+                        f"Inst. flow {direction} ({total_inst:+,.0f}Cr) conflicts with {base_signal}"
+                    )
         except Exception as e:
             print(f"FII/DII check error for {symbol}: {e}")
 
