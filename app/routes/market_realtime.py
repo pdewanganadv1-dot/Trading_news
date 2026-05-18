@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from datetime import datetime
 from app.services.market_data_service import market_data_service, TechnicalIndicators, TradingSignals
 from app.services.signal_explainer import signal_explainer
+from app.services.signal_monitor import _MONITORED_SYMBOLS
 
 router = APIRouter(prefix="/api/v1/market", tags=["market-realtime"])
 
@@ -166,10 +167,9 @@ async def get_5min_signals(symbol: str):
 @router.get("/signals")
 async def get_all_signals():
     """Get trading signals for all symbols."""
-    symbols = ['btc', 'eth', 'gold', 'silver', 'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank']
     results = {}
 
-    for symbol in symbols:
+    for symbol in _MONITORED_SYMBOLS:
         try:
             price_data = await market_data_service.get_price_data(symbol)
             if price_data:
@@ -189,7 +189,7 @@ async def get_all_signals():
 @router.get("/realtime")
 async def get_all_realtime():
     """Get real-time data for all supported symbols."""
-    symbols = ['btc', 'eth', 'gold', 'silver', 'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank']
+    symbols = _MONITORED_SYMBOLS
     results = {}
 
     for symbol in symbols:
