@@ -125,6 +125,87 @@ def _analyze_levels(data) -> Dict:
     }
 
 
+def _calc_sma(values, period):
+    if len(values) < period:
+        return None
+    return sum(values[-period:]) / period
+
+
+def _analyze_sma_slope(data) -> Dict:
+    """20-day SMA slope — rising, flat, or falling."""
+    if data is None or len(data) < 25:
+        return {}
+    closes = data["Close"].values
+    sma20_now = _calc_sma(list(closes), 20)
+    sma20_prev = _calc_sma(list(closes[:-1]), 20)
+    if sma20_now is None or sma20_prev is None:
+        return {}
+    slope_pct = ((sma20_now - sma20_prev) / sma20_prev) * 100
+    slope = "rising" if slope_pct > 0.05 else "falling" if slope_pct < -0.05 else "flat"
+    return {
+        "sma20": round(sma20_now, 2),
+        "slope": slope,
+        "slope_pct": round(slope_pct, 3),
+    }
+
+
+def _analyze_macd_daily(data) -> Dict:
+    """Daily MACD histogram alignment."""
+    if data is None or len(data) < 30:
+        return {}
+    closes = data["Close"].values
+    ema12 = _calc_ema(list(closes), 12)
+    ema26 = _calc_ema(list(closes), 26)
+    if ema12 is None or ema26 is None:
+        return {}
+    macd_line = ema12 - ema26
+    signal_line = _calc_ema([macd_line], 9) if len(closes) >= 26 else None
+    if signal_line is None:
+        return {}
+    histogram = macd_line - signal_line
+    return {
+        "macd": round(macd_line, 2),
+        "signal": round(signal_line, 2),
+        "histogram": round(histogram, 2),
+        "bullish": histogram > 0,
+    }
+
+
+def _calc_ema(values, period):
+    if len(values) < period:
+        return None
+    multiplier = 2 / (period + 1)
+    ema = sum(values[:period]) / period
+    for v in values[period:]:
+        ema = (v - ema) * multiplier + ema
+    return ema
+
+
+def _analyze_bb_position(data) -> Dict:
+    """Where price sits in Bollinger Bands on daily."""
+    if data is None or len(data) < 20:
+        return {}
+    closes = data["Close"].values[-20:]
+    price = closes[-1]
+    sma = sum(closes) / len(closes)
+    variance = sum((c - sma) ** 2 for c in closes) / len(closes)
+    std = variance ** 0.5
+    upper = sma + 2 * std
+    lower = sma - 2 * std
+    bb_width = (upper - lower) / sma * 100
+    pct_b = (price - lower) / (upper - lower) if upper != lower else 0.5
+    return {
+        "upper": round(upper, 2),
+        "middle": round(sma, 2),
+        "lower": round(lower, 2),
+        "width_pct": round(bb_width, 2),
+        "pct_b": round(pct_b, 2),
+        "near_lower": pct_b < 0.15,
+        "near_upper": pct_b > 0.85,
+        "squeeze": bb_width < 4.0,
+    }
+
+
 def _analyze_rsi(data) -> Dict:
     """RSI divergence detection on daily timeframe."""
     if data is None or len(data) < 20:
@@ -168,11 +249,15 @@ def scan_stock(symbol: str) -> Dict:
     streaks = _analyze_streaks(data)
     levels = _analyze_levels(data)
     rsi_data = _analyze_rsi(data)
+    sma_slope = _analyze_sma_slope(data)
+    macd_daily = _analyze_macd_daily(data)
+    bb_pos = _analyze_bb_position(data)
 
     # Composite edge score (0-10)
     score = 5
     signals = []
 
+    # === Volume ===
     if vol.get("heavy_buying"):
         score += 2
         signals.append("🚀 Heavy volume buying")
@@ -184,6 +269,8 @@ def scan_stock(symbol: str) -> Dict:
     if vol.get("price_up_vol_down"):
         score -= 1
         signals.append("⚡ Price up, volume declining (weak)")
+
+    # === Price Streak ===
     if streaks.get("streak_days", 0) >= 3:
         if streaks["streak_direction"] == "bullish":
             score += 1
@@ -191,18 +278,54 @@ def scan_stock(symbol: str) -> Dict:
         else:
             score -= 1
             signals.append(f"📉 {streaks['streak_days']} red days")
+
+    # === Levels ===
     if levels.get("near_20d_high"):
         score += 1
         signals.append(f"🎯 Near 20d high ({levels['pct_from_20d_high']}%)")
     if levels.get("near_20d_low"):
         score -= 1
         signals.append(f"⚠️ Near 20d low ({levels['pct_from_20d_low']}%)")
+
+    # === RSI ===
     if rsi_data.get("oversold"):
         score += 1
         signals.append("🔄 RSI oversold — bounce play")
     if rsi_data.get("overbought"):
         score -= 1
         signals.append("🔄 RSI overbought — caution")
+
+    # === SMA Slope (trend confirmation) ===
+    if sma_slope.get("slope") == "rising":
+        score += 1
+        signals.append(f"📐 SMA20 rising ({sma_slope['slope_pct']}%)")
+    elif sma_slope.get("slope") == "falling":
+        score -= 1
+        signals.append(f"📐 SMA20 falling ({sma_slope['slope_pct']}%)")
+
+    # === MACD Daily (momentum alignment) ===
+    if macd_daily.get("bullish") and vol.get("change_pct", 0) > 0:
+        score += 1
+        signals.append("📊 MACD bullish + price up")
+    elif macd_daily.get("bullish") is False and vol.get("change_pct", 0) < 0:
+        score += 1  # bearish confirmation
+        signals.append("📊 MACD bearish + price down")
+    elif macd_daily.get("bullish") is False and vol.get("change_pct", 0) > 0:
+        score -= 1
+        signals.append("⚠️ MACD bearish divergence (price up)")
+    elif macd_daily.get("bullish") and vol.get("change_pct", 0) < 0:
+        score -= 1
+        signals.append("⚠️ MACD bullish divergence (price down)")
+
+    # === Bollinger Band position ===
+    if bb_pos.get("squeeze"):
+        signals.append("🌀 BB squeeze — breakout imminent")
+    if bb_pos.get("near_lower") and rsi_data.get("rsi", 50) < 40:
+        score += 1
+        signals.append(f"📉 BB near lower + RSI low = bounce zone")
+    if bb_pos.get("near_upper") and rsi_data.get("rsi", 50) > 60:
+        score -= 1
+        signals.append(f"📈 BB near upper + RSI high = resistance zone")
 
     def _py(val):
         if isinstance(val, (np.bool_,)):
@@ -226,7 +349,11 @@ def scan_stock(symbol: str) -> Dict:
         "near_low": _py(levels.get("near_20d_low")),
         "streak": streaks.get("streak_direction"),
         "streak_days": _py(streaks.get("streak_days")),
-        "signals": signals[:3],
+        "sma_slope": sma_slope.get("slope"),
+        "macd_bullish": _py(macd_daily.get("bullish")),
+        "bb_squeeze": _py(bb_pos.get("squeeze")),
+        "bb_pct_b": _py(bb_pos.get("pct_b")),
+        "signals": signals[:4],
         "error": None,
     }
 
