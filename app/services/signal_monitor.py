@@ -44,11 +44,21 @@ async def check_and_notify():
 
             await record_signal(symbol, sig, conf, price, signal_data.get('reasons', []))
 
-            explanation = signal_explainer.explain(
-                symbol.upper(), sig, conf, signal_data.get('reasons', []),
-                signal_data.get('indicators', {}),
-                price=price,
-            )
+            # Only use Groq LLM for signals that may trigger alerts (BUY/SELL ≥ 50%)
+            # to stay within Groq free tier rate limits (100K tokens/day)
+            uses_llm = sig in ('BUY', 'SELL') and conf >= 0.5
+            if uses_llm:
+                explanation = signal_explainer.explain(
+                    symbol.upper(), sig, conf, signal_data.get('reasons', []),
+                    signal_data.get('indicators', {}),
+                    price=price,
+                )
+            else:
+                explanation = signal_explainer._template_explain(
+                    symbol.upper(), sig, conf, signal_data.get('reasons', []),
+                    signal_data.get('indicators', {}),
+                    price=price,
+                )
 
             entry = {
                 'symbol': symbol.upper(),

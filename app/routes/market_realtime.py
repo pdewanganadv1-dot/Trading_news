@@ -80,19 +80,6 @@ async def get_realtime_data(symbol: str):
     }
 
 
-@router.get("/debug")
-async def debug_groq():
-    from app.services.signal_explainer import signal_explainer
-    from app.config import settings
-    return {
-        "has_api_key": bool(settings.groq_api_key),
-        "key_preview": (settings.groq_api_key[:10] + "...") if settings.groq_api_key else None,
-        "model": settings.groq_model,
-        "use_llm": signal_explainer.use_llm,
-        "has_client": signal_explainer.client is not None,
-    }
-
-
 @router.get("/signals/{symbol}")
 async def get_5min_signals(symbol: str):
     """Get trading signals based on 5-minute timeframe data."""

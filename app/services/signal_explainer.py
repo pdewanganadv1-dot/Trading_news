@@ -67,7 +67,7 @@ class SignalExplainer:
                     symbol, signal, confidence, reasons, indicators, mtf, edge, sentiment, price
                 )
             except Exception as e:
-                logger.warning(f"Gemini explanation failed: {e}, falling back to template")
+                logger.warning(f"Groq explanation failed: {e}, falling back to template")
         return self._template_explain(
             symbol, signal, confidence, reasons, indicators, mtf, edge, sentiment, price
         )
