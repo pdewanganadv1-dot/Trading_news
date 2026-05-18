@@ -19,6 +19,13 @@ async def get_dashboard_with_news():
     return FileResponse(path)
 
 
+@router.get("/fiidii-dashboard")
+async def get_fiidii_dashboard():
+    """Serve the FII/DII flow dashboard."""
+    path = os.path.join(os.path.dirname(__file__), "../templates/fiidii_dashboard.html")
+    return FileResponse(path)
+
+
 @router.get("/api/dashboard/symbols")
 async def get_watchlist():
     """Get default watchlist symbols."""

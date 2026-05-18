@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FII/DII Dashboard - Trading Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0f0f14;
+            --bg-secondary: #18181f;
+            --bg-card: #1e1e28;
+            --border-color: #2a2a3a;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8888a0;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-blue: #4f8cff;
+            --accent-purple: #a78bfa;
+        }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header-actions { display: flex; gap: 1rem; align-items: center; }
+        .nav-link {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 0.85rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+        .nav-link:hover { background: var(--accent-blue); color: white; }
+        .refresh-btn {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .last-update { font-size: 0.8rem; color: var(--text-secondary); }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.25rem;
+            text-align: center;
+        }
+        .summary-card .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .summary-card .value { font-size: 1.6rem; font-weight: 700; margin-top: 0.5rem; }
+        .summary-card .sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .cards-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+        }
+        .card h2 { font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .chart-wrapper { height: 250px; }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .history-table th {
+            text-align: left;
+            padding: 0.6rem 0.8rem;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .history-table td {
+            padding: 0.6rem 0.8rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .inst-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 0.3rem;
+        }
+        .inst-bar-track {
+            flex: 1;
+            height: 8px;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .inst-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        .inst-bar-fill.fii { background: linear-gradient(90deg, #a78bfa, #6366f1); }
+        .inst-bar-fill.dii { background: linear-gradient(90deg, #34d399, #10b981); }
+        .inst-label { font-size: 0.8rem; width: 100px; }
+        .inst-value { font-size: 0.85rem; font-weight: 600; width: 120px; text-align: right; }
+        .detail-section { margin-bottom: 2rem; }
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .detail-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+        .detail-item .row { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.9rem; }
+        .detail-item .row .label { color: var(--text-secondary); }
+        .detail-item .row .val { font-weight: 600; }
+        .loading { text-align: center; padding: 3rem; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏦 FII/DII Institutional Flow Dashboard</h1>
+        <div class="header-actions">
+            <a href="/dashboard" class="nav-link">← Main Dashboard</a>
+            <span class="last-update" id="lastUpdate">Loading...</span>
+            <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+        </div>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card"><div class="label">FII Net</div><div class="value" id="fiiNet">--</div><div class="sub" id="fiiDate">--</div></div>
+        <div class="summary-card"><div class="label">DII Net</div><div class="value" id="diiNet">--</div><div class="sub" id="diiDate">--</div></div>
+        <div class="summary-card"><div class="label">Combined Net</div><div class="value" id="combinedNet">--</div><div class="sub" id="combinedDir">--</div></div>
+        <div class="summary-card"><div class="label">Trend (5d)</div><div class="value" id="trendLabel">--</div><div class="sub">FII direction</div></div>
+    </div>
+
+    <div class="cards-row">
+        <div class="card">
+            <h2>📊 FII Net Flow (Last 15 Days)</h2>
+            <div class="chart-wrapper"><canvas id="fiiChart"></canvas></div>
+        </div>
+        <div class="card">
+            <h2>📊 DII Net Flow (Last 15 Days)</h2>
+            <div class="chart-wrapper"><canvas id="diiChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 2rem;">
+        <h2>📋 Today's Breakdown</h2>
+        <div class="detail-grid">
+            <div class="detail-item">
+                <h3 style="font-size:0.85rem; margin-bottom:0.5rem; color: var(--accent-purple);">🏛️ FII (Foreign)</h3>
+                <div class="row"><span class="label">Buy</span><span class="val" id="fiiBuy">--</span></div>
+                <div class="row"><span class="label">Sell</span><span class="val" id="fiiSell">--</span></div>
+                <div class="row"><span class="label">Net</span><span class="val" id="fiiNetDetail">--</span></div>
+            </div>
+            <div class="detail-item">
+                <h3 style="font-size:0.85rem; margin-bottom:0.5rem; color: var(--accent-green);">🏛️ DII (Domestic)</h3>
+                <div class="row"><span class="label">Buy</span><span class="val" id="diiBuy">--</span></div>
+                <div class="row"><span class="label">Sell</span><span class="val" id="diiSell">--</span></div>
+                <div class="row"><span class="label">Net</span><span class="val" id="diiNetDetail">--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📜 Historical FII/DII Data</h2>
+        <table class="history-table">
+            <thead><tr><th>Date</th><th>FII Buy</th><th>FII Sell</th><th>FII Net</th><th>DII Buy</th><th>DII Sell</th><th>DII Net</th><th>Combined</th></tr></thead>
+            <tbody id="historyBody"><tr><td colspan="8" class="loading">Loading...</td></tr></tbody>
+        </table>
+    </div>
+
+    <script>
+        let fiiChart = null, diiChart = null;
+
+        function fmtCr(v) {
+            if (v === null || v === undefined) return '--';
+            const abs = Math.abs(v);
+            if (abs >= 1000) return (v / 1000).toFixed(2) + 'K Cr';
+            return v.toFixed(2) + ' Cr';
+        }
+
+        function fmtNum(v) {
+            if (v === null || v === undefined) return '--';
+            return '₹' + v.toLocaleString('en-IN', {maximumFractionDigits: 2});
+        }
+
+        async function loadData() {
+            document.getElementById('lastUpdate').textContent = 'Loading...';
+            try {
+                const [summaryRes, historyRes, trendRes] = await Promise.all([
+                    fetch('/api/v1/edge/fiidii'),
+                    fetch('/api/v1/edge/fiidii/history?days=15'),
+                    fetch('/api/v1/edge/fiidii/trend'),
+                ]);
+                const summary = await summaryRes.json();
+                const history = await historyRes.json();
+                const trend = await trendRes.json();
+
+                updateSummary(summary, trend);
+                updateDetail(summary);
+                updateHistory(history);
+                updateCharts(history);
+                document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('lastUpdate').textContent = 'Error loading data';
+            }
+        }
+
+        function updateSummary(s, t) {
+            const fiiNet = s.fii_net;
+            const diiNet = s.dii_net;
+            document.getElementById('fiiNet').textContent = fiiNet !== null ? fmtCr(fiiNet) : '--';
+            document.getElementById('fiiNet').className = 'value ' + (fiiNet > 0 ? 'positive' : fiiNet < 0 ? 'negative' : '');
+            document.getElementById('fiiDate').textContent = s.date || '--';
+
+            document.getElementById('diiNet').textContent = diiNet !== null ? fmtCr(diiNet) : '--';
+            document.getElementById('diiNet').className = 'value ' + (diiNet > 0 ? 'positive' : diiNet < 0 ? 'negative' : '');
+            document.getElementById('diiDate').textContent = s.date || '--';
+
+            const combined = (fiiNet || 0) + (diiNet || 0);
+            document.getElementById('combinedNet').textContent = fmtCr(combined);
+            document.getElementById('combinedNet').className = 'value ' + (combined > 0 ? 'positive' : combined < 0 ? 'negative' : '');
+            document.getElementById('combinedDir').textContent = combined > 0 ? '🟢 BULLISH' : combined < 0 ? '🔴 BEARISH' : '⚪ NEUTRAL';
+
+            const trendDir = t.fii_trend || '--';
+            document.getElementById('trendLabel').textContent = trendDir === 'rising' ? '📈 RISING' : trendDir === 'falling' ? '📉 FALLING' : '➡️ FLAT';
+            document.getElementById('trendLabel').className = 'value ' + (trendDir === 'rising' ? 'positive' : trendDir === 'falling' ? 'negative' : '');
+        }
+
+        function updateDetail(s) {
+            document.getElementById('fiiBuy').textContent = fmtNum(s.fii_buy);
+            document.getElementById('fiiSell').textContent = fmtNum(s.fii_sell);
+            const fn = s.fii_net;
+            const fiiEl = document.getElementById('fiiNetDetail');
+            fiiEl.textContent = fn !== null ? fmtCr(fn) : '--';
+            fiiEl.className = 'val ' + (fn > 0 ? 'positive' : fn < 0 ? 'negative' : '');
+
+            document.getElementById('diiBuy').textContent = fmtNum(s.dii_buy);
+            document.getElementById('diiSell').textContent = fmtNum(s.dii_sell);
+            const dn = s.dii_net;
+            const diiEl = document.getElementById('diiNetDetail');
+            diiEl.textContent = dn !== null ? fmtCr(dn) : '--';
+            diiEl.className = 'val ' + (dn > 0 ? 'positive' : dn < 0 ? 'negative' : '');
+        }
+
+        function updateHistory(h) {
+            const tbody = document.getElementById('historyBody');
+            const items = h.history || [];
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-secondary);">No historical data yet</td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map(item => {
+                const combined = (item.fii_net || 0) + (item.dii_net || 0);
+                return `<tr>
+                    <td>${item.date || '--'}</td>
+                    <td>${fmtCr(item.fii_buy)}</td>
+                    <td>${fmtCr(item.fii_sell)}</td>
+                    <td style="color:${item.fii_net > 0 ? 'var(--accent-green)' : item.fii_net < 0 ? 'var(--accent-red)' : 'inherit'}">${fmtCr(item.fii_net)}</td>
+                    <td>${fmtCr(item.dii_buy)}</td>
+                    <td>${fmtCr(item.dii_sell)}</td>
+                    <td style="color:${item.dii_net > 0 ? 'var(--accent-green)' : item.dii_net < 0 ? 'var(--accent-red)' : 'inherit'}">${fmtCr(item.dii_net)}</td>
+                    <td style="color:${combined > 0 ? 'var(--accent-green)' : combined < 0 ? 'var(--accent-red)' : 'inherit'}">${fmtCr(combined)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function updateCharts(h) {
+            const items = (h.history || []).slice().reverse();
+            if (items.length < 2) return;
+            const labels = items.map(i => i.date || '');
+            const fiiNets = items.map(i => i.fii_net || 0);
+            const diiNets = items.map(i => i.dii_net || 0);
+
+            const chartOpts = {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: '#8888a0' } },
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } },
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0', callback: v => v + 'Cr' } }
+                }
+            };
+
+            if (fiiChart) fiiChart.destroy();
+            fiiChart = new Chart(document.getElementById('fiiChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'FII Net (Cr)',
+                        data: fiiNets,
+                        backgroundColor: fiiNets.map(v => v >= 0 ? 'rgba(52, 211, 153, 0.7)' : 'rgba(248, 113, 113, 0.7)'),
+                        borderColor: fiiNets.map(v => v >= 0 ? '#34d399' : '#f87171'),
+                        borderWidth: 1,
+                    }]
+                },
+                options: chartOpts
+            });
+
+            if (diiChart) diiChart.destroy();
+            diiChart = new Chart(document.getElementById('diiChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'DII Net (Cr)',
+                        data: diiNets,
+                        backgroundColor: diiNets.map(v => v >= 0 ? 'rgba(52, 211, 153, 0.7)' : 'rgba(248, 113, 113, 0.7)'),
+                        borderColor: diiNets.map(v => v >= 0 ? '#34d399' : '#f87171'),
+                        borderWidth: 1,
+                    }]
+                },
+                options: chartOpts
+            });
+        }
+
+        loadData();
+        setInterval(loadData, 60000);
+    </script>
+</body>
+</html>
