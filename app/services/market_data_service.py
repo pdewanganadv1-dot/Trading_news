@@ -1,5 +1,6 @@
 import httpx
 import asyncio
+import time
 from typing import Dict, List, Optional
 from datetime import datetime
 import pandas as pd
@@ -12,6 +13,10 @@ class MarketDataService:
 
     def __init__(self):
         self.session = httpx.AsyncClient(timeout=30.0)
+        self._yf_last_call = 0.0
+        self._yf_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        }
 
     async def get_price_data(self, symbol: str) -> Dict:
         """Fetch real price data from Binance or fallback sources."""
@@ -75,8 +80,17 @@ class MarketDataService:
         try:
             ticker = symbol.upper()
             if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
-                session = yf.Ticker(f"{ticker}.NS")
-                info = session.info
+                # Rate-limit: 1 request per 2s minimum
+                now = time.time()
+                since_last = now - self._yf_last_call
+                if since_last < 2.0:
+                    await asyncio.sleep(2.0 - since_last)
+                import requests as _req
+                _s = _req.Session()
+                _s.headers.update(self._yf_headers)
+                tk = yf.Ticker(f"{ticker}.NS", session=_s)
+                info = tk.info
+                self._yf_last_call = time.time()
                 price = info.get("regularMarketPrice") or info.get("currentPrice")
                 if price:
                     prev_close = info.get("previousClose") or price
@@ -153,7 +167,16 @@ class MarketDataService:
             if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
                 interval_map = {'5m': ('5d', '5m'), '15m': ('5d', '15m'), '1h': ('1mo', '1h'), '1d': ('1mo', '1d')}
                 yf_period, yf_interval = interval_map.get(interval, ('1mo', '1d'))
-                data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
+                # Rate-limit: 1 request per 2s minimum
+                now = time.time()
+                since_last = now - self._yf_last_call
+                if since_last < 2.0:
+                    await asyncio.sleep(2.0 - since_last)
+                import requests as _req
+                _s = _req.Session()
+                _s.headers.update(self._yf_headers)
+                data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False, session=_s)
+                self._yf_last_call = time.time()
                 if data is not None and not data.empty:
                     data = data.reset_index()
                     closes = data['Close'].tolist()
