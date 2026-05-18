@@ -1128,6 +1128,23 @@
                 </div>
             </div>
 
+            <!-- FII/DII Flow (India Only) -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div class="chart-title-group">
+                        <h2 style="font-size:0.85rem;">🏛 FII/DII Institutional Flow</h2>
+                        <span class="symbol-badge" style="background:rgba(79,140,255,0.15);color:var(--accent-blue);font-size:0.6rem;">India Only</span>
+                        <span class="symbol-badge" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.6rem;" id="fiiDiiDate">--</span>
+                    </div>
+                    <div>
+                        <span style="color:var(--accent-gold);font-size:0.65rem;">● NSE</span>
+                    </div>
+                </div>
+                <div id="fiiDiiContent" style="padding:0.5rem;">
+                    <div class="loading">⏳ Loading FII/DII data...</div>
+                </div>
+            </div>
+
             <!-- Signal Log -->
             <div class="chart-card">
                 <div class="chart-header">
@@ -1854,6 +1871,62 @@
         }
         loadEdgeScores();
         setInterval(loadEdgeScores, 300000); // every 5 min
+
+        // FII/DII institutional flow (India only, %E0%A4%AD%E0%A4%BE%E0%A4%B0%E0%A4%A4)
+        async function loadFiiDii() {
+            try {
+                const [summaryResp, trendResp] = await Promise.all([
+                    fetch('/api/v1/edge/fiidii'),
+                    fetch('/api/v1/edge/fiidii/trend')
+                ]);
+                if (!summaryResp.ok && !trendResp.ok) return;
+                const summary = summaryResp.ok ? await summaryResp.json() : {};
+                const trend = trendResp.ok ? await trendResp.json() : {};
+                const el = document.getElementById('fiiDiiContent');
+                const dateEl = document.getElementById('fiiDiiDate');
+                if (!el) return;
+                const d = summary;
+                if (d.date) dateEl.textContent = d.date;
+                const fiiNet = d.fii_net ?? 0;
+                const diiNet = d.dii_net ?? 0;
+                const combined = fiiNet + diiNet;
+                const signalIcon = combined > 500 ? '🟢' : combined < -500 ? '🔴' : '🟡';
+                const signalLabel = combined > 500 ? 'Bullish' : combined < -500 ? 'Bearish' : 'Neutral';
+                const signalColor = combined > 500 ? 'var(--accent-green)' : combined < -500 ? 'var(--accent-red)' : 'var(--text-secondary)';
+                const fiiArrow = trend.fii_trend === 'rising' ? '↑' : '↓';
+                const diiArrow = trend.dii_trend === 'rising' ? '↑' : '↓';
+                const fiiColor = fiiNet >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                const diiColor = diiNet >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                el.innerHTML = `
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;">
+                        <div style="text-align:center;padding:0.75rem;background:var(--bg-secondary);border-radius:12px;border:1px solid var(--border-color);">
+                            <div style="font-size:0.65rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.25rem;">FII Net</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:${fiiColor};">₹${Math.abs(fiiNet).toFixed(0)}Cr</div>
+                            <div style="font-size:0.75rem;color:var(--text-secondary);">${fiiNet >= 0 ? 'Buying' : 'Selling'} ${fiiArrow}</div>
+                        </div>
+                        <div style="text-align:center;padding:0.75rem;background:var(--bg-secondary);border-radius:12px;border:1px solid var(--border-color);">
+                            <div style="font-size:0.65rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.25rem;">DII Net</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:${diiColor};">₹${Math.abs(diiNet).toFixed(0)}Cr</div>
+                            <div style="font-size:0.75rem;color:var(--text-secondary);">${diiNet >= 0 ? 'Buying' : 'Selling'} ${diiArrow}</div>
+                        </div>
+                        <div style="text-align:center;padding:0.75rem;background:var(--bg-secondary);border-radius:12px;border:1px solid ${signalColor};">
+                            <div style="font-size:0.65rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.25rem;">Combined Signal</div>
+                            <div style="font-size:1.3rem;font-weight:700;color:${signalColor};">${signalIcon} ${signalLabel}</div>
+                            <div style="font-size:0.7rem;color:var(--text-secondary);">FII+DII: ₹${combined.toFixed(0)}Cr</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:0.5rem;display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-secondary);padding:0.25rem 0.5rem;">
+                        <span>Source: ${d.source || 'NSE'}</span>
+                        <span>Trend: FII ${trend.fii_trend || '--'} · DII ${trend.dii_trend || '--'}</span>
+                        <span>Avg FII: ₹${trend.avg_fii_net ? trend.avg_fii_net.toFixed(0) : '--'}Cr</span>
+                    </div>`;
+            } catch(e) {
+                const el = document.getElementById('fiiDiiContent');
+                if (el) el.innerHTML = '<div class="no-news">FII/DII data unavailable</div>';
+            }
+        }
+        loadFiiDii();
+        setInterval(loadFiiDii, 120000); // refresh every 2 min
     </script>
 </body>
 </html>
