@@ -363,6 +363,35 @@ async def _handle_message(text: str, chat_id: int):
                 return await telegram_notifier.send_message(f"✅ Alert #{alert_id} removed.")
         return await telegram_notifier.send_message(f"Alert #{alert_id} not found.")
 
+    m = re.match(r'^(\w+)-news$', text)
+    if m:
+        sym = m.group(1).lower()
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(f"http://localhost:8000/api/v1/news/live/{sym}")
+                if resp.status_code != 200:
+                    return await telegram_notifier.send_message(f"📰 No news found for *{sym.upper()}*")
+                data = resp.json()
+                articles = data.get("news", [])
+                sentiment = data.get("sentiment", {})
+                if not articles:
+                    return await telegram_notifier.send_message(f"📰 No news found for *{sym.upper()}*")
+            lines = [f"📰 *News — {sym.upper()}*", ""]
+            s = sentiment.get("sentiment", "neutral")
+            emoji = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}
+            lines.append(f"📊 Sentiment: {emoji.get(s, '⚪')} {s.upper()} ({sentiment.get('score', 0):+.2f})")
+            lines.append("")
+            for article in articles[:6]:
+                title = article.get('title', '')
+                source = article.get('source', '')
+                lines.append(f"• {title}")
+                if source:
+                    lines.append(f"  └ _{source}_")
+                lines.append("")
+            return await telegram_notifier.send_message("\n".join(lines))
+        except Exception as e:
+            return await telegram_notifier.send_message(f"Error fetching news: {e}")
+
     if text in ('btc', 'eth', 'gold', 'silver', 'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank'):
         try:
             price_data = await market_data_service.get_price_data(text)
