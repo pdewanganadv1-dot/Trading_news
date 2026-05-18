@@ -423,23 +423,24 @@ _MAX_HISTORY = 30
 async def _try_fetch_fii_dii():
     """Fetch FII/DII data using nselib library."""
     try:
-        from nselib import capital_market
-        data = capital_market.fii_dii_trading_activity()
-        if data and not data.empty:
-            row = data.iloc[-1]
-            fii_buy = float(row.get("FII_Buy", 0) or 0)
-            fii_sell = float(row.get("FII_Sell", 0) or 0)
-            dii_buy = float(row.get("DII_Buy", 0) or 0)
-            dii_sell = float(row.get("DII_Sell", 0) or 0)
-            return {
-                "fii_buy": fii_buy,
-                "fii_sell": fii_sell,
-                "fii_net": round(fii_buy - fii_sell, 2),
-                "dii_buy": dii_buy,
-                "dii_sell": dii_sell,
-                "dii_net": round(dii_buy - dii_sell, 2),
-                "date": str(row.name) if hasattr(row, "name") else datetime.now().strftime("%Y-%m-%d"),
-            }
+        from nselib.capital_market.capital_market_data import fii_dii_trading_activity
+        df = fii_dii_trading_activity()
+        if df is not None and not df.empty:
+            fii_row = df[df["category"].str.contains("FII", case=False, na=False)]
+            dii_row = df[df["category"].str.contains("DII", case=False, na=False)]
+            latest_date = df["date"].iloc[0] if "date" in df.columns else ""
+            result = {"date": str(latest_date), "source": "nselib"}
+            if not fii_row.empty:
+                r = fii_row.iloc[0]
+                result["fii_buy"] = float(r.get("buyValue", 0))
+                result["fii_sell"] = float(r.get("sellValue", 0))
+                result["fii_net"] = round(float(r.get("netValue", 0)), 2)
+            if not dii_row.empty:
+                r = dii_row.iloc[0]
+                result["dii_buy"] = float(r.get("buyValue", 0))
+                result["dii_sell"] = float(r.get("sellValue", 0))
+                result["dii_net"] = round(float(r.get("netValue", 0)), 2)
+            return result
     except Exception as e:
         print(f"nselib FII/DII fetch error: {e}")
     return None
