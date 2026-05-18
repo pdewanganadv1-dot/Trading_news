@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     signal_confidence_threshold: float = 0.65
     signal_check_interval_seconds: int = 120
     groq_api_key: Optional[str] = None
-    groq_model: str = "llama3-70b-8192"
+    groq_model: str = "llama-3.3-70b-versatile"
 
     class Config:
         env_file = ".env"
