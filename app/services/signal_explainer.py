@@ -1,7 +1,7 @@
 """Signal Explanation Service — generates natural language explanations for trading signals.
 
 Two modes:
-  - LLM mode: Uses OpenAI API (requires OPENAI_API_KEY)
+  - LLM mode: Uses Google Gemini API (free tier available, set GEMINI_API_KEY)
   - Template mode: Smart template-based fallback (always works)
 """
 
@@ -33,19 +33,20 @@ def _trend_emoji(t: Optional[str]) -> str:
 
 class SignalExplainer:
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or settings.openai_api_key
-        self.model = settings.llm_model
+        self.api_key = api_key or settings.gemini_api_key
+        self.model_name = settings.gemini_model
         self.use_llm = bool(self.api_key)
         if self.use_llm:
             try:
-                from openai import OpenAI
-                self.client = OpenAI(api_key=self.api_key)
-                logger.info("OpenAI client initialized for signal explanations")
+                import google.generativeai as genai
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel(self.model_name)
+                logger.info(f"Gemini client initialized ({self.model_name})")
             except ImportError:
-                logger.warning("openai package not installed, falling back to template mode")
+                logger.warning("google-generativeai not installed, using template mode")
                 self.use_llm = False
             except Exception as e:
-                logger.warning(f"Failed to init OpenAI: {e}, using template mode")
+                logger.warning(f"Failed to init Gemini: {e}, using template mode")
                 self.use_llm = False
 
     def explain(
@@ -66,7 +67,7 @@ class SignalExplainer:
                     symbol, signal, confidence, reasons, indicators, mtf, edge, sentiment, price
                 )
             except Exception as e:
-                logger.warning(f"LLM explanation failed: {e}, falling back to template")
+                logger.warning(f"Gemini explanation failed: {e}, falling back to template")
         return self._template_explain(
             symbol, signal, confidence, reasons, indicators, mtf, edge, sentiment, price
         )
@@ -150,13 +151,8 @@ class SignalExplainer:
             "or conflict, and what to watch for. Use plain English, avoid jargon overload. Be direct.\n\n"
             f"{context}"
         )
-        resp = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=250,
-            temperature=0.3,
-        )
-        return resp.choices[0].message.content.strip()
+        resp = self.model.generate_content(prompt)
+        return resp.text.strip()
 
     def _template_explain(
         self,
