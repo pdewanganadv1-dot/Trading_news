@@ -14,9 +14,6 @@ class MarketDataService:
     def __init__(self):
         self.session = httpx.AsyncClient(timeout=30.0)
         self._yf_last_call = 0.0
-        self._yf_headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-        }
 
     async def get_price_data(self, symbol: str) -> Dict:
         """Fetch real price data from Binance or fallback sources."""
@@ -85,10 +82,7 @@ class MarketDataService:
                 since_last = now - self._yf_last_call
                 if since_last < 2.0:
                     await asyncio.sleep(2.0 - since_last)
-                import requests as _req
-                _s = _req.Session()
-                _s.headers.update(self._yf_headers)
-                tk = yf.Ticker(f"{ticker}.NS", session=_s)
+                tk = yf.Ticker(f"{ticker}.NS")
                 info = tk.info
                 self._yf_last_call = time.time()
                 price = info.get("regularMarketPrice") or info.get("currentPrice")
@@ -172,10 +166,7 @@ class MarketDataService:
                 since_last = now - self._yf_last_call
                 if since_last < 2.0:
                     await asyncio.sleep(2.0 - since_last)
-                import requests as _req
-                _s = _req.Session()
-                _s.headers.update(self._yf_headers)
-                data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False, session=_s)
+                data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
                 self._yf_last_call = time.time()
                 if data is not None and not data.empty:
                     data = data.reset_index()
