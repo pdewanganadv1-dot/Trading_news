@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from datetime import datetime
 from app.services.market_data_service import market_data_service, TechnicalIndicators, TradingSignals
 from app.services.signal_explainer import signal_explainer
-from app.services.signal_monitor import _MONITORED_SYMBOLS
+from app.services.signal_monitor import _MONITORED_SYMBOLS, get_cached_signals
 
 router = APIRouter(prefix="/api/v1/market", tags=["market-realtime"])
 
@@ -166,22 +166,32 @@ async def get_5min_signals(symbol: str):
 
 @router.get("/signals")
 async def get_all_signals():
-    """Get trading signals for all symbols."""
-    results = {}
+    """Get cached trading signals for all symbols (updated by background loop every ~10min)."""
+    cache = get_cached_signals()
 
+    results = {}
+    now = datetime.now()
     for symbol in _MONITORED_SYMBOLS:
-        try:
-            price_data = await market_data_service.get_price_data(symbol)
-            if price_data:
-                prices_5m = await market_data_service.get_5min_prices(symbol, 100)
-                signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
-                results[symbol] = {
-                    "signal": signal_data['signal'],
-                    "confidence": signal_data['confidence'],
-                    "price": price_data['price']
-                }
-        except Exception:
-            pass
+        entry = cache.get(symbol)
+        if entry:
+            age_s = (now - datetime.fromisoformat(entry["timestamp"])).total_seconds()
+            results[symbol] = {
+                "signal": entry["signal"],
+                "confidence": entry["confidence"],
+                "price": entry["price"],
+                "reasons": entry.get("reasons", []),
+                "age_seconds": round(age_s, 1),
+                "cached": True,
+            }
+        else:
+            results[symbol] = {
+                "signal": "PENDING",
+                "confidence": 0,
+                "price": None,
+                "reasons": [],
+                "age_seconds": None,
+                "cached": False,
+            }
 
     return results
 

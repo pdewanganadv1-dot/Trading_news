@@ -10,6 +10,7 @@ from app.services.signal_explainer import signal_explainer
 
 
 signal_log: List[Dict] = []
+_signal_cache: Dict[str, Dict] = {}
 _last_sent: Dict[str, str] = {}
 _CONFIRMED_SENT: Dict[str, str] = {}  # Tracks composite signal sends
 
@@ -116,6 +117,16 @@ async def _process_symbol(symbol: str) -> None:
                     if ok:
                         _CONFIRMED_SENT[symbol] = f"{sig}_{comp_conf}"
 
+        _signal_cache[symbol] = {
+            "symbol": entry["symbol"],
+            "signal": entry["signal"],
+            "confidence": entry["confidence"],
+            "price": entry["price"],
+            "reasons": entry["reasons"],
+            "explanation": entry["explanation"],
+            "timestamp": entry["timestamp"],
+        }
+
         signal_log.insert(0, entry)
         if len(signal_log) > 100:
             signal_log.pop()
@@ -178,3 +189,7 @@ async def signal_monitor_loop():
 
 def get_signal_log(limit: int = 50) -> List[Dict]:
     return signal_log[:limit]
+
+
+def get_cached_signals() -> Dict[str, Dict]:
+    return dict(_signal_cache)
