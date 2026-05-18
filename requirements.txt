@@ -12,7 +12,7 @@ python-multipart==0.0.6
 mplfinance
 docker
 stockstats
-yfinance
+yfinance==0.2.65
 pandas>=2.0.0
 pytz>=2023.3
 groq>=0.5.0

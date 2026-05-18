@@ -71,16 +71,13 @@ class MarketDataService:
             except Exception as e:
                 print(f"CoinGecko API error: {e}")
 
-        # Try yfinance for Indian stocks and other non-crypto assets (non-blocking)
+        # Try yfinance for Indian stocks and other non-crypto assets
         try:
             ticker = symbol.upper()
             if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
-                def _fetch_yf_price():
-                    t = yf.Ticker(f"{ticker}.NS")
-                    info = t.info
-                    price = info.get("regularMarketPrice") or info.get("currentPrice")
-                    return price, info
-                price, info = await asyncio.to_thread(_fetch_yf_price)
+                session = yf.Ticker(f"{ticker}.NS")
+                info = session.info
+                price = info.get("regularMarketPrice") or info.get("currentPrice")
                 if price:
                     prev_close = info.get("previousClose") or price
                     change = ((price - prev_close) / prev_close) * 100
@@ -150,15 +147,13 @@ class MarketDataService:
         except Exception as e:
             print(f"Klines error ({interval}): {e}")
 
-        # Try yfinance for Indian stocks (non-blocking)
+        # Try yfinance for Indian stocks
         try:
             ticker = symbol.upper()
             if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
                 interval_map = {'5m': ('5d', '5m'), '15m': ('5d', '15m'), '1h': ('1mo', '1h'), '1d': ('1mo', '1d')}
                 yf_period, yf_interval = interval_map.get(interval, ('1mo', '1d'))
-                def _fetch_klines():
-                    return yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
-                data = await asyncio.to_thread(_fetch_klines)
+                data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
                 if data is not None and not data.empty:
                     data = data.reset_index()
                     closes = data['Close'].tolist()

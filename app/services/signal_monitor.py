@@ -46,9 +46,6 @@ _INDIAN_STOCKS = [
 
 _MONITORED_SYMBOLS = ['btc', 'eth', 'gold', 'silver'] + _INDIAN_STOCKS
 
-_MAX_CONCURRENT = 3  # Limit concurrent yfinance calls (Yahoo rate-limits)
-
-
 async def _process_symbol(symbol: str) -> None:
     """Process a single symbol: fetch data, generate signal, explain, alert."""
     try:
