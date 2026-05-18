@@ -129,6 +129,7 @@ async def _process_symbol(symbol: str) -> None:
             "timestamp": entry["timestamp"],
         }
 
+        global _cache_start
         if not _cache_start:
             _cache_start = datetime.now().isoformat()
 
