@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     telegram_chat_id: str = "5163568145"
     signal_confidence_threshold: float = 0.65
     signal_check_interval_seconds: int = 120
+    openai_api_key: Optional[str] = None
+    llm_model: str = "gpt-4o-mini"
 
     class Config:
         env_file = ".env"

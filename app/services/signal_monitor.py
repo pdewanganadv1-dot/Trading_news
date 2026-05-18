@@ -6,6 +6,7 @@ from app.services.market_data_service import market_data_service, TradingSignals
 from app.services.telegram_notifier import telegram_notifier
 from app.services.accuracy_tracker import record_signal, resolve_signals
 from app.services.signal_confirmer import confirm_signal
+from app.services.signal_explainer import signal_explainer
 
 
 signal_log: List[Dict] = []
@@ -43,12 +44,19 @@ async def check_and_notify():
 
             await record_signal(symbol, sig, conf, price, signal_data.get('reasons', []))
 
+            explanation = signal_explainer._template_explain(
+                symbol.upper(), sig, conf, signal_data.get('reasons', []),
+                signal_data.get('indicators', {}),
+                price=price,
+            )
+
             entry = {
                 'symbol': symbol.upper(),
                 'signal': sig,
                 'confidence': conf,
                 'price': price,
                 'reasons': signal_data.get('reasons', []),
+                'explanation': explanation,
                 'timestamp': datetime.now().isoformat(),
                 'notified': False,
             }
@@ -73,7 +81,8 @@ async def check_and_notify():
                     if last != f"{sig}_{comp_conf}":
                         display_conf = max(conf, comp_conf)
                         ok = await telegram_notifier.send_signal_alert(
-                            symbol, sig, display_conf, price, reasons[:3]
+                            symbol, sig, display_conf, price, reasons[:3],
+                            explanation=explanation,
                         )
                         entry['notified'] = ok
                         if ok:

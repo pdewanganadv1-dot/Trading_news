@@ -990,6 +990,15 @@
                     </div>
                 </div>
 
+                <!-- AI Signal Explanation -->
+                <div class="indicator-panel" id="explanationPanel" style="display:none;">
+                    <div class="indicator-section-title">
+                        <span>💡 AI Signal Explanation</span>
+                        <span id="explanationSource" class="indicator-updated" style="color:var(--accent-cyan);">Template</span>
+                    </div>
+                    <div id="explanationContent" style="padding:0.5rem 0;font-size:0.75rem;line-height:1.6;color:var(--text-primary);white-space:pre-wrap;"></div>
+                </div>
+
                 <!-- Technical Indicators Grid -->
                 <div class="indicator-panel">
                     <div class="indicator-section-title">
@@ -1374,6 +1383,16 @@
             badge.textContent = text + (signalData.confidence ? ' (' + (signalData.confidence * 100).toFixed(0) + '%)' : '');
             badge.className = 'signal-hero-badge signal-' + text.toLowerCase();
             conf.textContent = signalData.confidence ? (signalData.confidence * 100).toFixed(0) + '%' : '--';
+
+            const panel = document.getElementById('explanationPanel');
+            const content = document.getElementById('explanationContent');
+            const source = document.getElementById('explanationSource');
+            if (signalData.explanation) {
+                content.textContent = signalData.explanation;
+                panel.style.display = 'block';
+            } else {
+                panel.style.display = 'none';
+            }
         }
 
         function refreshMTF(signalData) {

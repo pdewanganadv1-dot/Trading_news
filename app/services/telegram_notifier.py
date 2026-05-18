@@ -1,5 +1,5 @@
 import httpx
-from typing import Optional
+from typing import Optional, List
 from app.config import settings
 
 _INDIAN_STOCKS = {
@@ -38,7 +38,15 @@ class TelegramNotifier:
             print(f"Telegram send error: {e}")
             return False
 
-    async def send_signal_alert(self, symbol: str, signal: str, confidence: float, price: float, reasons: list) -> bool:
+    async def send_signal_alert(
+        self,
+        symbol: str,
+        signal: str,
+        confidence: float,
+        price: float,
+        reasons: list,
+        explanation: Optional[str] = None,
+    ) -> bool:
         emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⚪"}
         msg = (
             f"{emoji.get(signal, '⚡')} *{signal} SIGNAL* for *{symbol.upper()}*\n"
@@ -46,6 +54,14 @@ class TelegramNotifier:
             f"📊 Confidence: `{confidence*100:.0f}%`\n"
             f"📝 Reasons: `{', '.join(reasons[:3])}`"
         )
+        if explanation:
+            lines = explanation.split("\n")
+            header = lines[0] if lines else ""
+            mtf_lines = [l for l in lines if l.startswith("MTF ")]
+            key_parts = [header] + mtf_lines[:2]
+            summary = " | ".join(key_parts).strip()
+            if summary:
+                msg += f"\n\n💡 *AI Explanation:* {summary}"
         return await self.send_message(msg)
 
 

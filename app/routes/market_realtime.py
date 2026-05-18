@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from datetime import datetime
 from app.services.market_data_service import market_data_service, TechnicalIndicators, TradingSignals
+from app.services.signal_explainer import signal_explainer
 
 router = APIRouter(prefix="/api/v1/market", tags=["market-realtime"])
 
@@ -135,6 +136,18 @@ async def get_5min_signals(symbol: str):
         },
     }
 
+    explanation = None
+    if sig5:
+        explanation = signal_explainer._template_explain(
+            symbol.upper(),
+            sig5.get("signal", "HOLD"),
+            sig5.get("confidence", 0),
+            sig5.get("reasons", []),
+            sig5.get("indicators", {}),
+            mtf=mtf,
+            price=price,
+        )
+
     return {
         "status": "success",
         "symbol": symbol.upper(),
@@ -145,6 +158,7 @@ async def get_5min_signals(symbol: str):
         "confidence": _pick(sig5, "confidence"),
         "reasons": _pick(sig5, "reasons"),
         "indicators": _pick(sig5, "indicators"),
+        "explanation": explanation,
         "timestamp": datetime.now().isoformat()
     }
 
