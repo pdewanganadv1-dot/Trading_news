@@ -83,7 +83,7 @@ class MarketDataService:
                 if since_last < 2.0:
                     await asyncio.sleep(2.0 - since_last)
                 tk = yf.Ticker(f"{ticker}.NS")
-                info = tk.info
+                info = await asyncio.to_thread(lambda: tk.info)
                 self._yf_last_call = time.time()
                 price = info.get("regularMarketPrice") or info.get("currentPrice")
                 if price:
@@ -166,7 +166,9 @@ class MarketDataService:
                 since_last = now - self._yf_last_call
                 if since_last < 2.0:
                     await asyncio.sleep(2.0 - since_last)
-                data = yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
+                data = await asyncio.to_thread(
+                    lambda: yf.download(f"{ticker}.NS", period=yf_period, interval=yf_interval, progress=False, multi_level_index=False)
+                )
                 self._yf_last_call = time.time()
                 if data is not None and not data.empty:
                     data = data.reset_index()
