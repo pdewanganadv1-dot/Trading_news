@@ -138,7 +138,7 @@ async def get_5min_signals(symbol: str):
 
     explanation = None
     if sig5:
-        explanation = signal_explainer._template_explain(
+        explanation = signal_explainer.explain(
             symbol.upper(),
             sig5.get("signal", "HOLD"),
             sig5.get("confidence", 0),

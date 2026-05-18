@@ -10,6 +10,7 @@ from app.services.chart_generator import generate_signal_chart
 from app.services.accuracy_tracker import get_accuracy_stats
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
 from app.services.market_edge_service import scan_all_stocks, scan_stock, get_market_breadth, get_fii_dii_summary, set_fii_dii
+from app.services.signal_monitor import _MONITORED_SYMBOLS
 import docker
 
 _price_alerts: list = []
@@ -18,14 +19,12 @@ _MAX_ALERTS = 50
 BOT_TOKEN = settings.telegram_bot_token
 CHAT_ID = settings.telegram_chat_id
 
+_SYMBOLS = _MONITORED_SYMBOLS
+_CHART_SYMBOLS = '|'.join(_SYMBOLS)
+_SOCIAL_SYMBOLS = '|'.join(_SYMBOLS)
 
 _TOP_INDIAN = ['reliance', 'tcs', 'infy', 'hdfcbank', 'icicibank']
-_ALL_INDIAN = set(_TOP_INDIAN) | {
-    'sbin', 'lt', 'wipro', 'itc', 'bhartiartl', 'maruti',
-    'nestleind', 'hindunilvr', 'asianpaint', 'sunpharma', 'titan',
-    'bajajfinsv', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel',
-    'cipla', 'ultracemco'
-}
+_ALL_INDIAN = {s for s in _SYMBOLS if s not in ('btc', 'eth', 'gold', 'silver')}
 
 
 def _price_fmt(price: float, sym: str) -> str:
@@ -182,7 +181,7 @@ async def _handle_message(text: str, chat_id: int):
         except Exception as e:
             return await telegram_notifier.send_message(f"❌ Docker error: {e}")
 
-    m = re.match(r'^social\s+(btc|eth|gold|silver|aapl|tsla|nvda|amzn|msft|googl|reliance|tcs|hdfcbank|infy|icicibank)$', text)
+    m = re.match(r'^social\s+(\w+)$', text)
     if m:
         sym = m.group(1).upper()
         stocktwits, reddit = await asyncio.gather(fetch_stocktwits(sym), fetch_reddit(sym))
@@ -316,7 +315,7 @@ async def _handle_message(text: str, chat_id: int):
         )
         return await telegram_notifier.send_message(msg)
 
-    m = re.match(r'^/chart\s+(btc|eth|gold|silver|reliance|tcs|hdfcbank|infy|icicibank)$', text)
+    m = re.match(r'^/chart\s+(\w+)$', text)
     if m:
         sym = m.group(1)
         path = await generate_signal_chart(sym)
@@ -324,7 +323,7 @@ async def _handle_message(text: str, chat_id: int):
             return await _send_photo(f"📈 *{sym.upper()} — 5m Chart*", path)
         return await telegram_notifier.send_message(f"Could not generate chart for {sym.upper()}")
 
-    m = re.match(r'^alert\s+(btc|eth|gold|silver|reliance|tcs|hdfcbank|infy|icicibank)\s+(above|below)\s+([\d.]+)$', text)
+    m = re.match(r'^alert\s+(\w+)\s+(above|below)\s+([\d.]+)$', text)
     if m:
         global _alert_id_counter
         _alert_id_counter += 1
@@ -390,7 +389,7 @@ async def _handle_message(text: str, chat_id: int):
         except Exception as e:
             return await telegram_notifier.send_message(f"Error fetching news: {e}")
 
-    if text in ('btc', 'eth', 'gold', 'silver', 'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank'):
+    if text in _SYMBOLS:
         try:
             price_data = await market_data_service.get_price_data(text)
             if not price_data:

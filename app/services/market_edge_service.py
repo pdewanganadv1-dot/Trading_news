@@ -1,4 +1,5 @@
 import asyncio
+import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -335,8 +336,6 @@ def scan_stock(symbol: str) -> Dict:
         if isinstance(val, (np.integer,)):
             return int(val)
         return val
-
-    import numpy as np
 
     return {
         "symbol": symbol.upper(),
