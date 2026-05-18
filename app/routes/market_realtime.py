@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from datetime import datetime
 from app.services.market_data_service import market_data_service, TechnicalIndicators, TradingSignals
 from app.services.signal_explainer import signal_explainer
-from app.services.signal_monitor import _MONITORED_SYMBOLS, get_cached_signals
+from app.services.signal_monitor import _MONITORED_SYMBOLS, get_cached_signals, get_cached_realtime
 
 router = APIRouter(prefix="/api/v1/market", tags=["market-realtime"])
 
@@ -198,15 +198,27 @@ async def get_all_signals():
 
 @router.get("/realtime")
 async def get_all_realtime():
-    """Get real-time data for all supported symbols."""
-    symbols = _MONITORED_SYMBOLS
-    results = {}
+    """Get cached real-time data for all symbols (updated by background loop every ~10min)."""
+    cache = get_cached_realtime()
 
-    for symbol in symbols:
-        try:
-            data = await get_realtime_data(symbol)
-            results[symbol] = data
-        except Exception:
-            pass
+    results = {}
+    now = datetime.now()
+    for symbol in _MONITORED_SYMBOLS:
+        entry = cache.get(symbol)
+        if entry:
+            age_s = (now - datetime.fromisoformat(entry["timestamp"])).total_seconds()
+            results[symbol] = {
+                "symbol": entry["symbol"],
+                "price": entry["price"],
+                "age_seconds": round(age_s, 1),
+                "cached": True,
+            }
+        else:
+            results[symbol] = {
+                "symbol": symbol.upper(),
+                "price": None,
+                "age_seconds": None,
+                "cached": False,
+            }
 
     return results

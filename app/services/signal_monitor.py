@@ -11,8 +11,10 @@ from app.services.signal_explainer import signal_explainer
 
 signal_log: List[Dict] = []
 _signal_cache: Dict[str, Dict] = {}
+_realtime_cache: Dict[str, Dict] = {}
 _last_sent: Dict[str, str] = {}
 _CONFIRMED_SENT: Dict[str, str] = {}  # Tracks composite signal sends
+_cache_start: str = ""
 
 # Nifty 100 stocks (monitored for trading signals)
 _INDIAN_STOCKS = [
@@ -35,12 +37,12 @@ _INDIAN_STOCKS = [
     "dlf", "esi", "exideind", "federalbnk", "gail",
     "godrejcp", "godrejpro", "gvk", "havells", "heromotoco",
     "hindustan", "hindzinc", "idfcfirstb", "ioc", "irctc",
-    "irfc", "itc", "lic", "lutrading", "mcdowell",
+    "irfc", "lic", "lutrading", "mcdowell",
     "motherson", "mphend", "muthoot", "navin", "pageind",
     "petronet", "pidilite", "pfc", "ramco", "rb",
     "recl", "relianceind", "sail", "samvardhana", "sir",
     "siemens", "srtrans", "tatachem", "tatacoffee", "tatapower",
-    "tcs", "thermax", "torrentpow", "torrentpharm", "tvs",
+    "thermax", "torrentpow", "torrentpharm", "tvs",
     "ujjivan", "unionbank", "varunever", "vestutech", "voltas",
     "yesbank", "zyduslife",
 ]
@@ -127,6 +129,15 @@ async def _process_symbol(symbol: str) -> None:
             "timestamp": entry["timestamp"],
         }
 
+        if not _cache_start:
+            _cache_start = datetime.now().isoformat()
+
+        _realtime_cache[symbol] = {
+            "symbol": symbol.upper(),
+            "price": price_data,
+            "timestamp": datetime.now().isoformat(),
+        }
+
         signal_log.insert(0, entry)
         if len(signal_log) > 100:
             signal_log.pop()
@@ -193,3 +204,30 @@ def get_signal_log(limit: int = 50) -> List[Dict]:
 
 def get_cached_signals() -> Dict[str, Dict]:
     return dict(_signal_cache)
+
+
+def get_cached_realtime() -> Dict[str, Dict]:
+    return dict(_realtime_cache)
+
+
+def get_cache_stats() -> Dict:
+    now = datetime.now()
+    total = len(_MONITORED_SYMBOLS)
+    cached = len(_signal_cache)
+    ages = []
+    for v in _signal_cache.values():
+        try:
+            ages.append((now - datetime.fromisoformat(v["timestamp"])).total_seconds())
+        except Exception:
+            pass
+    max_age = round(max(ages), 1) if ages else None
+    min_age = round(min(ages), 1) if ages else None
+    return {
+        "total_symbols": total,
+        "cached_signals": cached,
+        "cached_realtime": len(_realtime_cache),
+        "max_age_seconds": max_age,
+        "min_age_seconds": min_age,
+        "started_at": _cache_start,
+        "pct_complete": round(cached / total * 100, 1) if total else 0,
+    }

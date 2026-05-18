@@ -16,6 +16,7 @@ from app.routes.signals_log import router as signals_log_router
 from app.routes.fundamentals import router as fundamentals_router
 from app.routes.nifty100 import router as nifty100_router
 from app.routes.edge import router as edge_router
+from app.services.signal_monitor import get_cache_stats
 import asyncio
 
 
@@ -56,7 +57,11 @@ def root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    stats = get_cache_stats()
+    return {
+        "status": "healthy",
+        "cache": stats,
+    }
 
 
 app.include_router(market_router)
