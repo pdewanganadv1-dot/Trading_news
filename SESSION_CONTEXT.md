@@ -25,7 +25,13 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: ad3cefe
+- **Git commit HEAD**: 488ea1b
+
+### Latest Session (May 18, 2026)
+
+**Done**:
+1. **Fixed circular import**: `signal_confirmer.py` imported `_INDIAN_STOCKS` from `signal_monitor.py`, but `signal_monitor.py` already imported `confirm_signal` from `signal_confirmer.py`. Fixed with lazy import inside the function instead of top-level import.
+2. **FII/DII card on main dashboard**: Added institutional flow card in `dashboard_live.html` between Market Edge and Signal Log sections. Shows FII net, DII net, combined signal (bullish/bearish/neutral), trend arrows, and "India Only" badge. Fetches from `/api/v1/edge/fiidii` + `/fiidii/trend`, refreshes every 2 min.
 
 ### Known Issues
 1. **Groq quota**: 100K tokens/day free tier — exhausted. Only calls LLM for BUY/SELL ≥ 50% confidence. Resets ~24h cycle.
