@@ -11,13 +11,24 @@ router = APIRouter(prefix="/api/v1/market", tags=["market-realtime"])
 async def get_realtime_data(symbol: str):
     """Get real-time market data with calculated indicators for a symbol."""
     # Get current price
+    import yfinance as yf
+    try:
+        t = yf.Ticker(f"{symbol.upper()}.NS")
+        info = t.info
+        yf_price = info.get("regularMarketPrice") or info.get("currentPrice")
+        yf_state = info.get("marketState")
+    except Exception as e:
+        yf_price = None
+        yf_state = f"error: {e}"
+
     price_data = await market_data_service.get_price_data(symbol)
 
     if not price_data:
         return {
             "status": "error",
             "message": "Could not fetch price data",
-            "symbol": symbol.upper()
+            "symbol": symbol.upper(),
+            "debug_yf": {"price": yf_price, "state": str(yf_state) if yf_state else None}
         }
 
     # Get historical data for indicators
