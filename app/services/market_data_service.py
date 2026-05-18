@@ -245,7 +245,73 @@ class TechnicalIndicators:
             result["adx"] = round(df["adx"].iloc[-1], 2) if "adx" in df.columns else 25.0
         except Exception:
             result["adx"] = 25.0
+
+        # SuperTrend
+        try:
+            result["supertrend"] = TechnicalIndicators._calc_supertrend(prices)
+        except Exception:
+            result["supertrend"] = {"trend": "neutral", "value": None}
+
+        # Ichimoku Cloud
+        try:
+            result["ichimoku"] = TechnicalIndicators._calc_ichimoku(prices)
+        except Exception:
+            result["ichimoku"] = {"signal": "neutral", "tenkan": None, "kijun": None}
+
         return result
+
+    @staticmethod
+    def _calc_supertrend(prices: List[float], atr_period: int = 10, multiplier: float = 3.0) -> Dict:
+        if len(prices) < atr_period + 1:
+            return {"trend": "neutral", "value": None, "direction": None}
+        closes = np.array(prices)
+        highs = closes * 1.002
+        lows = closes * 0.998
+        tr = np.maximum(
+            highs[1:] - lows[1:],
+            np.maximum(
+                abs(highs[1:] - closes[:-1]),
+                abs(lows[1:] - closes[:-1])
+            )
+        )
+        atr = np.mean(tr[-atr_period:])
+        hl2 = (highs[-1] + lows[-1]) / 2
+        upper = hl2 + multiplier * atr
+        lower = hl2 - multiplier * atr
+        trend = "bullish" if closes[-1] > lower else "bearish" if closes[-1] < upper else "neutral"
+        return {
+            "trend": trend,
+            "value": round(upper if trend == "bearish" else lower, 2),
+            "direction": "up" if trend == "bullish" else "down",
+            "atr": round(atr, 2)
+        }
+
+    @staticmethod
+    def _calc_ichimoku(prices: List[float]) -> Dict:
+        if len(prices) < 52:
+            return {"signal": "neutral", "tenkan": None, "kijun": None, "span_a": None, "span_b": None}
+        highs = np.array(prices) * 1.002
+        lows = np.array(prices) * 0.998
+        tenkan = (max(highs[-9:]) + min(lows[-9:])) / 2
+        kijun = (max(highs[-26:]) + min(lows[-26:])) / 2
+        span_a = (tenkan + kijun) / 2
+        span_b = (max(highs[-52:]) + min(lows[-52:])) / 2
+        price = prices[-1]
+        if price > kijun and tenkan > kijun and price > span_a:
+            signal = "bullish"
+        elif price < kijun and tenkan < kijun and price < span_a:
+            signal = "bearish"
+        else:
+            signal = "neutral"
+        cloud_bullish = span_a > span_b
+        return {
+            "signal": signal,
+            "tenkan": round(tenkan, 2),
+            "kijun": round(kijun, 2),
+            "span_a": round(span_a, 2),
+            "span_b": round(span_b, 2),
+            "cloud_bullish": cloud_bullish
+        }
 
 
 class TradingSignals:
@@ -285,13 +351,21 @@ class TradingSignals:
                 signals.append(('SELL', 3))
             weights.append(3)
 
-        # MACD Signal (weight: 2)
+        # MACD Line Cross (weight: 3) — cross of MACD line over signal line
         macd = indicators.get('macd', {})
-        if macd.get('histogram', 0) > 0:
-            signals.append(('BUY', 2))
-        elif macd.get('histogram', 0) < 0:
-            signals.append(('SELL', 2))
-        weights.append(2)
+        macd_line = macd.get('macd')
+        macd_signal = macd.get('signal')
+        macd_hist = macd.get('histogram', 0)
+        if macd_line is not None and macd_signal is not None:
+            if macd_line > macd_signal and macd_hist > 0:
+                signals.append(('BUY', 3))
+            elif macd_line < macd_signal and macd_hist < 0:
+                signals.append(('SELL', 3))
+            elif macd_hist > 0:
+                signals.append(('BUY', 1))  # Weak bullish
+            elif macd_hist < 0:
+                signals.append(('SELL', 1))  # Weak bearish
+            weights.append(3)
 
         # Bollinger Bands (weight: 1)
         bb = indicators.get('bb', {})
@@ -317,6 +391,24 @@ class TradingSignals:
                 signals.append(('HOLD', 1))  # Weak trend
             weights.append(1)
 
+        # SuperTrend (weight: 3)
+        st = indicators.get('supertrend', {})
+        if st.get('trend') == 'bullish':
+            signals.append(('BUY', 3))
+        elif st.get('trend') == 'bearish':
+            signals.append(('SELL', 3))
+        if st.get('trend') != 'neutral':
+            weights.append(3)
+
+        # Ichimoku Cloud (weight: 2)
+        ichi = indicators.get('ichimoku', {})
+        if ichi.get('signal') == 'bullish':
+            signals.append(('BUY', 2))
+        elif ichi.get('signal') == 'bearish':
+            signals.append(('SELL', 2))
+        if ichi.get('signal') != 'neutral':
+            weights.append(2)
+
         # Calculate weighted signal
         buy_score = sum(w for s, w in signals if s == 'BUY')
         sell_score = sum(w for s, w in signals if s == 'SELL')
@@ -340,16 +432,23 @@ class TradingSignals:
         if sma9 and sma20:
             if sma9 > sma20: reasons.append('SMA bullish crossover')
             else: reasons.append('SMA bearish crossover')
-        if macd.get('histogram'):
+        if macd_line is not None and macd_signal is not None:
+            if macd_line > macd_signal: reasons.append(f'MACD bullish cross')
+            elif macd_line < macd_signal: reasons.append(f'MACD bearish cross')
+        elif macd.get('histogram'):
             reasons.append(f'MACD {"bullish" if macd["histogram"] > 0 else "bearish"}')
         if stoch:
             if stoch['k'] < 20: reasons.append(f'Stochastic oversold ({stoch["k"]:.1f})')
             elif stoch['k'] > 80: reasons.append(f'Stochastic overbought ({stoch["k"]:.1f})')
+        if st.get('trend') != 'neutral':
+            reasons.append(f'SuperTrend {st["trend"]} ({st.get("direction","")})')
+        if ichi.get('signal') != 'neutral':
+            reasons.append(f'Ichimoku {ichi["signal"]} {"(cloud bullish)" if ichi.get("cloud_bullish") else "(cloud bearish)"}')
 
         return {
             'signal': signal,
             'confidence': round(confidence, 2),
-            'reasons': reasons[:3],
+            'reasons': reasons[:4],
             'indicators': {
                 'rsi': round(rsi, 2) if rsi else None,
                 'sma': {
@@ -360,7 +459,9 @@ class TradingSignals:
                 'macd': macd,
                 'bb': bb,
                 'stochastic': stoch,
-                'adx': adx
+                'adx': adx,
+                'supertrend': st,
+                'ichimoku': ichi
             }
         }
 

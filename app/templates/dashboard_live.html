@@ -1010,6 +1010,8 @@
                         <div class="indicator-item"><div class="indicator-name">Stoch %K</div><div class="indicator-value" id="indStochK">--</div><div class="indicator-signal" id="indStochKSignal">--</div></div>
                         <div class="indicator-item"><div class="indicator-name">Stoch %D</div><div class="indicator-value" id="indStochD">--</div><div class="indicator-signal" id="indStochDSignal">--</div></div>
                         <div class="indicator-item"><div class="indicator-name">ADX</div><div class="indicator-value" id="indAdx">--</div><div class="indicator-signal" id="indAdxSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">SuperTrend</div><div class="indicator-value" id="indSuperTrend">--</div><div class="indicator-signal" id="indSuperTrendSignal">--</div></div>
+                        <div class="indicator-item"><div class="indicator-name">Ichimoku</div><div class="indicator-value" id="indIchimoku">--</div><div class="indicator-signal" id="indIchimokuSignal">--</div></div>
                     </div>
                 </div>
             </div>
@@ -1315,6 +1317,24 @@
                     if (p.price > ind.bb.upper) { bbSig.textContent = 'BREAK UP'; bbSig.className = 'indicator-signal overbought'; }
                     else if (p.price < ind.bb.lower) { bbSig.textContent = 'BREAK DN'; bbSig.className = 'indicator-signal oversold'; }
                     else { bbSig.textContent = 'INSIDE'; bbSig.className = 'indicator-signal neutral'; }
+                }
+                // SuperTrend
+                if (ind.supertrend) {
+                    const st = ind.supertrend;
+                    document.getElementById('indSuperTrend').textContent = (st.trend || '--').toUpperCase();
+                    const stSig = document.getElementById('indSuperTrendSignal');
+                    if (st.trend === 'bullish') { stSig.textContent = 'BUY'; stSig.className = 'indicator-signal buy'; }
+                    else if (st.trend === 'bearish') { stSig.textContent = 'SELL'; stSig.className = 'indicator-signal sell'; }
+                    else { stSig.textContent = 'NEUTRAL'; stSig.className = 'indicator-signal neutral'; }
+                }
+                // Ichimoku
+                if (ind.ichimoku) {
+                    const ichi = ind.ichimoku;
+                    document.getElementById('indIchimoku').textContent = (ichi.signal || '--').toUpperCase();
+                    const ichiSig = document.getElementById('indIchimokuSignal');
+                    if (ichi.signal === 'bullish') { ichiSig.textContent = 'BUY'; ichiSig.className = 'indicator-signal buy'; }
+                    else if (ichi.signal === 'bearish') { ichiSig.textContent = 'SELL'; ichiSig.className = 'indicator-signal sell'; }
+                    else { ichiSig.textContent = 'NEUTRAL'; ichiSig.className = 'indicator-signal neutral'; }
                 }
                 // Trend
                 document.getElementById('indicatorTrend').textContent = 'Trend: ' + (market.trend || 'neutral').toUpperCase();
