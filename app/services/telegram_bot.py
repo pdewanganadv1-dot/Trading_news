@@ -367,15 +367,13 @@ async def _handle_message(text: str, chat_id: int):
     if m:
         sym = m.group(1).lower()
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                resp = await client.get(f"http://localhost:8000/api/v1/news/live/{sym}")
-                if resp.status_code != 200:
-                    return await telegram_notifier.send_message(f"📰 No news found for *{sym.upper()}*")
-                data = resp.json()
-                articles = data.get("news", [])
-                sentiment = data.get("sentiment", {})
-                if not articles:
-                    return await telegram_notifier.send_message(f"📰 No news found for *{sym.upper()}*")
+            from app.routes.news import _fetch_news_for_symbol, filter_news_by_symbol
+            from app.services.real_news import real_news_service
+            all_news = await _fetch_news_for_symbol(sym)
+            articles = filter_news_by_symbol(all_news, sym)
+            if not articles:
+                return await telegram_notifier.send_message(f"📰 No news found for *{sym.upper()}*")
+            sentiment = real_news_service.get_market_sentiment(articles)
             lines = [f"📰 *News — {sym.upper()}*", ""]
             s = sentiment.get("sentiment", "neutral")
             emoji = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪"}
