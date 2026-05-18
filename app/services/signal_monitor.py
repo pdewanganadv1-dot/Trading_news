@@ -46,7 +46,7 @@ _INDIAN_STOCKS = [
 
 _MONITORED_SYMBOLS = ['btc', 'eth', 'gold', 'silver'] + _INDIAN_STOCKS
 
-_MAX_CONCURRENT = 10  # Limit concurrent yfinance calls
+_MAX_CONCURRENT = 3  # Limit concurrent yfinance calls (Yahoo rate-limits)
 
 
 async def _process_symbol(symbol: str) -> None:
@@ -128,15 +128,9 @@ async def _process_symbol(symbol: str) -> None:
 
 
 async def check_and_notify():
-    """Process all monitored symbols in parallel batches."""
-    sem = asyncio.Semaphore(_MAX_CONCURRENT)
-
-    async def _process(symbol: str):
-        async with sem:
-            await _process_symbol(symbol)
-
-    tasks = [_process(sym) for sym in _MONITORED_SYMBOLS]
-    await asyncio.gather(*tasks)
+    """Process all monitored symbols sequentially (Yahoo rate-limits parallel requests)."""
+    for symbol in _MONITORED_SYMBOLS:
+        await _process_symbol(symbol)
 
 
 _last_edge_alert: Dict[str, float] = {}
