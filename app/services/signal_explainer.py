@@ -1,7 +1,7 @@
 """Signal Explanation Service — generates natural language explanations for trading signals.
 
 Two modes:
-  - LLM mode: Uses Google Gemini API (free tier available, set GEMINI_API_KEY)
+  - LLM mode: Uses Groq API (set GROQ_API_KEY)
   - Template mode: Smart template-based fallback (always works)
 """
 
@@ -33,20 +33,20 @@ def _trend_emoji(t: Optional[str]) -> str:
 
 class SignalExplainer:
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or settings.gemini_api_key
-        self.model_name = settings.gemini_model
+        self.api_key = api_key or settings.groq_api_key
+        self.model_name = settings.groq_model
+        self.client = None
         self.use_llm = bool(self.api_key)
         if self.use_llm:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel(self.model_name)
-                logger.info(f"Gemini client initialized ({self.model_name})")
+                from groq import Groq
+                self.client = Groq(api_key=self.api_key)
+                logger.info(f"Groq client initialized ({self.model_name})")
             except ImportError:
-                logger.warning("google-generativeai not installed, using template mode")
+                logger.warning("groq not installed, using template mode")
                 self.use_llm = False
             except Exception as e:
-                logger.warning(f"Failed to init Gemini: {e}, using template mode")
+                logger.warning(f"Failed to init Groq: {e}, using template mode")
                 self.use_llm = False
 
     def explain(
@@ -151,8 +151,11 @@ class SignalExplainer:
             "or conflict, and what to watch for. Use plain English, avoid jargon overload. Be direct.\n\n"
             f"{context}"
         )
-        resp = self.model.generate_content(prompt)
-        return resp.text.strip()
+        resp = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return resp.choices[0].message.content.strip()
 
     def _template_explain(
         self,

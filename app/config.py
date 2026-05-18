@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     telegram_chat_id: str = "5163568145"
     signal_confidence_threshold: float = 0.65
     signal_check_interval_seconds: int = 120
-    gemini_api_key: Optional[str] = None
-    gemini_model: str = "models/gemini-2.0-flash-exp"
+    groq_api_key: Optional[str] = None
+    groq_model: str = "llama3-70b-8192"
 
     class Config:
         env_file = ".env"
