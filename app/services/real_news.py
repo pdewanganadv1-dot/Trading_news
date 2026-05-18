@@ -10,7 +10,7 @@ class RealNewsService:
     """Service for fetching real news from multiple sources."""
 
     _cache: Dict = {}
-    _cache_ttl = 45  # seconds
+    _cache_ttl = 300  # seconds (5 min — sentiment pipeline runs every 10min)
 
     def __init__(self):
         self.session = httpx.AsyncClient(

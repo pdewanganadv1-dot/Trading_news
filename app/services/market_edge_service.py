@@ -1,4 +1,5 @@
 import asyncio
+import time
 import numpy as np
 import yfinance as yf
 from datetime import datetime, timedelta
@@ -20,6 +21,14 @@ _breadth_cache = {}
 _breadth_cache_ts = 0
 _BREADTH_TTL = 3600  # 1 hour
 
+# Rate limiter for yfinance in edge scanner
+_yf_last_call_ts: float = 0
+
+# Cache for scan_all_stocks
+_scan_cache: List[Dict] = []
+_scan_cache_ts: float = 0
+_SCAN_TTL = 300  # 5 minutes
+
 
 def _yf_ticker(symbol: str) -> Optional[str]:
     s = symbol.lower()
@@ -32,9 +41,16 @@ def _yf_ticker(symbol: str) -> Optional[str]:
 
 def _get_yf_price(symbol: str):
     """Get daily price & volume data from yfinance (synchronous helper)."""
+    global _yf_last_call_ts
     ticker = _yf_ticker(symbol)
     if not ticker:
         return None
+    # Rate limit: 1 call per 1.5s minimum across all edge scanner calls
+    now = time.time()
+    since_last = now - _yf_last_call_ts
+    if since_last < 1.5:
+        time.sleep(1.5 - since_last)
+    _yf_last_call_ts = time.time()
     try:
         stock = yf.Ticker(ticker)
         data = stock.history(period="1mo")
@@ -358,7 +374,11 @@ def scan_stock(symbol: str) -> Dict:
 
 
 async def scan_all_stocks() -> List[Dict]:
-    """Scan all monitored stocks and return ranked by edge score."""
+    """Scan all monitored stocks and return ranked by edge score (cached for 5min)."""
+    global _scan_cache, _scan_cache_ts
+    now = time.time()
+    if _scan_cache and (now - _scan_cache_ts) < _SCAN_TTL:
+        return list(_scan_cache)
     loop = asyncio.get_event_loop()
     results = []
     for sym in _INDIAN:
@@ -368,8 +388,9 @@ async def scan_all_stocks() -> List[Dict]:
                 results.append(result)
         except Exception as e:
             print(f"Edge scan error {sym}: {e}")
-        await asyncio.sleep(0.1)  # Rate limit
     results.sort(key=lambda x: x.get("score", 0), reverse=True)
+    _scan_cache = results
+    _scan_cache_ts = now
     return results
 
 

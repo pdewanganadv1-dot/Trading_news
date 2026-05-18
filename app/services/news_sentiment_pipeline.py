@@ -116,10 +116,15 @@ async def _update_symbol_sentiment(symbol: str) -> Dict:
 
 async def refresh_all_sentiments():
     global _SENTIMENT_CACHE, _SENTIMENT_CACHE_TS
-    results = {}
+    # Pre-warm news cache with one call before parallel processing
+    await real_news_service.get_all_news()
+    tasks = {}
     for symbol in _NIFTY_STOCKS:
+        tasks[symbol] = asyncio.create_task(_update_symbol_sentiment(symbol))
+    results = {}
+    for symbol, task in tasks.items():
         try:
-            results[symbol] = await _update_symbol_sentiment(symbol)
+            results[symbol] = await task
         except Exception as e:
             print(f"[SentimentPipeline] Error for {symbol}: {e}")
     _SENTIMENT_CACHE = results

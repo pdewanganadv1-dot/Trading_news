@@ -97,7 +97,7 @@ async def _process_symbol(symbol: str) -> None:
         # Primary gate: base signal must cross threshold
         should_alert = sig in ('BUY', 'SELL') and conf >= settings.signal_confidence_threshold
         if should_alert:
-            confirmed = await confirm_signal(symbol, sig, conf, signal_data.get('reasons', []), price)
+            confirmed = await confirm_signal(symbol, sig, conf, signal_data.get('reasons', []), price, prices_5m=prices_5m)
             comp_sig = confirmed["signal"]
             comp_conf = confirmed["confidence"]
             reasons = confirmed["reasons"]
@@ -148,9 +148,19 @@ async def _process_symbol(symbol: str) -> None:
 
 
 async def check_and_notify():
-    """Process all monitored symbols sequentially (Yahoo rate-limits parallel requests)."""
-    for symbol in _MONITORED_SYMBOLS:
+    """Process all monitored symbols with limited parallelism (Yahoo rate-limits parallel requests).
+    Processes BTC/ETH/GOLD/SILVER first sequentially (metals use fallback, crypto uses Binance),
+    then Indian stocks in parallel batches of 5."""
+    for symbol in ('btc', 'eth', 'gold', 'silver'):
         await _process_symbol(symbol)
+    tasks = []
+    for symbol in _INDIAN_STOCKS:
+        tasks.append(_process_symbol(symbol))
+        if len(tasks) >= 5:
+            await asyncio.gather(*tasks)
+            tasks = []
+    if tasks:
+        await asyncio.gather(*tasks)
 
 
 _last_edge_alert: Dict[str, float] = {}
@@ -180,23 +190,35 @@ async def _edge_scan():
         print(f"Edge scan error: {e}")
 
 
+def _is_market_hours() -> bool:
+    """Check if Indian market is open (weekday 9:00am-4:00pm IST = UTC 3:30-10:30)."""
+    now = datetime.utcnow()
+    if now.weekday() >= 5:
+        return False
+    utc_hour = now.hour + now.minute / 60.0
+    ist_hour = utc_hour + 5.5
+    return 9 <= ist_hour < 16
+
+
 async def signal_monitor_loop():
     resolve_counter = 0
     edge_counter = 0
     while True:
-        start = datetime.now()
-        await check_and_notify()
-        elapsed = (datetime.now() - start).total_seconds()
-        resolve_counter += 1
-        edge_counter += 1
-        if resolve_counter >= 30:
-            resolve_counter = 0
-            await resolve_signals()
-        if edge_counter >= 15:  # Edge scan every ~30 min
-            edge_counter = 0
-            _ = asyncio.create_task(_edge_scan())
-        # Sleep for the remaining interval (min 60s between cycles)
-        await asyncio.sleep(max(60, settings.signal_check_interval_seconds - elapsed))
+        if _is_market_hours():
+            start = datetime.now()
+            await check_and_notify()
+            elapsed = (datetime.now() - start).total_seconds()
+            resolve_counter += 1
+            edge_counter += 1
+            if resolve_counter >= 30:
+                resolve_counter = 0
+                await resolve_signals()
+            if edge_counter >= 15:  # Edge scan every ~30 min during market hours
+                edge_counter = 0
+                _ = asyncio.create_task(_edge_scan())
+            await asyncio.sleep(max(60, settings.signal_check_interval_seconds - elapsed))
+        else:
+            await asyncio.sleep(300)  # Check every 5min outside market hours
 
 
 def get_signal_log(limit: int = 50) -> List[Dict]:

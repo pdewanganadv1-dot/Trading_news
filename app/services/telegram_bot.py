@@ -10,8 +10,7 @@ from app.services.chart_generator import generate_signal_chart
 from app.services.accuracy_tracker import get_accuracy_stats
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
 from app.services.market_edge_service import scan_all_stocks, scan_stock, get_market_breadth, get_fii_dii_summary, set_fii_dii, get_fii_dii_history
-from app.services.signal_monitor import _MONITORED_SYMBOLS
-import docker
+from app.services.signal_monitor import _MONITORED_SYMBOLS, get_cached_realtime, get_cached_signals
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -96,9 +95,26 @@ def _build_help() -> str:
 
 async def _fetch_dashboard_data():
     symbols = ['btc', 'eth', 'gold', 'silver'] + _TOP_INDIAN
+    realtime = get_cached_realtime()
+    cached_sigs = get_cached_signals()
     prices = {}
     signals = {}
     for sym in symbols:
+        rt = realtime.get(sym.lower())
+        cs = cached_sigs.get(sym.lower())
+        if rt and cs and rt.get("timestamp") and cs.get("timestamp"):
+            # Use cache if less than 5min old
+            try:
+                age = (datetime.now() - datetime.fromisoformat(rt["timestamp"])).total_seconds()
+                if age < 300:
+                    prices[sym] = rt.get("price", {})
+                    sig = cs.get("signal", "HOLD")
+                    conf = cs.get("confidence", 0)
+                    reasons = cs.get("reasons", [])
+                    signals[sym] = {"signal": sig, "confidence": conf, "reasons": reasons}
+                    continue
+            except Exception:
+                pass
         try:
             price_data = await market_data_service.get_price_data(sym)
             if price_data:
@@ -177,6 +193,7 @@ async def _handle_message(text: str, chat_id: int):
 
     if text in ('docker', '/docker'):
         try:
+            import docker
             client = docker.from_env()
             containers = client.containers.list(all=True)
             lines = ["🐳 *Docker Status*", ""]
@@ -223,7 +240,6 @@ async def _handle_message(text: str, chat_id: int):
         return await telegram_notifier.send_message(msg)
 
     if text in ('stocks', '/stocks', 'list', '/list'):
-        from app.services.signal_monitor import _MONITORED_SYMBOLS
         crypto = [s.upper() for s in _MONITORED_SYMBOLS if s in ('btc', 'eth')]
         metals = [s.upper() for s in _MONITORED_SYMBOLS if s in ('gold', 'silver')]
         indian = [s.upper() for s in _MONITORED_SYMBOLS if s not in ('btc', 'eth', 'gold', 'silver')]

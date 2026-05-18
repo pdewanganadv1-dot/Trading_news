@@ -8,13 +8,11 @@ from app.services.real_news import real_news_service
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
 
 
-async def get_multiframe_prices(symbol: str) -> Tuple[List[float], List[float], List[float], List[float]]:
-    """Fetch 5m, 15m, 1h, 1d prices for multi-timeframe analysis."""
-    prices_5m = await market_data_service.get_5min_prices(symbol, 100)
+async def get_multiframe_prices(symbol: str) -> Tuple[List[float], List[float], List[float]]:
+    """Fetch 5m, 15m, 1h prices for multi-timeframe analysis (1d skipped — cached hourly elsewhere)."""
     prices_15m = await market_data_service._get_klines(symbol, '15m', 60)
     prices_1h = await market_data_service._get_klines(symbol, '1h', 48)
-    prices_1d = await market_data_service.get_historical_prices(symbol, 30)
-    return prices_5m, prices_15m, prices_1h, prices_1d
+    return prices_15m, prices_1h
 
 
 def _tf_signal(prices: List[float], current_price: float) -> Tuple[str, float, List[str]]:
@@ -31,23 +29,26 @@ async def confirm_signal(
     base_confidence: float,
     base_reasons: List[str],
     price: float,
+    prices_5m: Optional[List[float]] = None,
 ) -> Dict:
     """
     Multi-conformation signal check.
+    Accepts optional pre-fetched 5m prices to avoid re-fetching yfinance.
     Returns composite signal with adjusted confidence.
     """
     symbol_lower = symbol.lower()
 
-    # 1. Multi-timeframe alignment
+    # 1. Multi-timeframe alignment (use pre-fetched 5m if available)
     tf_signals = {}
     try:
-        p5, p15, p1h, p1d = await get_multiframe_prices(symbol_lower)
+        if prices_5m is not None and len(prices_5m) >= 20:
+            p5 = prices_5m
+        else:
+            p5 = await market_data_service.get_5min_prices(symbol_lower, 100)
+        p15, p1h = await get_multiframe_prices(symbol_lower)
         tf_signals["5m"] = _tf_signal(p5, price) if p5 and len(p5) >= 20 else ("HOLD", 0, [])
         tf_signals["15m"] = _tf_signal(p15, price) if p15 and len(p15) >= 20 else ("HOLD", 0, [])
         tf_signals["1h"] = _tf_signal(p1h, price) if p1h and len(p1h) >= 20 else ("HOLD", 0, [])
-        # 1d uses daily close as current price
-        daily_price = p1d[-1] if p1d is not None and len(p1d) > 0 else price
-        tf_signals["1d"] = _tf_signal(p1d, daily_price) if p1d and len(p1d) >= 20 else ("HOLD", 0, [])
     except Exception as e:
         print(f"MTF error for {symbol}: {e}")
 
@@ -103,7 +104,7 @@ async def confirm_signal(
         score += base_dir * 3 * base_confidence
         confirmations.append(f"Base {base_signal} ({base_confidence:.0%})")
 
-    # MTF alignment (3 timeframes: 5m, 15m, 1h)
+    # MTF alignment (5m, 15m, 1h; 1d only used for cached edge context)
     for tf_name, (tf_sig, tf_conf, tf_reasons) in tf_signals.items():
         max_score += 2
         if tf_sig == base_signal:
