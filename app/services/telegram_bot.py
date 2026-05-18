@@ -16,6 +16,8 @@ import docker
 _price_alerts: list = []
 _alert_id_counter = 0
 _MAX_ALERTS = 50
+_agent_instructions: list = []  # Pending instructions from Telegram for AI agent
+_agent_handled_ids: set = set()
 BOT_TOKEN = settings.telegram_bot_token
 CHAT_ID = settings.telegram_chat_id
 
@@ -412,7 +414,18 @@ async def _handle_message(text: str, chat_id: int):
         except Exception as e:
             return await telegram_notifier.send_message(f"Error: {str(e)}")
 
-    return False
+    # Forward unrecognized commands to AI agent queue
+    if text and chat_id:
+        _agent_instructions.append({
+            "text": text,
+            "chat_id": chat_id,
+            "timestamp": datetime.now().isoformat(),
+        })
+        if len(_agent_instructions) > 100:
+            _agent_instructions.pop(0)
+        return await telegram_notifier.send_message(
+            f"🤖 Forwarded to AI agent. I'll handle this shortly."
+        )
 
 
 async def telegram_poll_loop():
