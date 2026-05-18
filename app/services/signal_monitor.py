@@ -13,97 +13,130 @@ signal_log: List[Dict] = []
 _last_sent: Dict[str, str] = {}
 _CONFIRMED_SENT: Dict[str, str] = {}  # Tracks composite signal sends
 
-# Stocks monitored for trading signals (most liquid Nifty 100)
+# Nifty 100 stocks (monitored for trading signals)
 _INDIAN_STOCKS = [
+    # Nifty 50
     "reliance", "tcs", "hdfcbank", "infy", "icicibank",
-    "sbin", "lt", "wipro", "itc",
-    "bhartiartl", "maruti", "nestleind", "hindunilvr", "asianpaint",
-    "sunpharma", "titan", "bajajfinsv", "hcltech", "kotakbank",
-    "axisbank", "ntpc", "tatasteel", "cipla", "ultracemco",
+    "sbin", "lt", "wipro", "itc", "bhartiartl",
+    "maruti", "nestleind", "hindunilvr", "asianpaint", "sunpharma",
+    "titan", "bajajfinsv", "hcltech", "kotakbank", "axisbank",
+    "ntpc", "tatasteel", "cipla", "ultracemco", "adaniports",
+    "adanient", "apollohosp", "bajajauto", "bajfinance", "bpcl",
+    "britannia", "coalindia", "divislab", "drreddy", "eichermot",
+    "grasim", "hdfclife", "hindalco", "indusindbk", "jswsteel",
+    "m&m", "ongc", "powergrid", "sbilife", "shriramfin",
+    "tataconsum", "tatamotors", "techm", "trent",
+    # Nifty Next 50
+    "abb", "abfrl", "abcap", "adanienergy", "adani green",
+    "ambujacem", "auropharma", "bandhanbnk", "bankbaroda", "bergerpaint",
+    "biocon", "bse", "canbk", "castrol", "chambalfert",
+    "colgate", "concor", "coforget", "cummins", "dabur",
+    "dlf", "esi", "exideind", "federalbnk", "gail",
+    "godrejcp", "godrejpro", "gvk", "havells", "heromotoco",
+    "hindustan", "hindzinc", "idfcfirstb", "ioc", "irctc",
+    "irfc", "itc", "lic", "lutrading", "mcdowell",
+    "motherson", "mphend", "muthoot", "navin", "pageind",
+    "petronet", "pidilite", "pfc", "ramco", "rb",
+    "recl", "relianceind", "sail", "samvardhana", "sir",
+    "siemens", "srtrans", "tatachem", "tatacoffee", "tatapower",
+    "tcs", "thermax", "torrentpow", "torrentpharm", "tvs",
+    "ujjivan", "unionbank", "varunever", "vestutech", "voltas",
+    "yesbank", "zyduslife",
 ]
 
 _MONITORED_SYMBOLS = ['btc', 'eth', 'gold', 'silver'] + _INDIAN_STOCKS
 
+_MAX_CONCURRENT = 10  # Limit concurrent yfinance calls
+
+
+async def _process_symbol(symbol: str) -> None:
+    """Process a single symbol: fetch data, generate signal, explain, alert."""
+    try:
+        price_data = await market_data_service.get_price_data(symbol)
+        if not price_data:
+            return
+
+        prices_5m = await market_data_service.get_5min_prices(symbol, 100)
+        if not prices_5m or len(prices_5m) < 20:
+            return  # Not enough data for a signal
+
+        signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
+
+        sig = signal_data['signal']
+        conf = signal_data['confidence']
+        price = price_data['price']
+
+        await record_signal(symbol, sig, conf, price, signal_data.get('reasons', []))
+
+        # Only use Groq LLM for signals that may trigger alerts (BUY/SELL ≥ 50%)
+        uses_llm = sig in ('BUY', 'SELL') and conf >= 0.5
+        if uses_llm:
+            explanation = signal_explainer.explain(
+                symbol.upper(), sig, conf, signal_data.get('reasons', []),
+                signal_data.get('indicators', {}),
+                price=price,
+            )
+        else:
+            explanation = signal_explainer._template_explain(
+                symbol.upper(), sig, conf, signal_data.get('reasons', []),
+                signal_data.get('indicators', {}),
+                price=price,
+            )
+
+        entry = {
+            'symbol': symbol.upper(),
+            'signal': sig,
+            'confidence': conf,
+            'price': price,
+            'reasons': signal_data.get('reasons', []),
+            'explanation': explanation,
+            'timestamp': datetime.now().isoformat(),
+            'notified': False,
+        }
+
+        # Primary gate: base signal must cross threshold
+        should_alert = sig in ('BUY', 'SELL') and conf >= settings.signal_confidence_threshold
+        if should_alert:
+            confirmed = await confirm_signal(symbol, sig, conf, signal_data.get('reasons', []), price)
+            comp_sig = confirmed["signal"]
+            comp_conf = confirmed["confidence"]
+            reasons = confirmed["reasons"]
+
+            entry["composite_signal"] = comp_sig
+            entry["composite_confidence"] = comp_conf
+            entry["confirmations"] = confirmed.get("confirmations", [])
+            entry["warnings"] = confirmed.get("warnings", [])
+
+            if comp_sig == sig and comp_conf >= settings.signal_confidence_threshold * 0.9:
+                last = _CONFIRMED_SENT.get(symbol)
+                if last != f"{sig}_{comp_conf}":
+                    display_conf = max(conf, comp_conf)
+                    ok = await telegram_notifier.send_signal_alert(
+                        symbol, sig, display_conf, price, reasons[:3],
+                        explanation=explanation,
+                    )
+                    entry['notified'] = ok
+                    if ok:
+                        _CONFIRMED_SENT[symbol] = f"{sig}_{comp_conf}"
+
+        signal_log.insert(0, entry)
+        if len(signal_log) > 100:
+            signal_log.pop()
+
+    except Exception as e:
+        print(f"Signal monitor error for {symbol}: {e}")
+
 
 async def check_and_notify():
-    for symbol in _MONITORED_SYMBOLS:
-        try:
-            price_data = await market_data_service.get_price_data(symbol)
-            if not price_data:
-                continue
+    """Process all monitored symbols in parallel batches."""
+    sem = asyncio.Semaphore(_MAX_CONCURRENT)
 
-            prices_5m = await market_data_service.get_5min_prices(symbol, 100)
-            if not prices_5m or len(prices_5m) < 20:
-                continue  # Not enough data for a signal
+    async def _process(symbol: str):
+        async with sem:
+            await _process_symbol(symbol)
 
-            signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
-
-            sig = signal_data['signal']
-            conf = signal_data['confidence']
-            price = price_data['price']
-
-            await record_signal(symbol, sig, conf, price, signal_data.get('reasons', []))
-
-            # Only use Groq LLM for signals that may trigger alerts (BUY/SELL ≥ 50%)
-            # to stay within Groq free tier rate limits (100K tokens/day)
-            uses_llm = sig in ('BUY', 'SELL') and conf >= 0.5
-            if uses_llm:
-                explanation = signal_explainer.explain(
-                    symbol.upper(), sig, conf, signal_data.get('reasons', []),
-                    signal_data.get('indicators', {}),
-                    price=price,
-                )
-            else:
-                explanation = signal_explainer._template_explain(
-                    symbol.upper(), sig, conf, signal_data.get('reasons', []),
-                    signal_data.get('indicators', {}),
-                    price=price,
-                )
-
-            entry = {
-                'symbol': symbol.upper(),
-                'signal': sig,
-                'confidence': conf,
-                'price': price,
-                'reasons': signal_data.get('reasons', []),
-                'explanation': explanation,
-                'timestamp': datetime.now().isoformat(),
-                'notified': False,
-            }
-
-            # Primary gate: base signal must cross threshold
-            should_alert = sig in ('BUY', 'SELL') and conf >= settings.signal_confidence_threshold
-            if should_alert:
-                # Secondary gate: run multi-conformation check
-                confirmed = await confirm_signal(symbol, sig, conf, signal_data.get('reasons', []), price)
-                comp_sig = confirmed["signal"]
-                comp_conf = confirmed["confidence"]
-                reasons = confirmed["reasons"]
-
-                entry["composite_signal"] = comp_sig
-                entry["composite_confidence"] = comp_conf
-                entry["confirmations"] = confirmed.get("confirmations", [])
-                entry["warnings"] = confirmed.get("warnings", [])
-
-                # Only send if composite agrees and is above threshold
-                if comp_sig == sig and comp_conf >= settings.signal_confidence_threshold * 0.9:
-                    last = _CONFIRMED_SENT.get(symbol)
-                    if last != f"{sig}_{comp_conf}":
-                        display_conf = max(conf, comp_conf)
-                        ok = await telegram_notifier.send_signal_alert(
-                            symbol, sig, display_conf, price, reasons[:3],
-                            explanation=explanation,
-                        )
-                        entry['notified'] = ok
-                        if ok:
-                            _CONFIRMED_SENT[symbol] = f"{sig}_{comp_conf}"
-
-            signal_log.insert(0, entry)
-            if len(signal_log) > 100:
-                signal_log.pop()
-
-        except Exception as e:
-            print(f"Signal monitor error for {symbol}: {e}")
+    tasks = [_process(sym) for sym in _MONITORED_SYMBOLS]
+    await asyncio.gather(*tasks)
 
 
 _last_edge_alert: Dict[str, float] = {}
@@ -137,7 +170,9 @@ async def signal_monitor_loop():
     resolve_counter = 0
     edge_counter = 0
     while True:
+        start = datetime.now()
         await check_and_notify()
+        elapsed = (datetime.now() - start).total_seconds()
         resolve_counter += 1
         edge_counter += 1
         if resolve_counter >= 30:
@@ -146,7 +181,8 @@ async def signal_monitor_loop():
         if edge_counter >= 15:  # Edge scan every ~30 min
             edge_counter = 0
             _ = asyncio.create_task(_edge_scan())
-        await asyncio.sleep(settings.signal_check_interval_seconds)
+        # Sleep for the remaining interval (min 60s between cycles)
+        await asyncio.sleep(max(60, settings.signal_check_interval_seconds - elapsed))
 
 
 def get_signal_log(limit: int = 50) -> List[Dict]:

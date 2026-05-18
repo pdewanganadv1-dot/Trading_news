@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = "7424796820:AAFwug5i-Q1CoAe-4qkIHfRPLdwAysFc-pY"
     telegram_chat_id: str = "5163568145"
     signal_confidence_threshold: float = 0.65
-    signal_check_interval_seconds: int = 120
+    signal_check_interval_seconds: int = 600
     groq_api_key: Optional[str] = None
     groq_model: str = "llama-3.3-70b-versatile"
 

@@ -2,11 +2,8 @@ import httpx
 from typing import Optional, List
 from app.config import settings
 
-_INDIAN_STOCKS = {
-    'reliance', 'tcs', 'hdfcbank', 'infy', 'icicibank', 'sbin', 'lt', 'wipro', 'itc',
-    'bhartiartl', 'maruti', 'nestleind', 'hindunilvr', 'asianpaint', 'sunpharma', 'titan',
-    'bajajfinsv', 'hcltech', 'kotakbank', 'axisbank', 'ntpc', 'tatasteel', 'cipla', 'ultracemco'
-}
+from app.services.signal_monitor import _INDIAN_STOCKS as _INDIAN_LIST
+_INDIAN_STOCKS = set(_INDIAN_LIST)
 
 
 def _price_fmt(price: float, symbol: str) -> str:
