@@ -44,7 +44,7 @@ async def check_and_notify():
 
             await record_signal(symbol, sig, conf, price, signal_data.get('reasons', []))
 
-            explanation = signal_explainer._template_explain(
+            explanation = signal_explainer.explain(
                 symbol.upper(), sig, conf, signal_data.get('reasons', []),
                 signal_data.get('indicators', {}),
                 price=price,
