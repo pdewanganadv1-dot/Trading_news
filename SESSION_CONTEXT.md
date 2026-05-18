@@ -12,19 +12,20 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 4. **Yahoo rate limiting**: Added 2s delay between yfinance calls + custom User-Agent
 5. **Fixed curl_cffi conflict**: Removed custom `requests.Session` from yfinance calls — let yfinance manage its own (requires `curl_cffi` on Render)
 6. **Cached `/signals` endpoint**: Background loop writes results to `_signal_cache` dict; API reads from cache instead of live-fetching all 125 symbols (was timing out)
-7. **Telegram bot**: `@Signal_alpha267_bot` working (chat_id: 5163568145, polling loop 3s)
-8. **Fixed circular import**: `_INDIAN_STOCKS` hardcoded in `telegram_notifier.py`
-9. **Pinned yfinance==0.2.65** in requirements.txt
+7. **Fixed event loop blocking**: Wrapped `yf.Ticker().info` and `yf.download()` in `asyncio.to_thread()` + `asyncio.wait_for(15s)` — prevents yfinance from blocking the server (was causing health check failures)
+8. **Telegram bot**: `@Signal_alpha267_bot` working (chat_id: 5163568145, polling loop 3s)
+9. **Fixed circular import**: `_INDIAN_STOCKS` hardcoded in `telegram_notifier.py`
+10. **Pinned yfinance==0.2.65** in requirements.txt
 
 ### Current State
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: 38d9abc
+- **Git commit HEAD**: 7ef864c
 
 ### Known Issues
 1. **Groq quota**: 100K tokens/day free tier — exhausted. Only calls LLM for BUY/SELL ≥ 50% confidence. Resets ~24h cycle.
-2. **Yahoo rate limit**: 2s sequential delay works but makes bulk operations slow (~200s for 125 stocks)
+2. **Yahoo rate limit**: 2s sequential delay makes cache fill slow (~8 min for 125 stocks). Acceptable since bg loop runs every 600s.
 3. **Duplicates in _INDIAN_STOCKS**: `itc` and `tcs` appear twice (Nifty 50 + Next 50)
 4. **/realtime endpoint** (GET all) still fetches live — same timeout issue as /signals had (not cached yet)
 
@@ -33,7 +34,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 |------|---------|
 | `app/config.py` | Settings (groq_api_key, signal_check_interval=600s) |
 | `app/services/signal_monitor.py` | Bg loop, _signal_cache, _INDIAN_STOCKS (125 symbols) |
-| `app/services/market_data_service.py` | yfinance calls with 2s delay |
+| `app/services/market_data_service.py` | yfinance calls in threads with 2s delay + 15s timeout |
 | `app/services/signal_explainer.py` | Groq LLM client + template fallback |
 | `app/services/telegram_bot.py` | Polling loop, command handlers |
 | `app/services/telegram_notifier.py` | Send messages |
