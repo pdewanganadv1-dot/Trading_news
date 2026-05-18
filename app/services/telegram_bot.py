@@ -9,7 +9,7 @@ from app.services.real_news import real_news_service
 from app.services.chart_generator import generate_signal_chart
 from app.services.accuracy_tracker import get_accuracy_stats
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
-from app.services.market_edge_service import scan_all_stocks, scan_stock, get_market_breadth, get_fii_dii_summary, set_fii_dii
+from app.services.market_edge_service import scan_all_stocks, scan_stock, get_market_breadth, get_fii_dii_summary, set_fii_dii, get_fii_dii_history
 from app.services.signal_monitor import _MONITORED_SYMBOLS
 import docker
 
@@ -70,7 +70,7 @@ def _build_help() -> str:
         "• `edges` — Top 10 stocks ranked by edge score (0-10)\n"
         "• `edge <symbol>` — Edge scan for any stock (e.g. `edge reliance`)\n"
         "• `breadth` — Market breadth: % of Nifty 100 above 20-day SMA\n"
-        "• `fiidii` — FII/DII institutional flow (manual update supported)\n"
+        "• `fiidii` — FII/DII institutional flow + 5-day trend\n"
         "• `setfiidii <FII_buy> <FII_sell> <DII_buy> <DII_sell>` — Update FII/DII data\n\n"
         "📈 *Charts & Signals*\n"
         "• `/chart btc` — Candlestick chart with EMAs (btc/eth/gold/silver + Indian stocks)\n"
@@ -81,6 +81,12 @@ def _build_help() -> str:
         "• `/accuracy` — Signal win/loss statistics\n\n"
         "🌐 *Social Sentiment*\n"
         "• `social btc` — StockTwits + Reddit sentiment for any symbol\n\n"
+        "📰 *News Sentiment Pipeline*\n"
+        "• `sentiment` — Overall Nifty market sentiment overview\n"
+        "• `sentiment tcs` — Cached news sentiment for any Nifty stock\n\n"
+        "🌅 *Market Briefs*\n"
+        "• `premarket` — Pre-market brief: global cues, FII/DII, outlook\n"
+        "• `postmarket` — Post-market wrap: gainers, losers, FII/DII\n\n"
         "🛠 *System*\n"
         "• `docker` — Container status\n"
         "• `/help` — This message\n\n"
@@ -273,20 +279,39 @@ async def _handle_message(text: str, chat_id: int):
 
     if text in ('fiidii', '/fiidii'):
         d = await get_fii_dii_summary()
-        msg = (
-            f"🏦 *FII / DII Flow*\n\n"
-            f"📅 Date: `{d.get('date', 'N/A')}`\n\n"
-            f"*FII*\n"
-            f"  Buy:  `{d.get('fii_buy', '?')}`\n"
-            f"  Sell: `{d.get('fii_sell', '?')}`\n"
-            f"  Net:  `{d.get('fii_net', '?')}`\n\n"
-            f"*DII*\n"
-            f"  Buy:  `{d.get('dii_buy', '?')}`\n"
-            f"  Sell: `{d.get('dii_sell', '?')}`\n"
-            f"  Net:  `{d.get('dii_net', '?')}`\n\n"
-            f"💡 Use `setfiidii buy sell buy sell` to update"
-        )
-        return await telegram_notifier.send_message(msg)
+        history = get_fii_dii_history(5)
+        lines = ["🏦 *FII / DII Flow*", ""]
+        lines.append(f"📅 Date: `{d.get('date', 'N/A')}`")
+        lines.append(f"🏷 Source: `{d.get('source', '?')}`")
+        lines.append("")
+        lines.append(f"*FII*")
+        lines.append(f"  Buy:  `{d.get('fii_buy', '?')}`")
+        lines.append(f"  Sell: `{d.get('fii_sell', '?')}`")
+        fii_net = d.get('fii_net')
+        if fii_net is not None:
+            emoji = "🟢" if fii_net > 0 else "🔴" if fii_net < 0 else "⚪"
+            lines.append(f"  Net:  {emoji} `{fii_net:+,.2f}` Cr")
+        lines.append("")
+        lines.append(f"*DII*")
+        lines.append(f"  Buy:  `{d.get('dii_buy', '?')}`")
+        lines.append(f"  Sell: `{d.get('dii_sell', '?')}`")
+        dii_net = d.get('dii_net')
+        if dii_net is not None:
+            emoji = "🟢" if dii_net > 0 else "🔴" if dii_net < 0 else "⚪"
+            lines.append(f"  Net:  {emoji} `{dii_net:+,.2f}` Cr")
+        lines.append("")
+        if len(history) >= 2:
+            lines.append(f"*📊 FII Net Trend (Last {len(history)} days)*")
+            bar_chars = []
+            for h in reversed(history):
+                net = h.get('fii_net')
+                if net is not None:
+                    bar_chars.append("🟢" if net > 0 else "🔴" if net < 0 else "⚪")
+            if bar_chars:
+                lines.append("".join(bar_chars))
+            lines.append("")
+        lines.append("💡 Use `setfiidii buy sell buy sell` to update")
+        return await telegram_notifier.send_message("\n".join(lines))
 
     m = re.match(r'^setfiidii\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)$', text)
     if m:
@@ -390,6 +415,63 @@ async def _handle_message(text: str, chat_id: int):
             return await telegram_notifier.send_message("\n".join(lines))
         except Exception as e:
             return await telegram_notifier.send_message(f"Error fetching news: {e}")
+
+    if text == 'premarket':
+        try:
+            from app.services.daily_report import send_premarket_brief
+            await send_premarket_brief()
+            return
+        except Exception as e:
+            return await telegram_notifier.send_message(f"Error: {e}")
+
+    if text == 'postmarket':
+        try:
+            from app.services.daily_report import send_postmarket_brief
+            await send_postmarket_brief()
+            return
+        except Exception as e:
+            return await telegram_notifier.send_message(f"Error: {e}")
+
+    m = re.match(r'^sentiment\s+(\w+)$', text)
+    if m:
+        sym = m.group(1).lower()
+        try:
+            from app.services.news_sentiment_pipeline import get_cached_sentiment
+            data = get_cached_sentiment(sym)
+            emoji = {"bullish": "🟢", "bearish": "🔴", "neutral": "⚪", "unknown": "❓"}
+            sent = data.get("sentiment", "unknown")
+            msg = (
+                f"{emoji.get(sent, '❓')} *News Sentiment — {data.get('symbol', sym.upper())}*\n"
+                f"Sentiment: `{sent.upper()}`\n"
+                f"Score: `{data.get('score', 0)}`\n"
+                f"Articles: `{data.get('article_count', 0)}`\n"
+                f"🟢 Bullish: `{data.get('bullish_articles', 0)}` | "
+                f"🔴 Bearish: `{data.get('bearish_articles', 0)}`"
+            )
+            headlines = data.get("top_headlines", [])
+            if headlines:
+                msg += "\n\n📰 *Top Headlines:*\n" + "\n".join(f"• {h[:80]}" for h in headlines[:2])
+            return await telegram_notifier.send_message(msg)
+        except Exception as e:
+            return await telegram_notifier.send_message(f"Error: {e}")
+
+    if text == 'sentiment':
+        try:
+            from app.services.news_sentiment_pipeline import get_market_sentiment_overview
+            overview = get_market_sentiment_overview()
+            if overview.get("status") == "empty":
+                return await telegram_notifier.send_message("📊 Sentiment data not yet available. Try again in a few minutes.")
+            msg = (
+                f"📊 *Market Sentiment Overview*\n\n"
+                f"🟢 Bullish: `{overview['bullish']}/{overview['total_symbols']} ({overview['bullish_pct']}%)`\n"
+                f"🔴 Bearish: `{overview['bearish']}/{overview['total_symbols']} ({overview['bearish_pct']}%)`\n"
+                f"⚪ Neutral: `{overview['neutral']}`\n"
+                f"📈 Avg Score: `{overview['avg_score']}`\n\n"
+                f"💡 Use `sentiment <symbol>` for individual stock"
+            )
+            return await telegram_notifier.send_message(msg)
+        except Exception as e:
+            return await telegram_notifier.send_message(f"Error: {e}")
 
     if text in _SYMBOLS:
         try:

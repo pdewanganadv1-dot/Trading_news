@@ -16,6 +16,7 @@ from app.routes.signals_log import router as signals_log_router
 from app.routes.fundamentals import router as fundamentals_router
 from app.routes.nifty100 import router as nifty100_router
 from app.routes.edge import router as edge_router
+from app.routes.sentiment_pipeline import router as sentiment_pipeline_router
 from app.routes.agent import router as agent_router
 from app.services.signal_monitor import get_cache_stats
 import asyncio
@@ -26,13 +27,19 @@ async def lifespan(app: FastAPI):
     from app.services.signal_monitor import signal_monitor_loop
     from app.services.telegram_bot import telegram_poll_loop
     from app.services.daily_report import daily_report_loop
+    from app.services.news_sentiment_pipeline import sentiment_pipeline_loop
+    from app.services.market_edge_service import auto_update_fii_dii
     task1 = asyncio.create_task(signal_monitor_loop())
     task2 = asyncio.create_task(telegram_poll_loop())
     task3 = asyncio.create_task(daily_report_loop())
+    task4 = asyncio.create_task(sentiment_pipeline_loop())
+    task5 = asyncio.create_task(auto_update_fii_dii())
     yield
     task1.cancel()
     task2.cancel()
     task3.cancel()
+    task4.cancel()
+    task5.cancel()
 
 
 app = FastAPI(
@@ -80,3 +87,4 @@ app.include_router(fundamentals_router)
 app.include_router(nifty100_router)
 app.include_router(edge_router)
 app.include_router(agent_router)
+app.include_router(sentiment_pipeline_router)

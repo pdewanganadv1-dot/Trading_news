@@ -418,39 +418,120 @@ _LAST_FII_DII = {
     "source": "manual",
 }
 
-# Try to fetch from Investing.com India or similar
-async def _try_fetch_fii_dii():
-    """Attempt to auto-fetch FII/DII data (may fail, non-critical)."""
+_FII_DII_HISTORY: List[Dict] = []
+_MAX_HISTORY = 30
+_NSE_COOKIE_CACHE: Dict = {"cookie": None, "ts": 0}
+
+
+async def _get_nse_cookie() -> str:
+    now_ts = datetime.now().timestamp()
+    if _NSE_COOKIE_CACHE["cookie"] and (now_ts - _NSE_COOKIE_CACHE["ts"]) < 3600:
+        return _NSE_COOKIE_CACHE["cookie"]
     try:
         import httpx
-        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as c:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
             resp = await c.get(
-                "https://www.nseindia.com/api/cot?index=FII",
+                "https://www.nseindia.com",
                 headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Accept": "application/json",
-                    "Referer": "https://www.nseindia.com/",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
                 },
             )
+            cookie = resp.headers.get("set-cookie", "")
+            if cookie:
+                _NSE_COOKIE_CACHE["cookie"] = cookie
+                _NSE_COOKIE_CACHE["ts"] = now_ts
+            return cookie
+    except Exception as e:
+        print(f"NSE cookie fetch error: {e}")
+        return ""
+
+
+async def _try_fetch_fii_dii():
+    """Attempt to auto-fetch FII/DII data from NSE with cookie handling."""
+    try:
+        import httpx
+        cookie = await _get_nse_cookie()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.nseindia.com/",
+        }
+        if cookie:
+            headers["Cookie"] = cookie
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
+            resp = await c.get(
+                "https://www.nseindia.com/api/cot?index=FII",
+                headers=headers,
+            )
             if resp.status_code == 200:
-                return resp.json()
-    except Exception:
-        pass
+                data = resp.json()
+                return {
+                    "fii_buy": data.get("cat1Buy", 0) or data.get("fiiBuy", 0),
+                    "fii_sell": data.get("cat1Sell", 0) or data.get("fiiSell", 0),
+                    "fii_net": data.get("cat1Net", 0) or data.get("fiiNet", 0),
+                    "dii_buy": data.get("cat2Buy", 0) or data.get("diiBuy", 0),
+                    "dii_sell": data.get("cat2Sell", 0) or data.get("diiSell", 0),
+                    "dii_net": data.get("cat2Net", 0) or data.get("diiNet", 0),
+                    "date": data.get("date", datetime.now().strftime("%Y-%m-%d")),
+                }
+            resp2 = await c.get(
+                "https://www.nseindia.com/api/fiidii",
+                headers=headers,
+            )
+            if resp2.status_code == 200:
+                data2 = resp2.json()
+                return {
+                    "fii_buy": data2.get("FIIBuy", 0),
+                    "fii_sell": data2.get("FIISell", 0),
+                    "fii_net": data2.get("FIINet", 0),
+                    "dii_buy": data2.get("DIIBuy", 0),
+                    "dii_sell": data2.get("DIISell", 0),
+                    "dii_net": data2.get("DIINet", 0),
+                    "date": data2.get("date", datetime.now().strftime("%Y-%m-%d")),
+                }
+    except Exception as e:
+        print(f"NSE FII/DII fetch error: {e}")
     return None
 
 
+def _snapshot_fii_dii_history():
+    global _FII_DII_HISTORY
+    if _LAST_FII_DII.get("fii_buy") is not None:
+        snap = dict(_LAST_FII_DII)
+        snap["snapshot_ts"] = datetime.now().isoformat()
+        date = snap.get("date", "")
+        existing_idx = None
+        for i, h in enumerate(_FII_DII_HISTORY):
+            if h.get("date") == date:
+                existing_idx = i
+                break
+        if existing_idx is not None:
+            _FII_DII_HISTORY[existing_idx] = snap
+        else:
+            _FII_DII_HISTORY.append(snap)
+        _FII_DII_HISTORY.sort(key=lambda x: x.get("date", ""), reverse=True)
+        if len(_FII_DII_HISTORY) > _MAX_HISTORY:
+            _FII_DII_HISTORY = _FII_DII_HISTORY[:_MAX_HISTORY]
+
+
 async def get_fii_dii_summary() -> Dict:
-    """Get FII/DII summary (auto-fetched or manually set)."""
     global _LAST_FII_DII
     data = await _try_fetch_fii_dii()
     if data:
+        for k in ("fii_buy", "fii_sell", "fii_net", "dii_buy", "dii_sell", "dii_net", "date"):
+            v = data.get(k)
+            if v is not None:
+                _LAST_FII_DII[k] = v
+        _LAST_FII_DII["source"] = "nse"
         _LAST_FII_DII["auto_fetched"] = True
-        _LAST_FII_DII["date"] = datetime.now().strftime("%Y-%m-%d")
+        _snapshot_fii_dii_history()
     return _LAST_FII_DII
 
 
 def set_fii_dii(fii_buy: float, fii_sell: float, dii_buy: float, dii_sell: float):
-    """Manually set FII/DII data (via Telegram command)."""
     global _LAST_FII_DII
     _LAST_FII_DII = {
         "fii_buy": fii_buy,
@@ -462,4 +543,19 @@ def set_fii_dii(fii_buy: float, fii_sell: float, dii_buy: float, dii_sell: float
         "date": datetime.now().strftime("%Y-%m-%d"),
         "source": "manual",
     }
+    _snapshot_fii_dii_history()
     return _LAST_FII_DII
+
+
+def get_fii_dii_history(days: int = 10) -> List[Dict]:
+    return _FII_DII_HISTORY[:days]
+
+
+async def auto_update_fii_dii():
+    while True:
+        now = datetime.now()
+        utc_h = now.hour
+        is_market_open = 3 <= utc_h <= 10
+        if is_market_open:
+            await get_fii_dii_summary()
+        await asyncio.sleep(3600)
