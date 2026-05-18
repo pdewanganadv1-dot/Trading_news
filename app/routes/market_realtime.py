@@ -80,6 +80,18 @@ async def get_realtime_data(symbol: str):
     }
 
 
+@router.get("/yftest")
+async def yf_test():
+    import yfinance as yf
+    try:
+        t = yf.Ticker("RELIANCE.NS")
+        info = t.info
+        price = info.get("regularMarketPrice") or info.get("currentPrice")
+        return {"price": price, "market_state": info.get("marketState"), "ok": price is not None}
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+
 @router.get("/signals/{symbol}")
 async def get_5min_signals(symbol: str):
     """Get trading signals based on 5-minute timeframe data."""
