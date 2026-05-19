@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Chain Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0f0f14;
+            --bg-secondary: #18181f;
+            --bg-card: #1e1e28;
+            --border-color: #2a2a3a;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8888a0;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-blue: #4f8cff;
+            --accent-purple: #a78bfa;
+            --accent-gold: #fbbf24;
+            --accent-cyan: #38bdf8;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); padding: 2rem; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header-actions { display: flex; gap: 1rem; align-items: center; }
+        .refresh-btn { background: var(--accent-blue); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+        .last-update { font-size: 0.8rem; color: var(--text-secondary); }
+        .controls { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .controls select, .controls input { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.85rem; }
+        .controls label { color: var(--text-secondary); font-size: 0.85rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .summary-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; text-align: center; }
+        .summary-card .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .summary-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 0.4rem; }
+        .summary-card .sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .neutral { color: var(--accent-gold); }
+        .cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; }
+        .card h2 { font-size: 0.85rem; margin-bottom: 1rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .chart-wrapper { height: 250px; }
+        .chain-table-wrapper { overflow-x: auto; margin-bottom: 1.5rem; }
+        .chain-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .chain-table th { text-align: center; padding: 0.6rem 0.4rem; color: var(--text-secondary); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
+        .chain-table td { text-align: center; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--border-color); }
+        .chain-table tr:hover { background: rgba(255,255,255,0.03); }
+        .chain-table .strike { font-weight: 700; color: var(--accent-gold); }
+        .chain-table .atm-row { background: rgba(79, 140, 255, 0.08); border-left: 3px solid var(--accent-blue); }
+        .oi-bar { display: inline-block; height: 4px; border-radius: 2px; margin-left: 4px; width: 40px; vertical-align: middle; }
+        .oi-bar-fill { display: block; height: 100%; border-radius: 2px; }
+        .key-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.8rem; margin-bottom: 1.5rem; }
+        .level-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; }
+        .level-card .title { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .level-card .val { font-size: 1.2rem; font-weight: 700; margin-top: 0.3rem; }
+        .top-stocks { overflow-x: auto; }
+        .top-stocks table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .top-stocks th { text-align: left; padding: 0.6rem 0.5rem; color: var(--text-secondary); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-color); }
+        .top-stocks td { padding: 0.5rem; border-bottom: 1px solid var(--border-color); }
+        .loading { text-align: center; padding: 3rem; color: var(--text-secondary); }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .tab { padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary); }
+        .tab.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        @media (max-width: 768px) { .cards-row { grid-template-columns: 1fr; } body { padding: 1rem; } }
+        .badge { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .badge-bull { background: rgba(52,211,153,0.15); color: var(--accent-green); }
+        .badge-bear { background: rgba(248,113,113,0.15); color: var(--accent-red); }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Options Chain Analysis</h1>
+        <div class="header-actions">
+            <span class="last-update" id="lastUpdate">Loading...</span>
+            <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <label>Symbol:</label>
+        <select id="symbolSelect" onchange="loadChain()">
+            <option value="NIFTY">NIFTY</option>
+            <option value="BANKNIFTY">BANKNIFTY</option>
+            <option value="FINNIFTY">FINNIFTY</option>
+            <option value="MIDCPNIFTY">MIDCPNIFTY</option>
+        </select>
+        <label>Expiry:</label>
+        <select id="expirySelect" onchange="loadChain()">
+            <option value="">Nearest</option>
+        </select>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="chain" onclick="switchTab('chain')">Option Chain</div>
+        <div class="tab" data-tab="pcr" onclick="switchTab('pcr')">PCR Summary</div>
+        <div class="tab" data-tab="topstocks" onclick="switchTab('topstocks')">Top F&O Stocks</div>
+    </div>
+
+    <div id="tab-chain" class="tab-content active">
+        <div class="summary-grid" id="summaryGrid">
+            <div class="summary-card"><div class="label">Underlying</div><div class="value" id="underlying">--</div><div class="sub" id="underlyingDate">--</div></div>
+            <div class="summary-card"><div class="label">PCR (OI)</div><div class="value" id="pcrOi">--</div><div class="sub">Put/Call Ratio</div></div>
+            <div class="summary-card"><div class="label">PCR (Volume)</div><div class="value" id="pcrVol">--</div><div class="sub">Volume Ratio</div></div>
+            <div class="summary-card"><div class="label">Max Pain</div><div class="value" id="maxPain">--</div><div class="sub">Max pain strike</div></div>
+        </div>
+
+        <div class="key-levels" id="keyLevels"></div>
+
+        <div class="card" style="margin-bottom:1.5rem;">
+            <h2>OI Distribution</h2>
+            <div class="chart-wrapper"><canvas id="oiChart"></canvas></div>
+        </div>
+
+        <div class="card">
+            <h2>Option Chain <span id="chainTitle" style="color:var(--text-primary);"></span></h2>
+            <div class="chain-table-wrapper" id="chainWrapper">
+                <div class="loading">Loading chain data...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-pcr" class="tab-content">
+        <div class="card">
+            <h2>PCR Summary — All F&O Indices</h2>
+            <div class="cards-row" style="margin-bottom:1rem;">
+                <div class="chart-wrapper"><canvas id="pcrOiChart"></canvas></div>
+                <div class="chart-wrapper"><canvas id="pcrVolChart"></canvas></div>
+            </div>
+            <div class="top-stocks" id="pcrTableWrap"><div class="loading">Loading...</div></div>
+        </div>
+    </div>
+
+    <div id="tab-topstocks" class="tab-content">
+        <div class="card">
+            <h2>Top F&O Stocks by Open Interest</h2>
+            <div class="top-stocks" id="topStocksWrap"><div class="loading">Loading...</div></div>
+        </div>
+    </div>
+
+    <script>
+        let oiChart = null;
+
+        function fmtNum(v) {
+            if (v === null || v === undefined || v === '--') return '--';
+            if (Math.abs(v) >= 10000000) return (v / 10000000).toFixed(2) + 'Cr';
+            if (Math.abs(v) >= 100000) return (v / 100000).toFixed(2) + 'L';
+            if (Math.abs(v) >= 1000) return (v / 1000).toFixed(2) + 'K';
+            return v.toLocaleString('en-IN');
+        }
+
+        function fmtCr(v) {
+            if (v === null || v === undefined) return '--';
+            const abs = Math.abs(v);
+            if (abs >= 1000) return (v / 1000).toFixed(2) + 'K Cr';
+            return v.toFixed(2) + ' Cr';
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+            document.getElementById(`tab-${name}`).classList.add('active');
+        }
+
+        async function loadExpiries() {
+            const symbol = document.getElementById('symbolSelect').value;
+            try {
+                const res = await fetch(`/api/options-chain/expiries?symbol=${symbol}`);
+                const data = await res.json();
+                const sel = document.getElementById('expirySelect');
+                sel.innerHTML = '<option value="">Nearest</option>';
+                (data.expiries || []).forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e;
+                    opt.textContent = e;
+                    sel.appendChild(opt);
+                });
+            } catch(e) {}
+        }
+
+        async function loadChain() {
+            const symbol = document.getElementById('symbolSelect').value;
+            const expiry = document.getElementById('expirySelect').value;
+
+            document.getElementById('chainWrapper').innerHTML = '<div class="loading">Loading...</div>';
+
+            try {
+                const res = await fetch(`/api/options-chain/data?symbol=${symbol}${expiry ? '&expiry='+expiry : ''}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    document.getElementById('chainWrapper').innerHTML = `<div class="loading">${data.error}</div>`;
+                    return;
+                }
+
+                document.getElementById('underlying').textContent = data.underlying ? '₹' + Number(data.underlying).toFixed(2) : '--';
+                document.getElementById('underlyingDate').textContent = data.trade_date || '--';
+                document.getElementById('pcrOi').textContent = data.pcr_oi || '--';
+                document.getElementById('pcrOi').className = 'value ' + (data.pcr_oi > 1 ? 'positive' : data.pcr_oi < 0.7 ? 'negative' : 'neutral');
+                document.getElementById('pcrVol').textContent = data.pcr_vol || '--';
+                document.getElementById('pcrVol').className = 'value ' + (data.pcr_vol > 1 ? 'positive' : data.pcr_vol < 0.7 ? 'negative' : 'neutral');
+                document.getElementById('maxPain').textContent = data.max_pain ? '₹' + Number(data.max_pain).toLocaleString('en-IN') : '--';
+                document.getElementById('chainTitle').textContent = `— ${symbol} (Expiry: ${data.expiry_date || 'N/A'})`;
+
+                renderKeyLevels(data.key_levels);
+                renderChainTable(data.chain, data.underlying);
+                renderOiChart(data.chain);
+                document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+            } catch(e) {
+                document.getElementById('chainWrapper').innerHTML = '<div class="loading">Error loading data</div>';
+            }
+        }
+
+        function renderKeyLevels(levels) {
+            const el = document.getElementById('keyLevels');
+            if (!levels) { el.innerHTML = ''; return; }
+            el.innerHTML = `
+                <div class="level-card"><div class="title">Max CE OI (Resistance)</div><div class="val" style="color:var(--accent-red);">${levels.max_ce_oi ? '₹' + Number(levels.max_ce_oi.strike).toLocaleString('en-IN') + ' (' + fmtNum(levels.max_ce_oi.oi) + ')' : '--'}</div></div>
+                <div class="level-card"><div class="title">Max PE OI (Support)</div><div class="val" style="color:var(--accent-green);">${levels.max_pe_oi ? '₹' + Number(levels.max_pe_oi.strike).toLocaleString('en-IN') + ' (' + fmtNum(levels.max_pe_oi.oi) + ')' : '--'}</div></div>
+                <div class="level-card"><div class="title">Highest CE OI Buildup</div><div class="val" style="color:var(--accent-red);">${levels.max_ce_chng ? '₹' + Number(levels.max_ce_chng.strike).toLocaleString('en-IN') + ' (' + fmtNum(levels.max_ce_chng.chng) + ')' : '--'}</div></div>
+                <div class="level-card"><div class="title">Highest PE OI Buildup</div><div class="val" style="color:var(--accent-green);">${levels.max_pe_chng ? '₹' + Number(levels.max_pe_chng.strike).toLocaleString('en-IN') + ' (' + fmtNum(levels.max_pe_chng.chng) + ')' : '--'}</div></div>
+            `;
+        }
+
+        function renderChainTable(chain, underlying) {
+            const el = document.getElementById('chainWrapper');
+            if (!chain || chain.length === 0) {
+                el.innerHTML = '<div class="loading">No option chain data available</div>';
+                return;
+            }
+
+            const maxCeOi = Math.max(...chain.map(r => r.ce_oi), 1);
+            const maxPeOi = Math.max(...chain.map(r => r.pe_oi), 1);
+
+            let html = `<table class="chain-table"><thead><tr>
+                <th style="color:var(--accent-red);">CE OI</th>
+                <th style="color:var(--accent-red);">Chng OI</th>
+                <th style="color:var(--accent-red);">Vol</th>
+                <th style="color:var(--accent-red);">LTP</th>
+                <th class="strike">Strike</th>
+                <th style="color:var(--accent-green);">LTP</th>
+                <th style="color:var(--accent-green);">Vol</th>
+                <th style="color:var(--accent-green);">Chng OI</th>
+                <th style="color:var(--accent-green);">PE OI</th>
+            </tr></thead><tbody>`;
+
+            chain.forEach(r => {
+                const isAtm = underlying && Math.abs(r.strike - underlying) / underlying < 0.015;
+                const ceOiPct = (r.ce_oi / maxCeOi * 100).toFixed(0);
+                const peOiPct = (r.pe_oi / maxPeOi * 100).toFixed(0);
+                html += `<tr class="${isAtm ? 'atm-row' : ''}">
+                    <td style="color:var(--accent-red);">${fmtNum(r.ce_oi)}<span class="oi-bar"><span class="oi-bar-fill" style="width:${ceOiPct}%;background:var(--accent-red);"></span></span></td>
+                    <td style="color:${r.ce_chng_oi > 0 ? 'var(--accent-green)' : r.ce_chng_oi < 0 ? 'var(--accent-red)' : 'inherit'}">${r.ce_chng_oi > 0 ? '+' : ''}${fmtNum(r.ce_chng_oi)}</td>
+                    <td>${fmtNum(r.ce_volume)}</td>
+                    <td style="color:var(--accent-red);">${r.ce_ltp ? '₹' + r.ce_ltp.toFixed(2) : '--'}</td>
+                    <td class="strike">${r.strike.toLocaleString('en-IN')}</td>
+                    <td style="color:var(--accent-green);">${r.pe_ltp ? '₹' + r.pe_ltp.toFixed(2) : '--'}</td>
+                    <td>${fmtNum(r.pe_volume)}</td>
+                    <td style="color:${r.pe_chng_oi > 0 ? 'var(--accent-green)' : r.pe_chng_oi < 0 ? 'var(--accent-red)' : 'inherit'}">${r.pe_chng_oi > 0 ? '+' : ''}${fmtNum(r.pe_chng_oi)}</td>
+                    <td style="color:var(--accent-green);">${fmtNum(r.pe_oi)}<span class="oi-bar"><span class="oi-bar-fill" style="width:${peOiPct}%;background:var(--accent-green);"></span></span></td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            el.innerHTML = html;
+        }
+
+        function renderOiChart(chain) {
+            if (!chain || chain.length === 0) return;
+            const strikes = chain.map(r => r.strike);
+            const ceOi = chain.map(r => r.ce_oi);
+            const peOi = chain.map(r => -r.pe_oi);
+
+            const ctx = document.getElementById('oiChart').getContext('2d');
+            if (oiChart) oiChart.destroy();
+            oiChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: strikes,
+                    datasets: [
+                        { label: 'CE OI', data: ceOi, backgroundColor: 'rgba(248, 113, 113, 0.6)', borderColor: '#f87171', borderWidth: 1, borderRadius: 2 },
+                        { label: 'PE OI', data: peOi, backgroundColor: 'rgba(52, 211, 153, 0.6)', borderColor: '#34d399', borderWidth: 1, borderRadius: 2 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#8888a0' } } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0', maxRotation: 45 } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0', callback: v => fmtNum(Math.abs(v)) } }
+                    }
+                }
+            });
+        }
+
+        async function loadPcrSummary() {
+            try {
+                const res = await fetch('/api/options-chain/pcr-summary');
+                const data = await res.json();
+                const rows = data.rows || [];
+                const labels = rows.map(r => r.symbol);
+                const pcrOi = rows.map(r => r.pcr_oi);
+                const pcrVol = rows.map(r => r.pcr_vol);
+
+                const pcrCtx1 = document.getElementById('pcrOiChart').getContext('2d');
+                new Chart(pcrCtx1, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'PCR (OI)', data: pcrOi, backgroundColor: 'rgba(79, 140, 255, 0.6)', borderColor: '#4f8cff', borderWidth: 1 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888a0' } } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } } } }
+                });
+
+                const pcrCtx2 = document.getElementById('pcrVolChart').getContext('2d');
+                new Chart(pcrCtx2, {
+                    type: 'bar',
+                    data: { labels, datasets: [{ label: 'PCR (Volume)', data: pcrVol, backgroundColor: 'rgba(167, 139, 250, 0.6)', borderColor: '#a78bfa', borderWidth: 1 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888a0' } } }, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } } } }
+                });
+
+                let html = '<table><thead><tr><th>Index</th><th>PCR OI</th><th>PCR Vol</th><th>Underlying</th><th>Max Pain</th><th>Signal</th></tr></thead><tbody>';
+                rows.forEach(r => {
+                    const signal = r.pcr_oi > 1 ? '<span class="badge badge-bull">Bullish</span>' : r.pcr_oi < 0.7 ? '<span class="badge badge-bear">Bearish</span>' : '<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-gold);">Neutral</span>';
+                    html += `<tr><td><strong>${r.symbol}</strong></td><td>${r.pcr_oi}</td><td>${r.pcr_vol}</td><td>${r.underlying ? '₹' + Number(r.underlying).toLocaleString('en-IN') : '--'}</td><td>${r.max_pain ? '₹' + Number(r.max_pain).toLocaleString('en-IN') : '--'}</td><td>${signal}</td></tr>`;
+                });
+                html += '</tbody></table>';
+                document.getElementById('pcrTableWrap').innerHTML = html;
+            } catch(e) {
+                document.getElementById('pcrTableWrap').innerHTML = '<div class="loading">Error loading PCR data</div>';
+            }
+        }
+
+        async function loadTopStocks() {
+            try {
+                const res = await fetch('/api/options-chain/top-stocks?limit=30');
+                const data = await res.json();
+                const stocks = data.stocks || [];
+                let html = '<table><thead><tr><th>Symbol</th><th>Total OI</th><th>CE OI</th><th>PE OI</th><th>PCR</th><th>Volume</th></tr></thead><tbody>';
+                stocks.forEach(s => {
+                    html += `<tr><td><strong>${s.TckrSymb}</strong></td><td>${fmtNum(s.total_oi)}</td><td style="color:var(--accent-red);">${fmtNum(s.ce_oi)}</td><td style="color:var(--accent-green);">${fmtNum(s.pe_oi)}</td><td>${s.pcr}</td><td>${fmtNum(s.total_volume)}</td></tr>`;
+                });
+                html += '</tbody></table>';
+                document.getElementById('topStocksWrap').innerHTML = html;
+            } catch(e) {
+                document.getElementById('topStocksWrap').innerHTML = '<div class="loading">Error loading top stocks</div>';
+            }
+        }
+
+        async function loadAll() {
+            document.getElementById('lastUpdate').textContent = 'Loading...';
+            await loadExpiries();
+            await loadChain();
+            loadPcrSummary();
+            loadTopStocks();
+        }
+
+        loadAll();
+        setInterval(loadChain, 120000);
+    </script>
+</body>
+</html>

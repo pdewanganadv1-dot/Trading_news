@@ -18,6 +18,9 @@ from app.routes.nifty100 import router as nifty100_router
 from app.routes.edge import router as edge_router
 from app.routes.sentiment_pipeline import router as sentiment_pipeline_router
 from app.routes.agent import router as agent_router
+from app.routes.options_chain import router as options_chain_router
+from app.routes.insider_trading import router as insider_trading_router
+from app.routes.sector_rotation import router as sector_rotation_router
 from app.services.signal_monitor import get_cache_stats
 import asyncio
 
@@ -88,3 +91,6 @@ app.include_router(nifty100_router)
 app.include_router(edge_router)
 app.include_router(agent_router)
 app.include_router(sentiment_pipeline_router)
+app.include_router(options_chain_router)
+app.include_router(insider_trading_router)
+app.include_router(sector_rotation_router)

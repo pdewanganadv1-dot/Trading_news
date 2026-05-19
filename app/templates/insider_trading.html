@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insider Trading Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0f0f14;
+            --bg-secondary: #18181f;
+            --bg-card: #1e1e28;
+            --border-color: #2a2a3a;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8888a0;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-blue: #4f8cff;
+            --accent-purple: #a78bfa;
+            --accent-gold: #fbbf24;
+            --accent-cyan: #38bdf8;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); padding: 2rem; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header-actions { display: flex; gap: 1rem; align-items: center; }
+        .refresh-btn { background: var(--accent-blue); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+        .last-update { font-size: 0.8rem; color: var(--text-secondary); }
+        .controls { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .controls select { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.85rem; }
+        .controls label { color: var(--text-secondary); font-size: 0.85rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .summary-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; text-align: center; }
+        .summary-card .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .summary-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 0.4rem; }
+        .summary-card .sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .neutral { color: var(--accent-gold); }
+        .cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; }
+        .card h2 { font-size: 0.85rem; margin-bottom: 1rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .chart-wrapper { height: 250px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .loading { text-align: center; padding: 3rem; color: var(--text-secondary); }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .data-table th { text-align: left; padding: 0.6rem 0.5rem; color: var(--text-secondary); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; background: var(--bg-card); }
+        .data-table td { padding: 0.5rem; border-bottom: 1px solid var(--border-color); }
+        .data-table tr:hover { background: rgba(255,255,255,0.03); }
+        .table-wrap { overflow-x: auto; max-height: 500px; overflow-y: auto; }
+        .badge { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .badge-buy { background: rgba(52,211,153,0.15); color: var(--accent-green); }
+        .badge-sell { background: rgba(248,113,113,0.15); color: var(--accent-red); }
+        .top-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .top-item { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid var(--border-color); font-size: 0.85rem; }
+        .top-item .name { color: var(--text-primary); }
+        .top-item .val { font-weight: 600; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .tab { padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary); }
+        .tab.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        @media (max-width: 768px) { .cards-row { grid-template-columns: 1fr; } body { padding: 1rem; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Insider Trading & Bulk Deals</h1>
+        <div class="header-actions">
+            <span class="last-update" id="lastUpdate">Loading...</span>
+            <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <label>Period:</label>
+        <select id="periodSelect" onchange="loadAll()">
+            <option value="1W">1 Week</option>
+            <option value="1M" selected>1 Month</option>
+            <option value="6M">6 Months</option>
+        </select>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card"><div class="label">Bulk Deals</div><div class="value" id="bulkTotal">--</div><div class="sub">Total transactions</div></div>
+        <div class="summary-card"><div class="label">Bulk Net Value</div><div class="value" id="bulkNet">--</div><div class="sub">Buy - Sell</div></div>
+        <div class="summary-card"><div class="label">Block Deals</div><div class="value" id="blockTotal">--</div><div class="sub">Total transactions</div></div>
+        <div class="summary-card"><div class="label">Block Net Value</div><div class="value" id="blockNet">--</div><div class="sub">Buy - Sell</div></div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="bulk" onclick="switchTab('bulk')">Bulk Deals</div>
+        <div class="tab" data-tab="block" onclick="switchTab('block')">Block Deals</div>
+        <div class="tab" data-tab="top" onclick="switchTab('top')">Top Players</div>
+    </div>
+
+    <div id="tab-bulk" class="tab-content active">
+        <div class="card">
+            <h2>Bulk Deals</h2>
+            <div class="table-wrap" id="bulkTableWrap"><div class="loading">Loading...</div></div>
+        </div>
+    </div>
+
+    <div id="tab-block" class="tab-content">
+        <div class="card">
+            <h2>Block Deals</h2>
+            <div class="table-wrap" id="blockTableWrap"><div class="loading">Loading...</div></div>
+        </div>
+    </div>
+
+    <div id="tab-top" class="tab-content">
+        <div class="cards-row">
+            <div class="card">
+                <h2>Top Buyers</h2>
+                <div class="top-list" id="topBuyers"><div class="loading">Loading...</div></div>
+            </div>
+            <div class="card">
+                <h2>Top Sellers</h2>
+                <div class="top-list" id="topSellers"><div class="loading">Loading...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function fmtCr(v) {
+            if (v === null || v === undefined) return '--';
+            const abs = Math.abs(v);
+            if (abs >= 10000000) return '₹' + (v / 10000000).toFixed(2) + 'Cr';
+            if (abs >= 100000) return '₹' + (v / 100000).toFixed(2) + 'L';
+            if (abs >= 1000) return '₹' + (v / 1000).toFixed(1) + 'K';
+            return '₹' + v.toFixed(2);
+        }
+
+        function fmtNum(v) {
+            if (v === null || v === undefined) return '--';
+            return Number(v).toLocaleString('en-IN');
+        }
+
+        function switchTab(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+            document.getElementById(`tab-${name}`).classList.add('active');
+        }
+
+        function renderDealTable(deals) {
+            if (!deals || deals.length === 0) return '<div class="loading">No deals found</div>';
+            let html = '<table class="data-table"><thead><tr><th>Date</th><th>Symbol</th><th>Security</th><th>Client</th><th>Type</th><th>Quantity</th><th>Price</th><th>Total Value</th></tr></thead><tbody>';
+            deals.forEach(d => {
+                const isBuy = (d['Buy/Sell'] || '').toUpperCase() === 'BUY';
+                html += `<tr>
+                    <td>${d.Date || '--'}</td>
+                    <td><strong>${d.Symbol || '--'}</strong></td>
+                    <td style="color:var(--text-secondary);font-size:0.75rem;">${(d.SecurityName || '').substring(0, 30)}</td>
+                    <td style="color:var(--text-secondary);font-size:0.75rem;">${(d.ClientName || '').substring(0, 30)}</td>
+                    <td><span class="badge ${isBuy ? 'badge-buy' : 'badge-sell'}">${d['Buy/Sell'] || '--'}</span></td>
+                    <td>${fmtNum(d.QuantityTraded)}</td>
+                    <td>${d['TradePrice/Wght.Avg.Price'] ? '₹' + Number(d['TradePrice/Wght.Avg.Price']).toFixed(2) : '--'}</td>
+                    <td style="font-weight:600;">${fmtCr(d.TotalValue)}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderTopList(items, type) {
+            if (!items || items.length === 0) return '<div style="color:var(--text-secondary);">No data</div>';
+            return items.map(item => {
+                const val = item.TotalValue || 0;
+                return `<div class="top-item"><span class="name">${item.ClientName || '--'}</span><span class="val ${type === 'buy' ? 'positive' : 'negative'}">${fmtCr(val)}</span></div>`;
+            }).join('');
+        }
+
+        async function loadAll() {
+            const period = document.getElementById('periodSelect').value;
+            document.getElementById('lastUpdate').textContent = 'Loading...';
+
+            try {
+                const [bulkRes, blockRes, summaryRes] = await Promise.all([
+                    fetch(`/api/insider-trading/bulk-deals?period=${period}`),
+                    fetch(`/api/insider-trading/block-deals?period=${period}`),
+                    fetch(`/api/insider-trading/summary?period=${period}`)
+                ]);
+                const bulk = await bulkRes.json();
+                const block = await blockRes.json();
+                const summary = await summaryRes.json();
+
+                document.getElementById('bulkTotal').textContent = summary.bulk_total || 0;
+                document.getElementById('blockTotal').textContent = summary.block_total || 0;
+
+                const bulkNet = summary.bulk_net || 0;
+                document.getElementById('bulkNet').textContent = fmtCr(bulkNet);
+                document.getElementById('bulkNet').className = 'value ' + (bulkNet > 0 ? 'positive' : bulkNet < 0 ? 'negative' : '');
+
+                const blockNet = summary.block_net || 0;
+                document.getElementById('blockNet').textContent = fmtCr(blockNet);
+                document.getElementById('blockNet').className = 'value ' + (blockNet > 0 ? 'positive' : blockNet < 0 ? 'negative' : '');
+
+                document.getElementById('bulkTableWrap').innerHTML = renderDealTable(bulk.deals || []);
+                document.getElementById('blockTableWrap').innerHTML = renderDealTable(block.deals || []);
+                document.getElementById('topBuyers').innerHTML = renderTopList(summary.top_buyers || [], 'buy');
+                document.getElementById('topSellers').innerHTML = renderTopList(summary.top_sellers || [], 'sell');
+
+                document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+            } catch(e) {
+                document.getElementById('lastUpdate').textContent = 'Error loading data';
+            }
+        }
+
+        loadAll();
+        setInterval(loadAll, 120000);
+    </script>
+</body>
+</html>
