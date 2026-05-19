@@ -155,11 +155,20 @@ class AIAgentService:
 
         news_d = data.get("news", {})
         if news_d.get("articles"):
-            bull = sum(1 for a in news_d["articles"] if a.get("sentiment", {}).get("score", 0) > 0)
-            bear = sum(1 for a in news_d["articles"] if a.get("sentiment", {}).get("score", 0) < 0)
+            def _get_news_score(article):
+                s = article.get("sentiment")
+                if isinstance(s, dict):
+                    return s.get("score", 0)
+                if isinstance(s, (int, float)):
+                    return s
+                return 0
+            bull = sum(1 for a in news_d["articles"] if _get_news_score(a) > 0)
+            bear = sum(1 for a in news_d["articles"] if _get_news_score(a) < 0)
             lines.append(f"\nNEWS: {news_d['count']} articles (bullish: {bull}, bearish: {bear})")
             for a in news_d["articles"][:5]:
-                lines.append(f"  - {a['title']}")
+                title = a.get("title", "")
+                if isinstance(title, str):
+                    lines.append(f"  - {title}")
 
         social = data.get("social", {})
         if social and isinstance(social, dict) and "overall" in social:
@@ -186,8 +195,13 @@ class AIAgentService:
             elif tech["signal"] == "SELL":
                 bias_parts.append("technicals bearish")
         if news_d.get("articles"):
-            bull = sum(1 for a in news_d["articles"] if a.get("sentiment", {}).get("score", 0) > 0)
-            bear = sum(1 for a in news_d["articles"] if a.get("sentiment", {}).get("score", 0) < 0)
+            def _ns(a):
+                s = a.get("sentiment")
+                if isinstance(s, dict): return s.get("score", 0)
+                if isinstance(s, (int, float)): return s
+                return 0
+            bull = sum(1 for a in news_d["articles"] if _ns(a) > 0)
+            bear = sum(1 for a in news_d["articles"] if _ns(a) < 0)
             if bull > bear:
                 bias_parts.append("news positive")
             elif bear > bull:
