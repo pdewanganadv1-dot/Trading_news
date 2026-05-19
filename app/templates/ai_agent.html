@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Trading Agent</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0f0f14; --bg-secondary: #18181f; --bg-card: #1e1e28;
+            --border-color: #2a2a3a; --text-primary: #f0f0f5; --text-secondary: #8888a0;
+            --accent-green: #34d399; --accent-red: #f87171; --accent-blue: #4f8cff;
+            --accent-purple: #a78bfa; --accent-gold: #fbbf24; --accent-cyan: #38bdf8;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); padding: 2rem; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header-actions { display: flex; gap: 1rem; align-items: center; }
+        .refresh-btn { background: var(--accent-blue); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+        .last-update { font-size: 0.8rem; color: var(--text-secondary); }
+        .controls { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .controls input { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.9rem; width: 180px; }
+        .controls input:focus { border-color: var(--accent-blue); outline: none; }
+        .controls button { background: var(--accent-blue); border: none; color: white; padding: 0.5rem 1.5rem; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
+        .controls button:hover { opacity: 0.9; }
+        .controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h2 { font-size: 0.85rem; margin-bottom: 1rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .verdict-card { background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary)); border: 2px solid var(--border-color); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; position: relative; overflow: hidden; }
+        .verdict-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+        .verdict-card.bullish::before { background: linear-gradient(90deg, var(--accent-green), #10b981); }
+        .verdict-card.bearish::before { background: linear-gradient(90deg, var(--accent-red), #ef4444); }
+        .verdict-card.neutral::before { background: linear-gradient(90deg, var(--accent-gold), #f59e0b); }
+        .verdict-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .verdict-badge { padding: 0.3rem 1rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
+        .verdict-badge.BULLISH { background: rgba(52,211,153,0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+        .verdict-badge.BEARISH { background: rgba(248,113,113,0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .verdict-badge.NEUTRAL { background: rgba(251,191,36,0.15); color: var(--accent-gold); border: 1px solid var(--accent-gold); }
+        .verdict-text { font-size: 0.9rem; line-height: 1.6; color: var(--text-primary); margin-top: 0.5rem; white-space: pre-wrap; }
+        .verdict-meta { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+        .meta-item { font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 6px; background: var(--bg-secondary); border: 1px solid var(--border-color); }
+        .meta-item .label { color: var(--text-secondary); margin-right: 0.3rem; }
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .data-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; }
+        .data-card .title { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.5rem; }
+        .data-card .value { font-size: 1.2rem; font-weight: 700; }
+        .data-card .sub { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem; }
+        .data-card .items { font-size: 0.8rem; line-height: 1.5; margin-top: 0.3rem; }
+        .data-card .items .item { padding: 0.2rem 0; }
+        .loading { text-align: center; padding: 3rem; color: var(--text-secondary); }
+        .loading .spinner { display: inline-block; width: 40px; height: 40px; border: 3px solid var(--border-color); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 1rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .news-item { padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); font-size: 0.8rem; }
+        .news-item:last-child { border-bottom: none; }
+        .news-item .sentiment { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem; }
+        .sent-pos { background: var(--accent-green); }
+        .sent-neg { background: var(--accent-red); }
+        .sent-neu { background: var(--accent-gold); }
+        .suggestions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .suggestion { padding: 0.3rem 0.8rem; border-radius: 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; }
+        .suggestion:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+        @media (max-width: 768px) { .data-grid { grid-template-columns: 1fr; } body { padding: 1rem; } }
+        .chart-wrapper { height: 200px; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI Trading Agent</h1>
+        <div class="header-actions">
+            <span class="last-update" id="lastUpdate">Ready</span>
+        </div>
+    </div>
+
+    <div class="suggestions">
+        <span class="suggestion" onclick="analyze('NIFTY')">NIFTY</span>
+        <span class="suggestion" onclick="analyze('RELIANCE')">RELIANCE</span>
+        <span class="suggestion" onclick="analyze('TCS')">TCS</span>
+        <span class="suggestion" onclick="analyze('HDFCBANK')">HDFCBANK</span>
+        <span class="suggestion" onclick="analyze('INFY')">INFY</span>
+        <span class="suggestion" onclick="analyze('SBIN')">SBIN</span>
+        <span class="suggestion" onclick="analyze('BTC')">BTC</span>
+        <span class="suggestion" onclick="analyze('GOLD')">GOLD</span>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="symbolInput" placeholder="Enter symbol..." value="NIFTY" onkeydown="if(event.key==='Enter')analyze()">
+        <button id="analyzeBtn" onclick="analyze()">Analyze</button>
+    </div>
+
+    <div id="loading" class="loading" style="display:none;">
+        <div class="spinner"></div>
+        <div>AI Agent is gathering multi-modal data and generating verdict...</div>
+    </div>
+
+    <div id="results" style="display:none;">
+        <div class="verdict-card" id="verdictCard">
+            <div class="verdict-header">
+                <div><span style="font-size:1.2rem;font-weight:700;" id="verdictSymbol"></span> <span class="verdict-badge" id="verdictBias"></span></div>
+                <span class="verdict-badge" id="verdictAction"></span>
+            </div>
+            <div class="verdict-text" id="verdictText"></div>
+            <div class="verdict-meta" id="verdictMeta"></div>
+        </div>
+
+        <div class="data-grid">
+            <div class="card">
+                <h2>Price & Technicals</h2>
+                <div id="priceData"><div class="loading" style="padding:1rem;">No data</div></div>
+                <div class="chart-wrapper"><canvas id="priceChart"></canvas></div>
+            </div>
+            <div class="card">
+                <h2>News Sentiment</h2>
+                <div id="newsData"><div class="loading" style="padding:1rem;">No data</div></div>
+            </div>
+            <div class="card">
+                <h2>FII/DII Flow</h2>
+                <div id="fiidiiData"><div class="loading" style="padding:1rem;">No data</div></div>
+            </div>
+            <div class="card">
+                <h2>Social Sentiment</h2>
+                <div id="socialData"><div class="loading" style="padding:1rem;">No data</div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let priceChart = null;
+
+        function fmtCr(v) {
+            if (v === null || v === undefined) return '--';
+            const abs = Math.abs(v);
+            if (abs >= 1000) return (v > 0 ? '+' : '') + (v/1000).toFixed(2) + 'K Cr';
+            return (v > 0 ? '+' : '') + v.toFixed(2) + ' Cr';
+        }
+
+        async function analyze(symbol) {
+            const sym = (symbol || document.getElementById('symbolInput').value).toUpperCase().trim();
+            document.getElementById('symbolInput').value = sym;
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('analyzeBtn').disabled = true;
+            document.getElementById('lastUpdate').textContent = 'Analyzing...';
+
+            try {
+                const res = await fetch(`/api/ai-agent/analyze?symbol=${sym}&days=50`);
+                const data = await res.json();
+                renderVerdict(data);
+                renderPrice(data.data.price_data);
+                renderNews(data.data.news);
+                renderFiidii(data.data.fiidii);
+                renderSocial(data.data.social);
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+            } catch(e) {
+                document.getElementById('loading').innerHTML = '<div style="color:var(--accent-red);">Error analyzing. Check symbol and try again.</div>';
+            }
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('analyzeBtn').disabled = false;
+        }
+
+        function renderVerdict(data) {
+            const v = data.verdict || {};
+            const bias = (v.bias || 'NEUTRAL').toLowerCase();
+            const card = document.getElementById('verdictCard');
+            card.className = 'verdict-card ' + bias;
+
+            document.getElementById('verdictSymbol').textContent = data.symbol;
+            document.getElementById('verdictBias').textContent = v.bias || 'NEUTRAL';
+            document.getElementById('verdictBias').className = 'verdict-badge ' + (v.bias || 'NEUTRAL');
+
+            const actionEl = document.getElementById('verdictAction');
+            actionEl.textContent = v.action || 'HOLD';
+            actionEl.className = 'verdict-badge ' + (v.action === 'BUY' ? 'BULLISH' : v.action === 'SELL' ? 'BEARISH' : 'NEUTRAL');
+
+            document.getElementById('verdictText').textContent = v.analysis || 'No analysis generated.';
+
+            document.getElementById('verdictMeta').innerHTML = `
+                <span class="meta-item"><span class="label">Conviction:</span> ${v.conviction || '--'}</span>
+                <span class="meta-item"><span class="label">Source:</span> ${v.source || '--'}</span>
+                <span class="meta-item"><span class="label">Model:</span> ${v.source === 'groq' ? 'Groq LLM' : 'Template'}</span>
+            `;
+        }
+
+        function renderPrice(pd) {
+            const el = document.getElementById('priceData');
+            if (!pd || pd.error) {
+                el.innerHTML = '<div class="loading" style="padding:1rem;">No data</div>';
+                return;
+            }
+            const curr = pd.current || {};
+            el.innerHTML = `
+                <div class="data-card" style="border:none;padding:0;background:transparent;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+                        <div><div class="title">Price</div><div class="value">$${curr.price || '--'}</div></div>
+                        <div><div class="title">Change</div><div class="value" style="color:${(curr.change||0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${curr.change || '--'}%</div></div>
+                        <div><div class="title">Volume</div><div class="sub" style="font-size:1rem;">${curr.volume || '--'}</div></div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.5rem;">
+                        <div><div class="title">High</div><div class="sub">$${curr.high || '--'}</div></div>
+                        <div><div class="title">Low</div><div class="sub">$${curr.low || '--'}</div></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNews(news) {
+            const el = document.getElementById('newsData');
+            if (!news || !news.articles || news.articles.length === 0) {
+                el.innerHTML = '<div class="loading" style="padding:1rem;">No news found</div>';
+                return;
+            }
+            let html = `<div class="sub" style="margin-bottom:0.5rem;">${news.count || 0} articles found</div>`;
+            news.articles.forEach(a => {
+                const score = a.sentiment?.score || 0;
+                const cls = score > 0 ? 'sent-pos' : score < 0 ? 'sent-neg' : 'sent-neu';
+                html += `<div class="news-item"><span class="sentiment ${cls}"></span>${a.title}</div>`;
+            });
+            el.innerHTML = html;
+        }
+
+        function renderFiidii(fii) {
+            const el = document.getElementById('fiidiiData');
+            if (!fii || fii.error || !fii.current) {
+                el.innerHTML = '<div class="loading" style="padding:1rem;">No FII/DII data</div>';
+                return;
+            }
+            const c = fii.current || {};
+            const t = fii.trend || {};
+            const fn = c.fii_net || 0;
+            const dn = c.dii_net || 0;
+            el.innerHTML = `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                    <div class="data-card" style="border:1px solid var(--border-color);">
+                        <div class="title">FII Net</div>
+                        <div class="value" style="color:${fn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${fmtCr(fn)}</div>
+                        <div class="sub">Trend: ${t.fii_trend || '--'}</div>
+                    </div>
+                    <div class="data-card" style="border:1px solid var(--border-color);">
+                        <div class="title">DII Net</div>
+                        <div class="value" style="color:${dn >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${fmtCr(dn)}</div>
+                        <div class="sub">Date: ${c.date || '--'}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSocial(social) {
+            const el = document.getElementById('socialData');
+            if (!social || social.error) {
+                el.innerHTML = '<div class="loading" style="padding:1rem;">No social data</div>';
+                return;
+            }
+            const overall = social.overall || '--';
+            const st = social.stocktwits || {};
+            const rd = social.reddit || {};
+            el.innerHTML = `
+                <div class="data-card" style="border:none;padding:0;background:transparent;">
+                    <div class="value" style="font-size:1rem;margin-bottom:0.5rem;">Overall: ${overall}</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px;padding:0.5rem;">
+                            <div class="title">StockTwits</div>
+                            <div class="sub">${st.bullish || 0} bullish / ${st.bearish || 0} bearish</div>
+                        </div>
+                        <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:8px;padding:0.5rem;">
+                            <div class="title">Reddit</div>
+                            <div class="sub">${rd.bullish || 0} bullish / ${rd.bearish || 0} bearish</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        analyze();
+    </script>
+</body>
+</html>

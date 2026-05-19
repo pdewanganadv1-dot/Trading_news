@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Congressional Flows — Politician & Institutional Trades</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0f0f14; --bg-secondary: #18181f; --bg-card: #1e1e28;
+            --border-color: #2a2a3a; --text-primary: #f0f0f5; --text-secondary: #8888a0;
+            --accent-green: #34d399; --accent-red: #f87171; --accent-blue: #4f8cff;
+            --accent-purple: #a78bfa; --accent-gold: #fbbf24; --accent-cyan: #38bdf8;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); padding: 2rem; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header-actions { display: flex; gap: 1rem; align-items: center; }
+        .refresh-btn { background: var(--accent-blue); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
+        .last-update { font-size: 0.8rem; color: var(--text-secondary); }
+        .controls { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .controls select { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.85rem; }
+        .controls label { color: var(--text-secondary); font-size: 0.85rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .summary-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.25rem; text-align: center; }
+        .summary-card .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .summary-card .value { font-size: 1.4rem; font-weight: 700; margin-top: 0.4rem; }
+        .summary-card .sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card h2 { font-size: 0.85rem; margin-bottom: 1rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .chart-wrapper { height: 250px; margin-bottom: 1.5rem; }
+        .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+        .group-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.2rem; transition: transform 0.2s; }
+        .group-card:hover { transform: translateY(-2px); border-color: var(--accent-blue); }
+        .group-card .name { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; }
+        .group-card .net { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .group-card .meta { font-size: 0.75rem; color: var(--text-secondary); }
+        .group-card .stocks { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
+        .group-card .stock-tag { font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-secondary); }
+        .loading { text-align: center; padding: 3rem; color: var(--text-secondary); }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .data-table th { text-align: left; padding: 0.5rem; color: var(--text-secondary); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-color); }
+        .data-table td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border-color); }
+        .progress-bar { height: 6px; border-radius: 3px; background: var(--bg-primary); margin-top: 0.3rem; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+        .cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 768px) { .cards-row { grid-template-columns: 1fr; } body { padding: 1rem; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Congressional Trading — Group & Institutional Flows</h1>
+        <div class="header-actions">
+            <span class="last-update" id="lastUpdate">Loading...</span>
+            <button class="refresh-btn" onclick="loadAll()">↻ Refresh</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <label>Period:</label>
+        <select id="periodSelect" onchange="loadAll()">
+            <option value="1M">1 Month</option>
+            <option value="6M" selected>6 Months</option>
+        </select>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card"><div class="label">Tracked Groups</div><div class="value" id="totalGroups">--</div><div class="sub">Business houses</div></div>
+        <div class="summary-card"><div class="label">FII Net</div><div class="value" id="fiiNet">--</div><div class="sub" id="fiiDate">--</div></div>
+        <div class="summary-card"><div class="label">DII Net</div><div class="value" id="diiNet">--</div><div class="sub">Domestic institutions</div></div>
+        <div class="summary-card"><div class="label">FII Trend</div><div class="value" id="fiiTrend">--</div><div class="sub">Last 5 days</div></div>
+    </div>
+
+    <div class="cards-row">
+        <div class="card">
+            <h2>FII/DII Net Flow (30 Days)</h2>
+            <div class="chart-wrapper"><canvas id="fiidiiChart"></canvas></div>
+        </div>
+        <div class="card">
+            <h2>Group Net Flow (6 Months)</h2>
+            <div class="chart-wrapper"><canvas id="groupChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Business Group Bulk Deals</h2>
+        <div class="group-grid" id="groupGrid"><div class="loading">Loading groups...</div></div>
+    </div>
+
+    <div id="groupDetail" style="display:none;">
+        <div class="card">
+            <h2 id="detailTitle">Group Details</h2>
+            <div class="table-wrap" style="overflow-x:auto;" id="detailTableWrap"></div>
+        </div>
+    </div>
+
+    <script>
+        let fiidiiChart = null, groupChart = null;
+
+        function fmtCr(v) {
+            if (v === null || v === undefined) return '--';
+            const abs = Math.abs(v);
+            if (abs >= 10000000) return (v > 0 ? '+' : '') + (v/10000000).toFixed(2) + 'Cr';
+            if (abs >= 100000) return (v > 0 ? '+' : '') + (v/100000).toFixed(2) + 'L';
+            if (abs >= 1000) return (v > 0 ? '+' : '') + (v/1000).toFixed(2) + 'K Cr';
+            return (v > 0 ? '+' : '') + v.toFixed(2) + ' Cr';
+        }
+
+        function fmtNum(v) {
+            if (v === null || v === undefined) return '--';
+            return Number(v).toLocaleString('en-IN');
+        }
+
+        async function loadAll() {
+            const period = document.getElementById('periodSelect').value;
+            document.getElementById('lastUpdate').textContent = 'Loading...';
+
+            try {
+                const res = await fetch(`/api/politician-trades/dashboard?period=${period}`);
+                const data = await res.json();
+
+                const groups = data.groups || {};
+                const fiidii = data.fiidii || {};
+                const current = fiidii.current || {};
+                const trend = fiidii.trend || {};
+
+                document.getElementById('totalGroups').textContent = data.total_groups || 0;
+
+                const fn = current.fii_net || 0;
+                document.getElementById('fiiNet').textContent = fmtCr(fn);
+                document.getElementById('fiiNet').className = 'value ' + (fn >= 0 ? 'positive' : 'negative');
+                document.getElementById('fiiDate').textContent = current.date || '--';
+
+                const dn = current.dii_net || 0;
+                document.getElementById('diiNet').textContent = fmtCr(dn);
+                document.getElementById('diiNet').className = 'value ' + (dn >= 0 ? 'positive' : 'negative');
+
+                const td = trend.fii_trend || '--';
+                document.getElementById('fiiTrend').textContent = td === 'rising' ? '📈 BUYING' : td === 'falling' ? '📉 SELLING' : '➡️ FLAT';
+                document.getElementById('fiiTrend').className = 'value ' + (td === 'rising' ? 'positive' : td === 'falling' ? 'negative' : '');
+
+                renderGroups(groups);
+                renderFiidiiChart(fiidii.history);
+                renderGroupChart(groups);
+                document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+            } catch(e) {
+                document.getElementById('lastUpdate').textContent = 'Error loading data';
+                document.getElementById('groupGrid').innerHTML = '<div class="loading">Error</div>';
+            }
+        }
+
+        function renderGroups(groups) {
+            const grid = document.getElementById('groupGrid');
+            const entries = Object.entries(groups).filter(([k, v]) => v.count > 0);
+            if (entries.length === 0) {
+                grid.innerHTML = '<div class="loading">No bulk deals found for tracked groups in this period</div>';
+                return;
+            }
+
+            const maxAbs = Math.max(...entries.map(([,v]) => Math.abs(v.net || 0)), 1);
+
+            grid.innerHTML = entries.map(([name, g]) => {
+                const net = g.net || 0;
+                const barW = Math.abs(net) / maxAbs * 100;
+                return `<div class="group-card" onclick="showGroupDetail('${name}', ${JSON.stringify(g.deals || []).replace(/'/g,"\\'")})">
+                    <div class="name">${name}</div>
+                    <div class="net" style="color:${net >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${fmtCr(net)}</div>
+                    <div class="meta">${g.buy_count || 0} buys / ${g.sell_count || 0} sells &middot; ${g.count} total deals</div>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${barW}%;background:${net >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};"></div></div>
+                    <div class="stocks">${(g.symbols_found || []).slice(0,6).map(s => '<span class="stock-tag">'+s+'</span>').join('')}</div>
+                </div>`;
+            }).join('');
+        }
+
+        function showGroupDetail(name, deals) {
+            const el = document.getElementById('groupDetail');
+            document.getElementById('detailTitle').textContent = name + ' — Recent Deals';
+            if (!deals || deals.length === 0) {
+                document.getElementById('detailTableWrap').innerHTML = '<div class="loading">No deals to show</div>';
+            } else {
+                let html = '<table class="data-table"><thead><tr><th>Date</th><th>Symbol</th><th>Client</th><th>Type</th><th>Qty</th><th>Price</th><th>Value</th></tr></thead><tbody>';
+                deals.forEach(d => {
+                    const isBuy = (d['Buy/Sell'] || '').toUpperCase() === 'BUY';
+                    html += `<tr>
+                        <td>${d.Date || '--'}</td>
+                        <td><strong>${d.Symbol || '--'}</strong></td>
+                        <td style="font-size:0.75rem;color:var(--text-secondary);">${(d.ClientName || '').substring(0,25)}</td>
+                        <td><span style="color:${isBuy ? 'var(--accent-green)' : 'var(--accent-red)'}">${d['Buy/Sell'] || '--'}</span></td>
+                        <td>${fmtNum(d.QuantityTraded)}</td>
+                        <td>₹${Number(d['TradePrice/Wght.Avg.Price'] || 0).toFixed(2)}</td>
+                        <td style="font-weight:600;">${fmtCr(d.TotalValue)}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+                document.getElementById('detailTableWrap').innerHTML = html;
+            }
+            el.style.display = 'block';
+        }
+
+        function renderFiidiiChart(history) {
+            const ctx = document.getElementById('fiidiiChart').getContext('2d');
+            if (!history || !history.history) return;
+            const items = (history.history || []).slice().reverse();
+            if (items.length < 2) return;
+            const labels = items.map(i => i.date || '');
+            const fiiNets = items.map(i => i.fii_net || 0);
+            const diiNets = items.map(i => i.dii_net || 0);
+
+            if (fiidiiChart) fiidiiChart.destroy();
+            fiidiiChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'FII Net', data: fiiNets, backgroundColor: fiiNets.map(v => v >= 0 ? 'rgba(52,211,153,0.6)' : 'rgba(248,113,113,0.6)'), borderColor: fiiNets.map(v => v >= 0 ? '#34d399' : '#f87171'), borderWidth: 1 },
+                        { label: 'DII Net', data: diiNets, backgroundColor: diiNets.map(v => v >= 0 ? 'rgba(79,140,255,0.6)' : 'rgba(167,139,250,0.6)'), borderColor: diiNets.map(v => v >= 0 ? '#4f8cff' : '#a78bfa'), borderWidth: 1 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#8888a0' } } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0', callback: v => v + 'Cr' } }
+                    }
+                }
+            });
+        }
+
+        function renderGroupChart(groups) {
+            const ctx = document.getElementById('groupChart').getContext('2d');
+            const entries = Object.entries(groups).filter(([k, v]) => v.count > 0).slice(0, 10);
+            if (entries.length === 0) return;
+            const labels = entries.map(([k]) => k);
+            const nets = entries.map(([,v]) => (v.net || 0) / 10000000);
+
+            if (groupChart) groupChart.destroy();
+            groupChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Net Flow (Cr)',
+                        data: nets,
+                        backgroundColor: nets.map(v => v >= 0 ? 'rgba(52,211,153,0.6)' : 'rgba(248,113,113,0.6)'),
+                        borderColor: nets.map(v => v >= 0 ? '#34d399' : '#f87171'),
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8888a0', callback: v => v + 'Cr' } },
+                        y: { grid: { display: false }, ticks: { color: '#8888a0', font: { size: 9 } } }
+                    }
+                }
+            });
+        }
+
+        loadAll();
+        setInterval(loadAll, 120000);
+    </script>
+</body>
+</html>

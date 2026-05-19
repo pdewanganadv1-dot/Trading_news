@@ -21,6 +21,9 @@ from app.routes.agent import router as agent_router
 from app.routes.options_chain import router as options_chain_router
 from app.routes.insider_trading import router as insider_trading_router
 from app.routes.sector_rotation import router as sector_rotation_router
+from app.routes.ai_agent import router as ai_agent_router
+from app.routes.strategy_marketplace import router as strategy_marketplace_router
+from app.routes.politician_trades import router as politician_trades_router
 from app.services.signal_monitor import get_cache_stats
 import asyncio
 
@@ -94,3 +97,6 @@ app.include_router(sentiment_pipeline_router)
 app.include_router(options_chain_router)
 app.include_router(insider_trading_router)
 app.include_router(sector_rotation_router)
+app.include_router(ai_agent_router)
+app.include_router(strategy_marketplace_router)
+app.include_router(politician_trades_router)
