@@ -4,17 +4,21 @@ from typing import List, Dict
 from app.config import settings
 from app.services.market_data_service import market_data_service, TradingSignals
 from app.services.telegram_notifier import telegram_notifier
-from app.services.accuracy_tracker import record_signal, resolve_signals
+from app.services.accuracy_tracker import (
+    record_signal, resolve_signals,
+    save_signal_cache, save_realtime_cache, save_sent_signal,
+    load_signal_cache, load_realtime_cache, load_sent_signals,
+)
 from app.services.signal_confirmer import confirm_signal
 from app.services.signal_explainer import signal_explainer
 
 
 signal_log: List[Dict] = []
-_signal_cache: Dict[str, Dict] = {}
-_realtime_cache: Dict[str, Dict] = {}
+_signal_cache: Dict[str, Dict] = load_signal_cache()
+_realtime_cache: Dict[str, Dict] = load_realtime_cache()
 _last_sent: Dict[str, str] = {}
-_CONFIRMED_SENT: Dict[str, str] = {}  # Tracks composite signal sends
-_cache_start: str = ""
+_CONFIRMED_SENT: Dict[str, str] = load_sent_signals()
+_cache_start: str = datetime.now().isoformat() if _signal_cache else ""
 
 # Nifty 100 stocks (monitored for trading signals)
 _INDIAN_STOCKS = [
@@ -118,8 +122,9 @@ async def _process_symbol(symbol: str) -> None:
                     entry['notified'] = ok
                     if ok:
                         _CONFIRMED_SENT[symbol] = f"{sig}_{comp_conf}"
+                        save_sent_signal(symbol, f"{sig}_{comp_conf}")
 
-        _signal_cache[symbol] = {
+        cache_entry = {
             "symbol": entry["symbol"],
             "signal": entry["signal"],
             "confidence": entry["confidence"],
@@ -128,16 +133,20 @@ async def _process_symbol(symbol: str) -> None:
             "explanation": entry["explanation"],
             "timestamp": entry["timestamp"],
         }
+        _signal_cache[symbol] = cache_entry
+        save_signal_cache(symbol, cache_entry)
 
         global _cache_start
         if not _cache_start:
             _cache_start = datetime.now().isoformat()
 
-        _realtime_cache[symbol] = {
+        rt_entry = {
             "symbol": symbol.upper(),
             "price": price_data,
             "timestamp": datetime.now().isoformat(),
         }
+        _realtime_cache[symbol] = rt_entry
+        save_realtime_cache(symbol, rt_entry)
 
         signal_log.insert(0, entry)
         if len(signal_log) > 100:

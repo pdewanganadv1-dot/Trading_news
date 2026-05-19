@@ -1,11 +1,13 @@
+import json
 import sqlite3
 import os
 from datetime import datetime, timedelta
-from typing import List, Dict
+from typing import List, Dict, Optional
 from app.services.market_data_service import market_data_service
+from app.config import settings
 
 
-DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'signals.db')
+DB_PATH = os.path.join(settings.persistent_dir, 'signals.db')
 
 
 def _get_db():
@@ -23,6 +25,27 @@ def _get_db():
             outcome TEXT,
             exit_price REAL,
             pnl_pct REAL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS signal_cache (
+            symbol TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS realtime_cache (
+            symbol TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sent_signals (
+            symbol TEXT PRIMARY KEY,
+            composite_key TEXT NOT NULL,
+            timestamp TEXT NOT NULL
         )
     """)
     return conn
@@ -91,3 +114,66 @@ def get_accuracy_stats() -> Dict:
         'avg_pnl': round(avg, 2),
         'by_symbol': {},
     }
+
+
+def save_signal_cache(symbol: str, data: dict):
+    conn = _get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO signal_cache (symbol, data, timestamp) VALUES (?, ?, ?)",
+        (symbol, json.dumps(data), datetime.now().isoformat()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def save_realtime_cache(symbol: str, data: dict):
+    conn = _get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO realtime_cache (symbol, data, timestamp) VALUES (?, ?, ?)",
+        (symbol, json.dumps(data), datetime.now().isoformat()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def save_sent_signal(symbol: str, composite_key: str):
+    conn = _get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO sent_signals (symbol, composite_key, timestamp) VALUES (?, ?, ?)",
+        (symbol, composite_key, datetime.now().isoformat()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def load_signal_cache() -> Dict[str, dict]:
+    conn = _get_db()
+    rows = conn.execute("SELECT symbol, data FROM signal_cache").fetchall()
+    conn.close()
+    result = {}
+    for row in rows:
+        try:
+            result[row['symbol']] = json.loads(row['data'])
+        except Exception:
+            pass
+    return result
+
+
+def load_realtime_cache() -> Dict[str, dict]:
+    conn = _get_db()
+    rows = conn.execute("SELECT symbol, data FROM realtime_cache").fetchall()
+    conn.close()
+    result = {}
+    for row in rows:
+        try:
+            result[row['symbol']] = json.loads(row['data'])
+        except Exception:
+            pass
+    return result
+
+
+def load_sent_signals() -> Dict[str, str]:
+    conn = _get_db()
+    rows = conn.execute("SELECT symbol, composite_key FROM sent_signals").fetchall()
+    conn.close()
+    return {row['symbol']: row['composite_key'] for row in rows}

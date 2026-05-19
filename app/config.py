@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -13,6 +14,7 @@ class Settings(BaseSettings):
     signal_check_interval_seconds: int = 600
     groq_api_key: Optional[str] = None
     groq_model: str = "llama-3.3-70b-versatile"
+    persistent_dir: str = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
     class Config:
         env_file = ".env"
