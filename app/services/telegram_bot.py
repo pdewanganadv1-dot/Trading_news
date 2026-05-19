@@ -11,6 +11,12 @@ from app.services.accuracy_tracker import get_accuracy_stats
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
 from app.services.market_edge_service import scan_all_stocks, scan_stock, get_market_breadth, get_fii_dii_summary, set_fii_dii, get_fii_dii_history
 from app.services.signal_monitor import _MONITORED_SYMBOLS, get_cached_realtime, get_cached_signals
+from app.services.options_chain_service import options_chain_service
+from app.services.insider_service import insider_trading_service
+from app.services.sector_service import sector_rotation_service
+from app.services.politician_service import politician_trades_service
+from app.services.ai_agent_service import ai_agent_service
+from app.services.strategy_marketplace import strategy_marketplace_service
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -83,11 +89,27 @@ def _build_help() -> str:
         "📰 *News Sentiment Pipeline*\n"
         "• `sentiment` — Overall Nifty market sentiment overview\n"
         "• `sentiment tcs` — Cached news sentiment for any Nifty stock\n\n"
+        "🤖 *AI Agent*\n"
+        "• `/agent <symbol>` — Multi-modal AI analysis (news + tech + FII/DII + social)\n"
+        "• `social <symbol>` — StockTwits + Reddit sentiment\n\n"
+        "📊 *Options & Derivatives*\n"
+        "• `/options <symbol>` — Option chain, PCR, max pain, key levels\n"
+        "• `edges` — Top 10 stocks by edge score\n"
+        "• `fiidii` — FII/DII institutional flow\n\n"
+        "📋 *Strategy Marketplace*\n"
+        "• `/strategies` — Browse top trading strategies\n"
+        "• `/backtest <id>` — Run backtest on NIFTY\n\n"
+        "🏛 *Institutional & Political Flows*\n"
+        "• `/insider` — Bulk & block deals summary\n"
+        "• `/politicians` — Group/entity trade flows\n\n"
+        "🔄 *Sector Analysis*\n"
+        "• `/sectors` — Sector rotation performance\n\n"
         "🌅 *Market Briefs*\n"
         "• `premarket` — Pre-market brief: global cues, FII/DII, outlook\n"
         "• `postmarket` — Post-market wrap: gainers, losers, FII/DII\n\n"
         "🛠 *System*\n"
         "• `docker` — Container status\n"
+        "• `/markets` — All feature overview\n"
         "• `/help` — This message\n\n"
         "💡 *Tip:* Commands are case-insensitive. Alerts trigger automatically when price hits your target."
     )
@@ -511,6 +533,175 @@ async def _handle_message(text: str, chat_id: int):
             return await telegram_notifier.send_message(msg)
         except Exception as e:
             return await telegram_notifier.send_message(f"Error: {str(e)}")
+
+    m = re.match(r'^/agent\s+(\w+)$', text)
+    if m:
+        sym = m.group(1).upper()
+        status_msg = await telegram_notifier.send_message(f"🤖 AI Agent analyzing *{sym}*... Please wait ⏳")
+        try:
+            result = await ai_agent_service.analyze_stock(sym, 50)
+            v = result.get("verdict", {})
+            bias = v.get("bias", "NEUTRAL")
+            emoji = {"BULLISH": "🟢", "BEARISH": "🔴", "NEUTRAL": "⚪"}
+            action = v.get("action", "HOLD")
+            msg = (
+                f"{emoji.get(bias, '⚪')} *AI Agent — {sym}*\n\n"
+                f"*Bias:* {bias} | *Action:* {action}\n"
+                f"*Conviction:* {v.get('conviction', 'MEDIUM')}\n\n"
+                f"_{v.get('analysis', 'No analysis')[:800]}_\n\n"
+                f"🤖 Source: {v.get('source', 'template')}"
+            )
+            return await telegram_notifier.send_message(msg)
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Agent error: {e}")
+
+    if text == '/strategies':
+        strategies = strategy_marketplace_service.get_strategies()
+        lines = ["📋 *Strategy Marketplace — Top Strategies*", ""]
+        for s in strategies[:6]:
+            ret = s["metrics"]["total_return"]
+            emoji = "🟢" if ret.startswith("+") else "🔴"
+            lines.append(f"{emoji} *{s['name']}* by {s['author']}")
+            lines.append(f"   ├ Return: `{ret}` | Win: `{s['metrics']['win_rate']}` | Sharpe: `{s['metrics']['sharpe']}`")
+            lines.append(f"   ├ Type: `{s['type']}` | TF: `{s['timeframe']}` | Copies: `{s['copies']}`")
+            lines.append(f"   └ ⭐ `{s['rating']}/5` | Tags: `{', '.join(s['tags'][:3])}`")
+            lines.append("")
+        lines.append("💡 Use `/backtest <id>` to run a backtest")
+        return await telegram_notifier.send_message("\n".join(lines))
+
+    m = re.match(r'^/backtest\s+(\w+)$', text)
+    if m:
+        sid = m.group(1)
+        status_msg = await telegram_notifier.send_message(f"🔄 Running backtest for `{sid}`...")
+        try:
+            bt = strategy_marketplace_service.run_backtest(sid, "NIFTY", 365)
+            msg = (
+                f"📊 *Backtest — {bt.get('strategy_id')}*\n"
+                f"📈 Period: `{bt.get('period')}` on `{bt.get('symbol')}`\n\n"
+                f"*Results:*\n"
+                f"🟢 Return: `{bt.get('total_return_pct', 0):+.2f}%`\n"
+                f"🎯 Win Rate: `{bt.get('win_rate', 0)}%`\n"
+                f"📉 Max DD: `{bt.get('max_drawdown', 0)}%`\n"
+                f"📊 Profit Factor: `{bt.get('profit_factor', 'inf')}`\n"
+                f"🔄 Trades: `{bt.get('total_trades', 0)}`\n"
+                f"💰 Capital: `₹{bt.get('final_capital', 0):,.0f}` (from ₹{bt.get('initial_capital', 0):,.0f})"
+            )
+            return await telegram_notifier.send_message(msg)
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Backtest error: {e}")
+
+    m = re.match(r'^/options\s+(\w+)$', text)
+    if m:
+        sym = m.group(1).upper()
+        try:
+            data = await options_chain_service.get_option_chain(sym)
+            if "error" in data:
+                return await telegram_notifier.send_message(f"❌ {data['error']}")
+            chain = data.get("chain", [])
+            lines = [f"📊 *Options Chain — {sym}*", ""]
+            lines.append(f"📅 Expiry: `{data.get('expiry_date', 'N/A')}`")
+            lines.append(f"💰 Underlying: `₹{data.get('underlying', 0):,.2f}`")
+            lines.append(f"🟢 Max Pain: `₹{data.get('max_pain', 0):,}`")
+            lines.append(f"📊 PCR OI: `{data.get('pcr_oi', '--')}` | PCR Vol: `{data.get('pcr_vol', '--')}`")
+            lines.append("")
+            k = data.get("key_levels", {})
+            if k.get("max_ce_oi"):
+                lines.append(f"🔴 Resistance (Max CE OI): `₹{k['max_ce_oi']['strike']:,}`")
+            if k.get("max_pe_oi"):
+                lines.append(f"🟢 Support (Max PE OI): `₹{k['max_pe_oi']['strike']:,}`")
+            lines.append("")
+            atm = None
+            for r in chain:
+                if data.get("underlying") and abs(r["strike"] - data["underlying"]) / data["underlying"] < 0.005:
+                    atm = r
+                    break
+            if atm:
+                pcr_strike = round(atm["pe_oi"] / max(atm["ce_oi"], 1), 2)
+                lines.append(f"*ATM Strike (₹{atm['strike']:,}):*")
+                lines.append(f"CE OI: `{atm['ce_oi']:,}` | PE OI: `{atm['pe_oi']:,}` | PCR: `{pcr_strike}`")
+            lines.append(f"\n💡 Total OI — CE: `{data.get('total_ce_oi', 0):,}` | PE: `{data.get('total_pe_oi', 0):,}`")
+            return await telegram_notifier.send_message("\n".join(lines))
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Options error: {e}")
+
+    if text == '/insider':
+        try:
+            summary = await insider_trading_service.get_insider_summary("1M")
+            bulk = await insider_trading_service.get_bulk_deals("1W")
+            block = await insider_trading_service.get_block_deals("1W")
+            lines = ["🔍 *Insider Trading — Bulk & Block Deals*", ""]
+            lines.append(f"*Bulk Deals (1M)*")
+            lines.append(f"Total: `{summary.get('bulk_total', 0)}` transactions")
+            bn = summary.get("bulk_net", 0)
+            lines.append(f"Net Value: `₹{abs(bn)/10000000:.2f}Cr` {'🟢' if bn > 0 else '🔴' if bn < 0 else '⚪'}")
+            lines.append(f"Buys: `{summary.get('bulk_buy_value', 0)/10000000:.2f}Cr` | Sells: `{summary.get('bulk_sell_value', 0)/10000000:.2f}Cr`")
+            lines.append("")
+            lines.append(f"*Block Deals (1M)*")
+            lines.append(f"Total: `{summary.get('block_total', 0)}` transactions")
+            bln = summary.get("block_net", 0)
+            lines.append(f"Net Value: `₹{abs(bln)/10000000:.2f}Cr` {'🟢' if bln > 0 else '🔴' if bln < 0 else '⚪'}")
+            lines.append("")
+            if isinstance(bulk, list) and bulk:
+                lines.append(f"*Latest Bulk Deals (Top 5)*")
+                for d in bulk[:5]:
+                    direction = d.get("Buy/Sell", "")
+                    emoji = "🟢" if direction.upper() == "BUY" else "🔴"
+                    lines.append(f"{emoji} {d.get('Symbol','')} — {direction} `{d.get('QuantityTraded', 0):,.0f}` @ `₹{float(d.get('TradePrice/Wght.Avg.Price', 0)):.2f}`")
+            return await telegram_notifier.send_message("\n".join(lines))
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Insider error: {e}")
+
+    if text == '/sectors':
+        try:
+            view = await sector_rotation_service.get_full_rotation_view("1W")
+            sectors = view.get("sectors", [])
+            lines = ["🔄 *Sector Rotation — 1 Week Performance*", ""]
+            for s in sectors:
+                pct = s.get("change_pct", 0)
+                emoji = "🟢" if pct > 0 else "🔴" if pct < 0 else "⚪"
+                bar = "▰" * max(1, min(10, int(abs(pct) * 2))) + "▱" * max(0, 10 - max(1, min(10, int(abs(pct) * 2))))
+                lines.append(f"{emoji} `#{s.get('rank', '-')}` *{s['sector']}*: `{pct:+.2f}%`")
+                lines.append(f"   `{bar}`")
+            lines.append(f"\n📊 Total: `{view.get('total_sectors', 0)}` sectors, `{view.get('total_stocks', 0)}` stocks")
+            return await telegram_notifier.send_message("\n".join(lines))
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Sector error: {e}")
+
+    if text == '/politicians':
+        try:
+            dash = await politician_trades_service.get_politician_dashboard("6M")
+            groups = dash.get("groups", {})
+            active = {k: v for k, v in groups.items() if isinstance(v, dict) and v.get("count", 0) > 0}
+            lines = ["🏛 *Congressional Trading — Group Flows*", ""]
+            for name, g in sorted(active.items(), key=lambda x: abs(x[1].get("net", 0)), reverse=True)[:10]:
+                net = g.get("net", 0)
+                emoji = "🟢" if net > 0 else "🔴" if net < 0 else "⚪"
+                lines.append(f"{emoji} *{name}*: `₹{abs(net)/10000000:.2f}Cr` Net")
+                lines.append(f"   ├ Buys: `{g.get('buy_count', 0)}` | Sells: `{g.get('sell_count', 0)}` | Total: `{g.get('count', 0)}`")
+                lines.append(f"   └ Stocks: `{', '.join(g.get('symbols_found', [])[:5])}`")
+            lines.append("")
+            fii = dash.get("fiidii", {}).get("current", {})
+            fn = fii.get("fii_net", 0)
+            dn = fii.get("dii_net", 0)
+            lines.append(f"*FII/DII Flow*")
+            lines.append(f"FII: `₹{fn:+,.2f}Cr` {'🟢' if fn > 0 else '🔴'} | DII: `₹{dn:+,.2f}Cr` {'🟢' if dn > 0 else '🔴'}")
+            return await telegram_notifier.send_message("\n".join(lines))
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Politician error: {e}")
+
+    if text == '/markets':
+        msg = "📊 *Market Overview — All Features*\n\n"
+        msg += "Use these commands for detailed analysis:\n"
+        msg += "• `/agent <symbol>` — AI multi-modal analysis\n"
+        msg += "• `/options <symbol>` — Option chain with PCR & max pain\n"
+        msg += "• `/insider` — Bulk & block deals summary\n"
+        msg += "• `/sectors` — Sector rotation performance\n"
+        msg += "• `/politicians` — Group political trades\n"
+        msg += "• `/strategies` — Strategy marketplace\n"
+        msg += "• `/backtest <id>` — Backtest a strategy\n\n"
+        msg += "Or use any of these quick ones:\n"
+        msg += "`fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
+        return await telegram_notifier.send_message(msg)
 
     # Forward unrecognized commands to AI agent queue
     if text and chat_id:
