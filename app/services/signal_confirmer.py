@@ -186,7 +186,7 @@ async def confirm_signal(
             warnings.append(f"Social sentiment conflicts ({social_direction})")
 
     # 6. Combined FII + DII institutional flow (Indian stocks only)
-    from app.services.signal_monitor import _INDIAN_STOCKS as _is_set
+    from app.data.stocks import INDIAN_STOCKS_SET as _is_set
     is_indian = symbol_lower in _is_set
     if is_indian:
         try:

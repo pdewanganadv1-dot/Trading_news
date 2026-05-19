@@ -5,15 +5,9 @@ import yfinance as yf
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from collections import defaultdict
+from app.data.stocks import INDIAN_STOCKS
 
-_INDIAN = [
-    "reliance", "tcs", "hdfcbank", "infy", "icicibank",
-    "sbin", "lt", "wipro", "itc",
-    "bhartiartl", "maruti", "nestleind", "hindunilvr", "asianpaint",
-    "sunpharma", "titan", "bajajfinsv", "hcltech", "kotakbank",
-    "axisbank", "ntpc", "tatasteel", "cipla", "ultracemco",
-]
-
+_INDIAN = INDIAN_STOCKS
 _CRYPTO = ["btc", "eth"]
 
 # Cached results

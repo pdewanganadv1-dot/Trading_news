@@ -4,6 +4,7 @@ from typing import List, Dict
 from app.config import settings
 from app.services.market_data_service import market_data_service, TradingSignals
 from app.services.telegram_notifier import telegram_notifier
+from app.data.stocks import INDIAN_STOCKS, MONITORED_SYMBOLS
 from app.services.accuracy_tracker import (
     record_signal, resolve_signals,
     save_signal_cache, save_realtime_cache, save_sent_signal,
@@ -13,45 +14,15 @@ from app.services.signal_confirmer import confirm_signal
 from app.services.signal_explainer import signal_explainer
 
 
+_INDIAN_STOCKS = INDIAN_STOCKS
+_MONITORED_SYMBOLS = MONITORED_SYMBOLS
+
 signal_log: List[Dict] = []
 _signal_cache: Dict[str, Dict] = load_signal_cache()
 _realtime_cache: Dict[str, Dict] = load_realtime_cache()
 _last_sent: Dict[str, str] = {}
 _CONFIRMED_SENT: Dict[str, str] = load_sent_signals()
 _cache_start: str = datetime.now().isoformat() if _signal_cache else ""
-
-# Nifty 100 stocks (monitored for trading signals)
-_INDIAN_STOCKS = [
-    # Nifty 50
-    "reliance", "tcs", "hdfcbank", "infy", "icicibank",
-    "sbin", "lt", "wipro", "itc", "bhartiartl",
-    "maruti", "nestleind", "hindunilvr", "asianpaint", "sunpharma",
-    "titan", "bajajfinsv", "hcltech", "kotakbank", "axisbank",
-    "ntpc", "tatasteel", "cipla", "ultracemco", "adaniports",
-    "adanient", "apollohosp", "bajajauto", "bajfinance", "bpcl",
-    "britannia", "coalindia", "divislab", "drreddy", "eichermot",
-    "grasim", "hdfclife", "hindalco", "indusindbk", "jswsteel",
-    "m&m", "ongc", "powergrid", "sbilife", "shriramfin",
-    "tataconsum", "tatamotors", "techm", "trent",
-    # Nifty Next 50
-    "abb", "abfrl", "abcap", "adanienergy", "adani green",
-    "ambujacem", "auropharma", "bandhanbnk", "bankbaroda", "bergerpaint",
-    "biocon", "bse", "canbk", "castrol", "chambalfert",
-    "colgate", "concor", "coforget", "cummins", "dabur",
-    "dlf", "esi", "exideind", "federalbnk", "gail",
-    "godrejcp", "godrejpro", "gvk", "havells", "heromotoco",
-    "hindustan", "hindzinc", "idfcfirstb", "ioc", "irctc",
-    "irfc", "lic", "lutrading", "mcdowell",
-    "motherson", "mphend", "muthoot", "navin", "pageind",
-    "petronet", "pidilite", "pfc", "ramco", "rb",
-    "recl", "relianceind", "sail", "samvardhana", "sir",
-    "siemens", "srtrans", "tatachem", "tatacoffee", "tatapower",
-    "thermax", "torrentpow", "torrentpharm", "tvs",
-    "ujjivan", "unionbank", "varunever", "vestutech", "voltas",
-    "yesbank", "zyduslife",
-]
-
-_MONITORED_SYMBOLS = ['btc', 'eth', 'gold', 'silver'] + _INDIAN_STOCKS
 
 async def _process_symbol(symbol: str) -> None:
     """Process a single symbol: fetch data, generate signal, explain, alert."""
