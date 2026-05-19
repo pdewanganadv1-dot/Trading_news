@@ -34,7 +34,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
     - **Low**: Lazy import `docker` in telegram_bot.py (no crash if Docker unavailable)
     - Removed stale `GEMINI_API_KEY` from `.env` (Pydantic v2 validation error)
 
-### May 19, 2026 — Persistence & Reliability
+### May 19, 2026 — Persistence, Reliability & Stock List Consolidation
 
 **Done**:
 1. **Redeployed service**: Was returning 503 (down). Redeployed via Render hook, restored to healthy.
@@ -42,6 +42,8 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 3. **Render persistent disk**: Added 1GB disk mount at `/data` in `render.yaml` + `PERSISTENT_DIR=/data` env var so `signals.db` persists across deploys.
 4. **On-startup cache reload**: `signal_monitor.py` now loads `_signal_cache`, `_realtime_cache`, `_CONFIRMED_SENT` from DB on import — API serves cached data immediately, Telegram bot avoids duplicate alerts.
 5. **Config**: Added `persistent_dir` to `Settings` with fallback to project root.
+6. **Consolidated stock lists**: Created `app/data/stocks.py` as single source of truth for all 119 Indian stocks + 4 global assets. Removed duplicates from `signal_monitor.py`, `telegram_notifier.py`, `market_edge_service.py`, `signal_confirmer.py`.
+7. **Fixed edge scanner coverage**: Was only scanning 24 of 119 stocks. Now uses the full list via shared module.
 
 **Known Issues** (unchanged):
 1. **Groq quota**: 100K tokens/day free tier — exhausted. Only calls LLM for BUY/SELL ≥ 50% confidence. Resets ~24h cycle.
@@ -57,12 +59,14 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | File | Purpose |
 |------|---------|
 | `app/config.py` | Settings (groq_api_key, signal_check_interval=600s, persistent_dir) |
-| `app/services/signal_monitor.py` | Bg loop, caches, 123 Indian stocks, DB persistence |
+| `app/data/stocks.py` | Single source of truth for stock lists (INDIAN_STOCKS, MONITORED_SYMBOLS) |
+| `app/services/signal_monitor.py` | Bg loop, caches, 123 symbols, DB persistence |
 | `app/services/market_data_service.py` | yfinance calls in threads with 2s delay + 15s timeout |
 | `app/services/signal_explainer.py` | Groq LLM client + template fallback |
 | `app/services/telegram_bot.py` | Polling loop, command handlers |
-| `app/services/telegram_notifier.py` | Send messages, `_INDIAN_STOCKS` hardcoded list |
+| `app/services/telegram_notifier.py` | Send messages |
 | `app/services/accuracy_tracker.py` | SQLite DB — signal history + cache/sent persistence |
+| `app/services/market_edge_service.py` | Edge scanner, FII/DII, breadth (full 119 stocks) |
 | `app/routes/market_realtime.py` | API endpoints (signals + realtime) |
 | `app/main.py` | FastAPI entry, lifespan tasks |
 | `render.yaml` | Render service config (Docker + persistent disk) |
