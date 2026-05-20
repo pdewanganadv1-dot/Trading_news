@@ -63,13 +63,26 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
     - `/scalpon` / `/scalpoff` — Toggle SCALP signals on/off (currently **disabled** by default)
     - Target: 10% ROI, intraday or weekend hold
 
+### May 20, 2026 — DhanHQ Fixes & Credential Sync
+
+**Done**:
+1. **DhanHQ reads credentials at runtime**: `_headers()` and `_client()` now fallback to `settings.dhan_client_id`/`settings.dhan_access_token` directly instead of relying on import-time cache
+2. **Fixed scrip master column name**: Was reading `SYMBOL_NAME` (doesn't exist in CSV) → changed to `SEM_TRADING_SYMBOL` for security ID lookup
+3. **Filter security map to NSE EQ only**: Added `NSE` + `E` (equity) segment filter to avoid BSE/derivative symbol collisions
+4. **Added `/debug/dhan` endpoint**: Shows client_id, token status, security map state, profile, and funds for diagnosing Dhan issues
+5. **Added `get_debug_status()`**: Exports current Dhan connection state for debugging
+6. **Fixed Dhan env vars on Render**: User added `DHAN_CLIENT_ID` and `DHAN_ACCESS_TOKEN` env vars in Render dashboard (was incorrectly using `tradin_news`)
+7. **DhanHQ fully operational**: `/dhan` dashboard shows funds (₹20,832), profile, `/buy RELIANCE 1` works now (was failing with "Security ID not found")
+
+**Lesson**: Dhan scrip master CSV column `SYMBOL_NAME` doesn't exist — the correct column is `SEM_TRADING_SYMBOL` for the trading symbol. Must also filter to `NSE` + `E` segment only.
+
 ### Current State
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
-- **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: (latest — see git log)
-- **Repo**: Make sure it's **private** on GitHub (Settings → General → Danger Zone → Change visibility)
+- **Deploy hook**: ~~POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI~~ **(broken — repo made private; manual deploy via Render dashboard required)**
+- **Git commit HEAD**: `76cef44`
+- **Repo**: **Private** on GitHub
 
 ### Key Files
 | File | Purpose |
@@ -96,10 +109,6 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `render.yaml` | Render service config (Docker + persistent disk) |
 
 ### Telegram Commands
-| `/dhan` | DhanHQ dashboard (funds, account, data plan) |
-| `/dhanon` / `/dhanoff` | Toggle DhanHQ auto-trading |
-| `/buy <sym> <qty>` | Place BUY order via Dhan |
-| `/sell <sym> <qty>` | Place SELL order via Dhan |
 | Command | Description |
 |---------|-------------|
 | `summary` | Dashboard overview |
@@ -108,9 +117,12 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `breadth all` | Full list of stocks above SMA20 |
 | `sentiment` | Market sentiment with top bullish/bearish stocks |
 | `stocks` | All 119 monitored stocks |
+| `fiidii` | FII/DII institutional flow |
+| `social <sym>` | StockTwits + Reddit sentiment |
 | `/scalp` | SCALP signals — EMA 200 bounces on 1min chart |
 | `/scalpbt` | Backtest SCALP strategy on 6mo daily data |
 | `/scalpon` / `/scalpoff` | Toggle SCALP signals on/off (default: off) |
+| `/dhan` | DhanHQ dashboard (funds, account, data plan) |
 | `/dhanon` / `/dhanoff` | Toggle DhanHQ auto-trading (default: off) |
 | `/buy <sym> <qty>` | Place BUY order via Dhan |
 | `/sell <sym> <qty>` | Place SELL order via Dhan |
@@ -121,8 +133,6 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `/politicians` | Group political trades |
 | `/strategies` | Strategy marketplace |
 | `/backtest <id>` | Backtest a strategy |
-| `fiidii` | FII/DII institutional flow |
-| `social <sym>` | StockTwits + Reddit sentiment |
 
 ### Tech Stack
 - FastAPI + uvicorn (Render Docker, free tier)
