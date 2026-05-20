@@ -248,7 +248,7 @@ async def place_order(
     if not sid:
         return {"error": f"Security ID not found for {symbol}"}
 
-    payload = {
+    payload: dict = {
         "dhanClientId": _client(),
         "transactionType": transaction_type.upper(),
         "exchangeSegment": "NSE_EQ",
@@ -257,11 +257,15 @@ async def place_order(
         "validity": "DAY",
         "securityId": sid,
         "quantity": qty,
+        "disclosedQuantity": 0,
+        "price": 0.0,
+        "triggerPrice": 0.0,
+        "afterMarketOrder": False,
+        "boProfitValue": None,
+        "boStopLossValue": None,
     }
     if order_type.upper() == "LIMIT" and price > 0:
         payload["price"] = price
-    else:
-        payload["price"] = 0
 
     return await _post("/orders", payload)
 
