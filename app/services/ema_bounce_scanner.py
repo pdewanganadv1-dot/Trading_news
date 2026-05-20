@@ -176,3 +176,193 @@ async def scan_for_bounces() -> List[Dict]:
 async def get_recent_bounces(min_strength: float = 0.3) -> List[Dict]:
     signals = await scan_for_bounces()
     return [s for s in signals if s.get("strength", 0) >= min_strength]
+
+
+def _backtest_stock(symbol: str) -> Optional[Dict]:
+    ticker = _yf_ticker(symbol)
+    try:
+        stock = yf.Ticker(ticker)
+        data = stock.history(period="6mo", interval="1d")
+        if data.empty or len(data) < 210:
+            return None
+    except Exception:
+        return None
+
+    closes = data["Close"].values.tolist()
+    dates = data.index.tolist()
+
+    trades = []
+    in_position = False
+    entry_price = 0
+    entry_date = None
+    direction = None  # "BUY" or "SELL"
+    entry_idx = 0
+
+    for i in range(200, len(closes)):
+        segment = closes[:i+1]
+        ema200 = _calc_ema(segment, 200)
+        if ema200 is None:
+            continue
+        ema200_prev = _calc_ema(closes[:i], 200)
+        if ema200_prev is None:
+            continue
+
+        price = closes[i]
+        prev_price = closes[i-1]
+        above = price > ema200
+        prev_above = prev_price > ema200_prev
+
+        # Check context: was it below/above for last 3 candles?
+        above_flags = []
+        valid = True
+        for j in range(6):
+            idx = i - j
+            if idx < 200:
+                valid = False
+                break
+            sub_ema = _calc_ema(closes[:idx+1], 200)
+            if sub_ema is None:
+                valid = False
+                break
+            above_flags.append(closes[idx] > sub_ema)
+        if not valid or len(above_flags) < 3:
+            continue
+
+        signal = None
+        if not prev_above and above:  # BUY bounce
+            candles_below = sum(1 for f in above_flags if not f)
+            if candles_below >= 2:
+                signal = "BUY"
+        elif prev_above and not above:  # SELL breakdown
+            candles_above = sum(1 for f in above_flags if f)
+            if candles_above >= 2:
+                signal = "SELL"
+
+        if signal and not in_position:
+            in_position = True
+            entry_price = price
+            entry_date = dates[i]
+            direction = signal
+            entry_idx = i
+        elif in_position:
+            # Check exits
+            ret = (price - entry_price) / entry_price * 100
+            if direction == "SELL":
+                ret = -ret
+
+            exit_reason = None
+            if ret >= 10:
+                exit_reason = "TARGET 10%"
+            elif ret <= -5:
+                exit_reason = "STOP -5%"
+            elif i - entry_idx >= 20:
+                exit_reason = "TIMEOUT 20d"
+
+            if exit_reason:
+                trades.append({
+                    "symbol": symbol.upper(),
+                    "direction": direction,
+                    "entry_price": round(entry_price, 2),
+                    "exit_price": round(price, 2),
+                    "entry_date": str(entry_date.date()) if hasattr(entry_date, 'date') else str(entry_date),
+                    "exit_date": str(dates[i].date()) if hasattr(dates[i], 'date') else str(dates[i]),
+                    "return_pct": round(ret, 2),
+                    "exit_reason": exit_reason,
+                })
+                in_position = False
+                entry_price = 0
+                direction = None
+
+    if in_position:
+        ret = (closes[-1] - entry_price) / entry_price * 100
+        if direction == "SELL":
+            ret = -ret
+        trades.append({
+            "symbol": symbol.upper(),
+            "direction": direction,
+            "entry_price": round(entry_price, 2),
+            "exit_price": round(closes[-1], 2),
+            "entry_date": str(entry_date.date()) if hasattr(entry_date, 'date') else str(entry_date),
+            "exit_date": str(dates[-1].date()) if hasattr(dates[-1], 'date') else str(dates[-1]),
+            "return_pct": round(ret, 2),
+            "exit_reason": "OPEN",
+        })
+
+    return {"symbol": symbol.upper(), "trades": trades} if trades else None
+
+
+def _calc_sharpe(returns: List[float], rf: float = 0.05) -> float:
+    if len(returns) < 2:
+        return 0.0
+    avg_ret = np.mean(returns)
+    std_ret = np.std(returns)
+    if std_ret == 0:
+        return 0.0
+    return (avg_ret - rf/252) / std_ret * (252 ** 0.5)
+
+
+async def run_backtest() -> Dict:
+    """Backtest EMA 200 bounce strategy on daily data for all stocks."""
+    from app.services.telegram_notifier import telegram_notifier
+    await telegram_notifier.send_message("⏳ Backtesting EMA200 scalp on all 119 stocks (daily, 6mo)...")
+
+    loop = asyncio.get_event_loop()
+    all_trades = []
+    stock_results = []
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(_backtest_stock, sym): sym for sym in _INDIAN}
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+                if result and result.get("trades"):
+                    all_trades.extend(result["trades"])
+                    stock_results.append(result)
+            except Exception:
+                pass
+
+    if not all_trades:
+        return {"status": "empty", "message": "No trades generated"}
+
+    returns = [t["return_pct"] for t in all_trades]
+    wins = [r for r in returns if r > 0]
+    losses = [r for r in returns if r <= 0]
+    total = len(returns)
+    win_rate = len(wins) / total * 100 if total else 0
+    avg_return = np.mean(returns) if returns else 0
+    avg_win = np.mean(wins) if wins else 0
+    avg_loss = np.mean(losses) if losses else 0
+    max_return = max(returns)
+    min_return = min(returns)
+    sharpe = _calc_sharpe(returns)
+
+    # Best/worst trades
+    sorted_trades = sorted(all_trades, key=lambda x: x["return_pct"], reverse=True)
+    best5 = sorted_trades[:5]
+    worst5 = sorted_trades[-5:]
+    worst5.reverse()
+
+    # Stats per direction
+    buy_trades = [t for t in all_trades if t["direction"] == "BUY"]
+    sell_trades = [t for t in all_trades if t["direction"] == "SELL"]
+    buy_returns = [t["return_pct"] for t in buy_trades]
+    sell_returns = [t["return_pct"] for t in sell_trades]
+
+    return {
+        "status": "ok",
+        "total_trades": total,
+        "win_rate": round(win_rate, 1),
+        "avg_return": round(avg_return, 2),
+        "avg_win": round(avg_win, 2),
+        "avg_loss": round(avg_loss, 2),
+        "max_return": round(max_return, 2),
+        "min_return": round(min_return, 2),
+        "sharpe": round(sharpe, 2),
+        "buy_trades": len(buy_trades),
+        "sell_trades": len(sell_trades),
+        "buy_avg": round(np.mean(buy_returns), 2) if buy_returns else 0,
+        "sell_avg": round(np.mean(sell_returns), 2) if sell_returns else 0,
+        "best_trades": best5,
+        "worst_trades": worst5,
+        "stocks_with_signals": len(stock_results),
+    }

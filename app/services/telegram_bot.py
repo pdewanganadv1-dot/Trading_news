@@ -17,7 +17,7 @@ from app.services.sector_service import sector_rotation_service
 from app.services.politician_service import politician_trades_service
 from app.services.ai_agent_service import ai_agent_service
 from app.services.strategy_marketplace import strategy_marketplace_service
-from app.services.ema_bounce_scanner import get_recent_bounces
+from app.services.ema_bounce_scanner import get_recent_bounces, run_backtest
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -76,6 +76,7 @@ def _build_help() -> str:
         "• `edges` — Top 10 stocks ranked by edge score (0-10)\n"
         "• `edge <symbol>` — Edge scan for any stock (e.g. `edge reliance`)\n"
         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart across all 119 stocks\n"
+        "• `/scalpbt` — Backtest EMA 200 scalp strategy on 6mo daily data\n"
         "• `breadth` — Market breadth: % of Nifty 100 above 20-day SMA\n"
         "• `fiidii` — FII/DII institutional flow + 5-day trend\n"
         "• `setfiidii <FII_buy> <FII_sell> <DII_buy> <DII_sell>` — Update FII/DII data\n\n"
@@ -302,6 +303,33 @@ async def _handle_message(text: str, chat_id: int):
                 f"{signals}"
             )
         return await telegram_notifier.send_message("\n".join(lines))
+
+    if text in ('/scalpbt', 'scalpbt'):
+        bt = await run_backtest()
+        if bt.get("status") == "empty":
+            return await telegram_notifier.send_message("📊 Backtest: No trades generated.")
+        msg = (
+            f"📊 *SCALP Backtest Results*\n\n"
+            f"Period: `6 months` (daily) | Stocks: `{bt['stocks_with_signals']}`\n\n"
+            f"*Summary*\n"
+            f"📈 Total Trades: `{bt['total_trades']}`\n"
+            f"🎯 Win Rate: `{bt['win_rate']}%`\n"
+            f"💰 Avg Return: `{bt['avg_return']:+.2f}%`\n"
+            f"🟢 Avg Win: `{bt['avg_win']:+.2f}%` | 🔴 Avg Loss: `{bt['avg_loss']:+.2f}%`\n"
+            f"📊 Sharpe: `{bt['sharpe']}`\n"
+            f"📈 Max: `{bt['max_return']:+.2f}%` | 📉 Min: `{bt['min_return']:+.2f}%`\n"
+            f"🟢 BUY trades: `{bt['buy_trades']}` avg `{bt['buy_avg']:+.2f}%`\n"
+            f"🔴 SELL trades: `{bt['sell_trades']}` avg `{bt['sell_avg']:+.2f}%`\n\n"
+            f"*Top 5 Trades:*\n"
+        )
+        for t in bt.get("best_trades", []):
+            emoji = "🟢" if t['return_pct'] > 0 else "🔴"
+            msg += f"{emoji} `{t['symbol']}` {t['direction']} {t['return_pct']:+.2f}% ({t['exit_reason']})\n"
+        msg += f"\n*Worst 5 Trades:*\n"
+        for t in bt.get("worst_trades", []):
+            emoji = "🟢" if t['return_pct'] > 0 else "🔴"
+            msg += f"{emoji} `{t['symbol']}` {t['direction']} {t['return_pct']:+.2f}% ({t['exit_reason']})\n"
+        return await telegram_notifier.send_message(msg)
 
     if text in ('/scalp', 'scalp'):
         status_msg = await telegram_notifier.send_message("🔍 SCALP scan on 119 stocks (1m EMA200)... ⏳")
@@ -773,9 +801,10 @@ async def _handle_message(text: str, chat_id: int):
         msg += "• `/politicians` — Group political trades\n"
         msg += "• `/strategies` — Strategy marketplace\n"
         msg += "• `/backtest <id>` — Backtest a strategy\n"
-        msg +=         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart\n\n"
+        msg +=         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart\n"
+        "• `/scalpbt` — Backtest SCALP strategy on 6mo daily data\n\n"
         msg += "Or use any of these quick ones:\n"
-        msg += "`/scalp` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
+        msg += "`/scalp` / `/scalpbt` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)
 
     # Forward unrecognized commands to AI agent queue
