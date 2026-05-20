@@ -17,6 +17,7 @@ from app.services.sector_service import sector_rotation_service
 from app.services.politician_service import politician_trades_service
 from app.services.ai_agent_service import ai_agent_service
 from app.services.strategy_marketplace import strategy_marketplace_service
+from app.services.ema_bounce_scanner import get_recent_bounces
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -74,6 +75,7 @@ def _build_help() -> str:
         "🔥 *Edge Scanner*\n"
         "• `edges` — Top 10 stocks ranked by edge score (0-10)\n"
         "• `edge <symbol>` — Edge scan for any stock (e.g. `edge reliance`)\n"
+        "• `/scalp` — EMA 200 bounce scanner on 1min chart across all 119 stocks\n"
         "• `breadth` — Market breadth: % of Nifty 100 above 20-day SMA\n"
         "• `fiidii` — FII/DII institutional flow + 5-day trend\n"
         "• `setfiidii <FII_buy> <FII_sell> <DII_buy> <DII_sell>` — Update FII/DII data\n\n"
@@ -300,6 +302,45 @@ async def _handle_message(text: str, chat_id: int):
                 f"{signals}"
             )
         return await telegram_notifier.send_message("\n".join(lines))
+
+    if text in ('/scalp', 'scalp'):
+        status_msg = await telegram_notifier.send_message("🔍 Scanning all 119 stocks on 1m chart for EMA200 bounces... ⏳")
+        signals = await get_recent_bounces(min_strength=0.3)
+        buys = [s for s in signals if s['direction'] == 'BUY']
+        sells = [s for s in signals if s['direction'] == 'SELL']
+        lines = ["⚡ *EMA 200 Bounce Scanner (1min)*", ""]
+        lines.append(f"Found *{len(signals)}* active signals")
+        lines.append(f"🟢 BUY: `{len(buys)}`  🔴 SELL: `{len(sells)}`")
+        lines.append("")
+        if buys:
+            lines.append("*🟢 BUY Signals (bounce up from EMA200):*")
+            for s in buys[:8]:
+                lines.append(
+                    f"`{s['symbol']:<12}` ₹{s['price']:<8} "
+                    f"EMA: `{s['ema200']}` "
+                    f"Str: `{s['strength']}` "
+                    f"{'📈' if s.get('vol_ratio', 0) > 1.5 else ''}"
+                )
+                if s.get('reason'):
+                    lines.append(f"  └ {s['reason'][:80]}")
+            lines.append("")
+        if sells:
+            lines.append("*🔴 SELL Signals (break below EMA200):*")
+            for s in sells[:8]:
+                lines.append(
+                    f"`{s['symbol']:<12}` ₹{s['price']:<8} "
+                    f"EMA: `{s['ema200']}` "
+                    f"Str: `{s['strength']}` "
+                    f"{'📉' if s.get('vol_ratio', 0) > 1.5 else ''}"
+                )
+                if s.get('reason'):
+                    lines.append(f"  └ {s['reason'][:80]}")
+        lines.append("")
+        lines.append("🎯 Target: 10% | ⏱ TF: 1min intraday/weekend hold")
+        msg = "\n".join(lines)
+        if len(msg) > 4000:
+            msg = msg[:3900] + "\n\n... (truncated)"
+        return await telegram_notifier.send_message(msg)
 
     if text == 'breadth':
         b = await get_market_breadth(top_n=20)
@@ -731,9 +772,10 @@ async def _handle_message(text: str, chat_id: int):
         msg += "• `/sectors` — Sector rotation performance\n"
         msg += "• `/politicians` — Group political trades\n"
         msg += "• `/strategies` — Strategy marketplace\n"
-        msg += "• `/backtest <id>` — Backtest a strategy\n\n"
+        msg += "• `/backtest <id>` — Backtest a strategy\n"
+        msg += "• `/scalp` — EMA 200 bounce scanner on 1min chart\n\n"
         msg += "Or use any of these quick ones:\n"
-        msg += "`stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
+        msg += "`/scalp` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)
 
     # Forward unrecognized commands to AI agent queue
@@ -750,9 +792,34 @@ async def _handle_message(text: str, chat_id: int):
         )
 
 
+async def _auto_scalp_scan():
+    """Background scanner: runs EMA200 bounce scan every 5 min during market hours."""
+    while True:
+        try:
+            now = datetime.now()
+            utc_h = now.hour
+            # Market hours roughly 3:30 UTC to 10:00 UTC (9 AM - 3:30 PM IST)
+            is_market_open = 3 <= utc_h <= 10
+            if is_market_open:
+                signals = await get_recent_bounces(min_strength=0.3)
+                buys = [s for s in signals if s['direction'] == 'BUY']
+                sells = [s for s in signals if s['direction'] == 'SELL']
+                if buys or sells:
+                    msg = f"⚡ *Auto Scalp Scan*\n🟢 BUY: `{len(buys)}`  🔴 SELL: `{len(sells)}`\n\n"
+                    for s in (buys + sells)[:5]:
+                        emoji = "🟢" if s['direction'] == 'BUY' else "🔴"
+                        msg += f"{emoji} `{s['symbol']}` ₹{s['price']} EMA{s['ema200']} Str{s['strength']}\n"
+                    msg += "\n💡 `/scalp` for full list"
+                    await telegram_notifier.send_message(msg)
+        except Exception as e:
+            print(f"Auto scalp error: {e}")
+        await asyncio.sleep(300)
+
+
 async def telegram_poll_loop():
     offset = 0
     check_counter = 0
+    asyncio.create_task(_auto_scalp_scan())
 
     while True:
         try:
