@@ -225,6 +225,9 @@ async def _check_price_alerts():
 
 async def _handle_message(text: str, chat_id: int):
     text = text.strip().lower()
+    # Strip bot username from commands (e.g. /dhanon@bot -> /dhanon)
+    if '@' in text:
+        text = text.split('@')[0].strip()
 
     if text in ('/start', '/help'):
         return await telegram_notifier.send_message(_build_help())
@@ -277,7 +280,7 @@ async def _handle_message(text: str, chat_id: int):
         msg = _build_summary(prices, signals, news_count, sentiment, social_verdict)
         return await telegram_notifier.send_message(msg)
 
-    if text in ('stocks', '/stocks', 'list', '/list'):
+    if text in ('list', '/list'):
         crypto = [s.upper() for s in _MONITORED_SYMBOLS if s in ('btc', 'eth')]
         metals = [s.upper() for s in _MONITORED_SYMBOLS if s in ('gold', 'silver')]
         indian = [s.upper() for s in _MONITORED_SYMBOLS if s not in ('btc', 'eth', 'gold', 'silver')]
