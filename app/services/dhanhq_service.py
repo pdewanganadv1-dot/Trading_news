@@ -30,8 +30,8 @@ _QUOTE_CACHE_TTL = 10
 
 def _init():
     global _client_id, _access_token
-    _client_id = settings.dhan_client_id
-    _access_token = settings.dhan_access_token
+    _client_id = settings.dhan_client_id or os.environ.get("DHAN_CLIENT_ID")
+    _access_token = settings.dhan_access_token or os.environ.get("DHAN_ACCESS_TOKEN")
 
 
 # Auto-init on import
@@ -64,7 +64,11 @@ async def _load_security_map():
             content = resp.text
             reader = csv.DictReader(io.StringIO(content))
             for row in reader:
-                sym = row.get("SYMBOL_NAME", "").strip().upper()
+                exch = row.get("SEM_EXM_EXCH_ID", "").strip().upper()
+                seg = row.get("SEM_SEGMENT", "").strip().upper()
+                if exch != "NSE" or seg != "E":
+                    continue
+                sym = row.get("SEM_TRADING_SYMBOL", "").strip().upper()
                 sem_id = row.get("SEM_SMST_SECURITY_ID", "").strip()
                 if sym and sem_id:
                     _security_map[sym] = sem_id
