@@ -126,6 +126,7 @@ def _build_help() -> str:
         "🛠 *System*\n"
         "• `docker` — Container status\n"
         "• `/markets` — All feature overview\n"
+        "• `/live <sym>` — Live market price via WebSocket\n"
         "• `/help` — This message\n\n"
         "💡 *Tip:* Commands are case-insensitive. Alerts trigger automatically when price hits your target."
     )
@@ -819,6 +820,33 @@ async def _handle_message(text: str, chat_id: int):
         msg += f"\n📈 *{len(INDIAN_STOCKS)}* Indian stocks tracked"
         return await telegram_notifier.send_message(msg)
 
+    if text in ('/live', 'live') or re.match(r'^/live\s+\w+$', text):
+        from app.services.market_feed import get_live_price, get_all_live_prices, _ws_connected
+        parts = text.split(maxsplit=1)
+        if len(parts) > 1:
+            sym = parts[1].upper()
+            data = get_live_price(sym)
+            if not data:
+                return await telegram_notifier.send_message(f"❌ No live data for `{sym}`")
+            chg = data.get("ltp", 0) - data.get("day_open", 0)
+            pct = (chg / data.get("day_open", 1)) * 100 if data.get("day_open", 0) else 0
+            await telegram_notifier.send_message(
+                f"📡 *{sym}* — Live\n"
+                f"LTP: `₹{data['ltp']:,.2f}`\n"
+                f"Change: `₹{chg:+,.2f}` (`{pct:+.2f}%`)\n"
+                f"Day: H `{data.get('day_high', 0):,.2f}` L `{data.get('day_low', 0):,.2f}`\n"
+                f"Volume: `{data.get('volume', 0):,}`"
+            )
+            return
+        prices = get_all_live_prices()
+        top = sorted(prices.items(), key=lambda x: x[1].get("volume", 0), reverse=True)[:10]
+        msg = f"📡 *Live Market Feed* — {len(prices)} stocks\n\n"
+        for sym, d in top:
+            chg = d.get("ltp", 0) - d.get("day_open", 0)
+            msg += f"`{sym}` ₹{d['ltp']:,.2f} {chg:+.2f} Vol:{d.get('volume',0):,}\n"
+        msg += "\nUse `/live <SYMBOL>` for a single stock"
+        return await telegram_notifier.send_message(msg)
+
     if text == '/markets':
         msg = "📊 *Market Overview — All Features*\n\n"
         msg += "Use these commands for detailed analysis:\n"
@@ -835,7 +863,8 @@ async def _handle_message(text: str, chat_id: int):
         "• `/dhan` — DhanHQ dashboard\n"
         "• `/dhanon` / `/dhanoff` — Toggle DhanHQ auto-trading\n"
         "• `/buy <sym> <qty>` — Place BUY order\n"
-        "• `/sell <sym> <qty>` — Place SELL order\n\n"
+        "• `/sell <sym> <qty>` — Place SELL order\n"
+        "• `/live <sym>` — Live price via WebSocket feed\n\n"
         msg += "Or use any of these quick ones:\n"
         msg += "`/scalp` / `/scalpbt` / `/scalpon` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)

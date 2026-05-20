@@ -315,6 +315,21 @@ async def debug_ip():
     return {"server_ip": ip}
 
 
+@router.get("/debug/live-feed")
+async def debug_live_feed():
+    """Show live market feed status and sample prices."""
+    from app.services.market_feed import get_live_price, get_all_live_prices, _ws_connected
+
+    prices = get_all_live_prices()
+    sample = dict(list(prices.items())[:10])
+    return {
+        "connected": _ws_connected,
+        "symbols_tracked": len(prices),
+        "sample": {k: {"ltp": v.get("ltp"), "volume": v.get("volume"), "timestamp": v.get("timestamp")} for k, v in sample.items()},
+        "time": datetime.now().isoformat(),
+    }
+
+
 @router.get("/dashboard/v2")
 async def dashboard_v2():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_live.html")

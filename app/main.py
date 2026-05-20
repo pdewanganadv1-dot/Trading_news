@@ -35,17 +35,20 @@ async def lifespan(app: FastAPI):
     from app.services.daily_report import daily_report_loop
     from app.services.news_sentiment_pipeline import sentiment_pipeline_loop
     from app.services.market_edge_service import auto_update_fii_dii
+    from app.services.market_feed import feed_loop
     task1 = asyncio.create_task(signal_monitor_loop())
     task2 = asyncio.create_task(telegram_poll_loop())
     task3 = asyncio.create_task(daily_report_loop())
     task4 = asyncio.create_task(sentiment_pipeline_loop())
     task5 = asyncio.create_task(auto_update_fii_dii())
+    task6 = asyncio.create_task(feed_loop())
     yield
     task1.cancel()
     task2.cancel()
     task3.cancel()
     task4.cancel()
     task5.cancel()
+    task6.cancel()
 
 
 app = FastAPI(
