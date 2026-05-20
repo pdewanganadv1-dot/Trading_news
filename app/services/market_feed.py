@@ -18,9 +18,14 @@ _live_prices: Dict[str, Dict] = {}
 _live_prices_lock = asyncio.Lock()
 _ws_connected = False
 
-# Symbols we track (subset of MONITORED_SYMBOLS)
+# Reverse lookup: security_id -> symbol (built once)
+_security_id_to_symbol: Dict[str, str] = {}
+
+# Symbols we track — loaded dynamically from Dhan security map on connect.
+# Falls back to INDIAN_STOCKS (119) if map hasn't loaded yet.
 from app.data.stocks import INDIAN_STOCKS
-TRACKED_SYMBOLS = [s.upper() for s in INDIAN_STOCKS]
+TRACKED_SYMBOLS: list = []
+_FALLBACK_SYMBOLS = [s.upper() for s in INDIAN_STOCKS]
 
 
 def get_live_price(symbol: str) -> Optional[Dict]:
@@ -128,13 +133,8 @@ async def _parse_packet(data: bytes):
         return
     resp_code, msg_len, exchange, sec_id = header
 
-    # Find symbol by security ID (reverse lookup)
-    from app.services.dhanhq_service import _security_map
-    symbol = None
-    for sym, sid in _security_map.items():
-        if sid == str(sec_id):
-            symbol = sym
-            break
+    # Fast reverse lookup
+    symbol = _security_id_to_symbol.get(str(sec_id))
     if not symbol:
         return
 
@@ -161,7 +161,7 @@ async def _parse_packet(data: bytes):
 
 async def feed_loop():
     """Background task: maintain WebSocket connection and stream live prices."""
-    global _ws_connected
+    global _ws_connected, TRACKED_SYMBOLS
 
     while True:
         try:
@@ -171,6 +171,17 @@ async def feed_loop():
             if not token or not cid:
                 await asyncio.sleep(5)
                 continue
+
+            # Build tracked symbols from security map (all NSE EQ symbols)
+            from app.services.dhanhq_service import _security_map
+            if _security_map:
+                TRACKED_SYMBOLS = list(_security_map.keys())
+                # Build reverse lookup cache
+                global _security_id_to_symbol
+                _security_id_to_symbol = {sid: sym for sym, sid in _security_map.items()}
+            else:
+                TRACKED_SYMBOLS = _FALLBACK_SYMBOLS
+            print(f"Market feed tracking {len(TRACKED_SYMBOLS)} symbols")
 
             url = f"{WS_URL}?version=2&token={token}&clientId={cid}&authType=2"
             async with websockets.connect(url, ping_interval=10, ping_timeout=5) as ws:

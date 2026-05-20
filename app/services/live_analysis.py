@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from app.services.market_feed import get_all_live_prices, get_live_price
-from app.data.stocks import INDIAN_STOCKS
 from app.services.telegram_notifier import telegram_notifier
 
 # --- Volume spike tracking ---
@@ -117,10 +116,10 @@ def get_live_edge(symbol: str) -> Optional[Dict]:
 
 
 def get_live_edges() -> List[Dict]:
-    """Edge scores for all tracked stocks sorted by score."""
+    """Edge scores for all live symbols sorted by score."""
     results = []
-    for s in INDIAN_STOCKS:
-        e = get_live_edge(s.upper())
+    for sym in get_all_live_prices():
+        e = get_live_edge(sym)
         if e:
             results.append(e)
     return sorted(results, key=lambda x: -x["edge"])
