@@ -205,6 +205,19 @@ async def debug_dhan():
     }
 
 
+@router.get("/debug/ip")
+async def debug_ip():
+    """Show the server's public IP for DhanHQ whitelisting."""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get("https://api.ipify.org?format=json")
+            ip = r.json().get("ip", "unknown")
+    except Exception as e:
+        ip = f"error: {e}"
+    return {"server_ip": ip}
+
+
 @router.get("/dashboard/v2")
 async def dashboard_v2():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_live.html")
