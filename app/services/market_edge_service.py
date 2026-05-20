@@ -388,8 +388,10 @@ async def scan_all_stocks() -> List[Dict]:
     return results
 
 
-async def get_market_breadth() -> Dict:
-    """Market breadth: percentage of Nifty 100 stocks above 20-day SMA."""
+async def get_market_breadth(top_n: int = 15) -> Dict:
+    """Market breadth: percentage of Nifty 100 stocks above 20-day SMA.
+    Returns top_n stocks above/below SMA20 sorted by distance from SMA.
+    """
     global _breadth_cache, _breadth_cache_ts
     now = datetime.now().timestamp()
     if _breadth_cache and (now - _breadth_cache_ts) < _BREADTH_TTL:
@@ -398,23 +400,37 @@ async def get_market_breadth() -> Dict:
     loop = asyncio.get_event_loop()
     above = 0
     total = 0
+    stocks_above = []
+    stocks_below = []
     for sym in _INDIAN:
         try:
             data = await loop.run_in_executor(None, _get_yf_price, sym)
             if data is not None and len(data) >= 20:
-                sma20 = data["Close"].tail(20).mean()
-                last = data["Close"].iloc[-1]
+                closes = data["Close"]
+                sma20 = closes.tail(20).mean()
+                last = closes.iloc[-1]
+                pct_from_sma = round((last / sma20 - 1) * 100, 2)
                 if last > sma20:
                     above += 1
+                    stocks_above.append({"symbol": sym.upper(), "pct_above_sma": pct_from_sma})
+                else:
+                    stocks_below.append({"symbol": sym.upper(), "pct_below_sma": pct_from_sma})
                 total += 1
         except Exception:
             pass
         await asyncio.sleep(0.05)
 
+    stocks_above.sort(key=lambda x: x["pct_above_sma"], reverse=True)
+    stocks_below.sort(key=lambda x: x["pct_below_sma"])
+
     result = {
         "above_sma20": above,
         "total": total,
         "pct_above": round((above / total * 100), 1) if total else 0,
+        "stocks_above": stocks_above[:top_n],
+        "stocks_below": stocks_below[:top_n],
+        "top_above": stocks_above[:5],
+        "top_below": stocks_below[:5],
         "timestamp": datetime.now().isoformat(),
     }
     _breadth_cache = result

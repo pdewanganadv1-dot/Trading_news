@@ -151,6 +151,14 @@ def get_market_sentiment_overview() -> Dict:
     bearish = sum(1 for v in _SENTIMENT_CACHE.values() if v.get("sentiment") == "bearish")
     neutral = total - bullish - bearish
     avg_score = sum(v.get("score", 0) for v in _SENTIMENT_CACHE.values()) / total
+    bullish_stocks = sorted(
+        [(sym, v.get("score", 0)) for sym, v in _SENTIMENT_CACHE.items() if v.get("sentiment") == "bullish"],
+        key=lambda x: x[1], reverse=True
+    )
+    bearish_stocks = sorted(
+        [(sym, v.get("score", 0)) for sym, v in _SENTIMENT_CACHE.items() if v.get("sentiment") == "bearish"],
+        key=lambda x: x[1], reverse=True
+    )
     return {
         "status": "ok",
         "total_symbols": total,
@@ -160,6 +168,8 @@ def get_market_sentiment_overview() -> Dict:
         "avg_score": round(avg_score, 2),
         "bullish_pct": round(bullish / total * 100, 1) if total else 0,
         "bearish_pct": round(bearish / total * 100, 1) if total else 0,
+        "bullish_stocks": bullish_stocks,
+        "bearish_stocks": bearish_stocks,
         "cache_age_seconds": age,
         "updated_at": datetime.fromtimestamp(_SENTIMENT_CACHE_TS).isoformat() if _SENTIMENT_CACHE_TS else None,
     }

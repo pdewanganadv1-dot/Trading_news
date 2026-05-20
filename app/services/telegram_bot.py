@@ -302,17 +302,31 @@ async def _handle_message(text: str, chat_id: int):
         return await telegram_notifier.send_message("\n".join(lines))
 
     if text == 'breadth':
-        b = await get_market_breadth()
+        b = await get_market_breadth(top_n=20)
         bar_len = 20
         filled = int(b['pct_above'] / 100 * bar_len)
         bar = "🟩" * filled + "⬜" * (bar_len - filled)
         msg = (
             f"📊 *Market Breadth*\n\n"
-            f"Stocks above 20d SMA: `{b['above_sma20']}/{b['total']}`\n"
-            f"`{bar}`\n"
-            f"*{b['pct_above']}%* of Nifty 100 above SMA20\n\n"
-            f"📌 >70% = Overbought | <30% = Oversold"
+            f"Stocks above 20d SMA: `{b['above_sma20']}/{b['total']}` ({b['pct_above']}%)\n"
+            f"`{bar}`\n\n"
+            f"*Top 5 above SMA20:*\n"
         )
+        for s in b.get("top_above", []):
+            msg += f"🟢 `{s['symbol']:<12}` +{s['pct_above_sma']}%\n"
+        msg += f"\n*Bottom 5 below SMA20:*\n"
+        for s in b.get("top_below", []):
+            msg += f"🔴 `{s['symbol']:<12}` {s['pct_below_sma']}%\n"
+        msg += f"\n📌 >70% Overbought | <30% Oversold\n💡 `breadth all` for full list"
+        return await telegram_notifier.send_message(msg)
+
+    if text == 'breadth all':
+        b = await get_market_breadth(top_n=50)
+        msg = f"📊 *Full Breadth List*\nAbove: `{b['above_sma20']}/{b['total']}`\n\n*Stocks above SMA20:*\n"
+        for s in b.get("stocks_above", []):
+            msg += f"🟢 `{s['symbol']:<12}` +{s['pct_above_sma']}%\n"
+        if len(msg) > 3500:
+            msg = msg[:3500] + "\n... (truncated)"
         return await telegram_notifier.send_message(msg)
 
     if text in ('fiidii', '/fiidii'):
@@ -505,8 +519,14 @@ async def _handle_message(text: str, chat_id: int):
                 f"🔴 Bearish: `{overview['bearish']}/{overview['total_symbols']} ({overview['bearish_pct']}%)`\n"
                 f"⚪ Neutral: `{overview['neutral']}`\n"
                 f"📈 Avg Score: `{overview['avg_score']}`\n\n"
-                f"💡 Use `sentiment <symbol>` for individual stock"
+                f"*Top Bullish Stocks:*\n"
             )
+            for sym, sc in overview.get("bullish_stocks", [])[:5]:
+                msg += f"🟢 `{sym:<12}` Score: `{sc}`\n"
+            msg += f"\n*Top Bearish Stocks:*\n"
+            for sym, sc in overview.get("bearish_stocks", [])[:5]:
+                msg += f"🔴 `{sym:<12}` Score: `{sc}`\n"
+            msg += f"\n💡 Use `sentiment <symbol>` for individual stock"
             return await telegram_notifier.send_message(msg)
         except Exception as e:
             return await telegram_notifier.send_message(f"Error: {e}")
@@ -689,6 +709,19 @@ async def _handle_message(text: str, chat_id: int):
         except Exception as e:
             return await telegram_notifier.send_message(f"❌ Politician error: {e}")
 
+    if text == 'stocks':
+        from app.data.stocks import INDIAN_STOCKS
+        groups = {}
+        for s in sorted(INDIAN_STOCKS):
+            c = s[0].upper()
+            groups.setdefault(c, []).append(s.upper())
+        msg = "📊 *Monitored Stocks — Nifty 100*\n\n"
+        for letter in sorted(groups):
+            stocks = groups[letter]
+            msg += f"`{letter}:` {' '.join(stocks)}\n"
+        msg += f"\n📈 *{len(INDIAN_STOCKS)}* Indian stocks tracked"
+        return await telegram_notifier.send_message(msg)
+
     if text == '/markets':
         msg = "📊 *Market Overview — All Features*\n\n"
         msg += "Use these commands for detailed analysis:\n"
@@ -700,7 +733,7 @@ async def _handle_message(text: str, chat_id: int):
         msg += "• `/strategies` — Strategy marketplace\n"
         msg += "• `/backtest <id>` — Backtest a strategy\n\n"
         msg += "Or use any of these quick ones:\n"
-        msg += "`fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
+        msg += "`stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)
 
     # Forward unrecognized commands to AI agent queue
