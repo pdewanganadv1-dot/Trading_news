@@ -189,6 +189,22 @@ async def debug_news_standalone():
     return HTMLResponse(content=html)
 
 
+@router.get("/debug/dhan")
+async def debug_dhan():
+    """Debug DhanHQ connection status."""
+    from app.services.dhanhq_service import get_debug_status, get_dashboard, get_profile, get_fund_limit
+
+    status = get_debug_status()
+    profile = await get_profile()
+    funds = await get_fund_limit()
+
+    return {
+        "status": status,
+        "profile": profile,
+        "funds": funds,
+    }
+
+
 @router.get("/dashboard/v2")
 async def dashboard_v2():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_live.html")

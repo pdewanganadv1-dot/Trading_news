@@ -39,11 +39,16 @@ _init()
 
 
 def _headers() -> Dict[str, str]:
+    token = settings.dhan_access_token or _access_token or ""
     return {
-        "access-token": _access_token or "",
+        "access-token": token,
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
+
+
+def _client() -> str:
+    return settings.dhan_client_id or _client_id or ""
 
 
 async def _load_security_map():
@@ -81,13 +86,14 @@ async def ensure_security_map():
 
 
 async def _get(endpoint: str) -> Optional[Dict]:
-    if not _access_token:
-        return None
+    token = _headers()["access-token"]
+    if not token:
+        return {"error": "NO_TOKEN"}
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get(
                 f"{DHAN_BASE}{endpoint}",
-                headers={**_headers(), "client-id": _client_id or ""},
+                headers={**_headers(), "client-id": _client()},
             )
             if resp.status_code == 401:
                 return {"error": "TOKEN_EXPIRED"}
@@ -99,13 +105,14 @@ async def _get(endpoint: str) -> Optional[Dict]:
 
 
 async def _post(endpoint: str, data: dict) -> Optional[Dict]:
-    if not _access_token:
-        return None
+    token = _headers()["access-token"]
+    if not token:
+        return {"error": "NO_TOKEN"}
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 f"{DHAN_BASE}{endpoint}",
-                headers={**_headers(), "client-id": _client_id or ""},
+                headers={**_headers(), "client-id": _client()},
                 json=data,
             )
             if resp.status_code == 401:
@@ -119,15 +126,17 @@ async def _post(endpoint: str, data: dict) -> Optional[Dict]:
 
 async def renew_token() -> bool:
     global _access_token, _token_expiry
-    if not _access_token or not _client_id:
+    cid = _client()
+    token = _headers()["access-token"]
+    if not token or not cid:
         return False
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 f"{DHAN_BASE}/RenewToken",
                 headers={
-                    "access-token": _access_token,
-                    "dhanClientId": _client_id,
+                    "access-token": token,
+                    "dhanClientId": cid,
                 },
             )
             if resp.status_code == 200:
@@ -236,7 +245,7 @@ async def place_order(
         return {"error": f"Security ID not found for {symbol}"}
 
     payload = {
-        "dhanClientId": _client_id,
+        "dhanClientId": _client(),
         "transactionType": transaction_type.upper(),
         "exchangeSegment": "NSE_EQ",
         "productType": product_type.upper(),
@@ -256,7 +265,7 @@ async def cancel_order(order_id: str) -> Optional[Dict]:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.delete(
                 f"{DHAN_BASE}/orders/{order_id}",
-                headers={**_headers(), "client-id": _client_id or ""},
+                headers={**_headers(), "client-id": _client()},
             )
             if resp.status_code in (200, 202):
                 return resp.json()
@@ -283,10 +292,25 @@ async def auto_renew_loop():
     """Background loop: renew Dhan access token every 23 hours."""
     while True:
         try:
-            if _access_token and _client_id:
+            token = _headers()["access-token"]
+            if token and _client():
                 success = await renew_token()
                 if success:
                     print(f"Dhan token renewed at {datetime.now().isoformat()}")
         except Exception as e:
             print(f"Dhan token renew error: {e}")
         await asyncio.sleep(82800)  # 23 hours
+
+
+def get_debug_status() -> Dict:
+    """Return current DhanHQ state for debugging."""
+    cid = _client()
+    token = _headers()["access-token"]
+    return {
+        "client_id": cid,
+        "client_id_source": "settings" if settings.dhan_client_id else "module_cache" if _client_id else "none",
+        "has_token": bool(token),
+        "token_source": "settings" if settings.dhan_access_token else "module_cache" if _access_token else "none",
+        "dhan_enabled": dhan_enabled,
+        "has_security_map": bool(_security_map),
+    }
