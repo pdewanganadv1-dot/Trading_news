@@ -214,11 +214,9 @@ async def debug_place_test():
     await dhan.ensure_security_map()
     headers = {**dhan._headers(), "client-id": dhan._client()}
 
-    # Test GET fundlimit (Data API - no IP check)
     async with httpx.AsyncClient(timeout=15) as c:
         r1 = await c.get(f"{dhan.DHAN_BASE}/fundlimit", headers=headers)
 
-    # Test POST orders (Trading API - IP check)
     sid = dhan.get_security_id("RELIANCE")
     payload = {
         "dhanClientId": dhan._client(),
@@ -229,7 +227,53 @@ async def debug_place_test():
         "validity": "DAY",
         "securityId": sid,
         "quantity": 1,
-        "price": 0,
+        "price": 0.0,
+        "disclosedQuantity": 0,
+        "triggerPrice": 0.0,
+        "afterMarketOrder": False,
+        "boProfitValue": None,
+        "boStopLossValue": None,
+    }
+    async with httpx.AsyncClient(timeout=15) as c:
+        r2 = await c.post(
+            f"{dhan.DHAN_BASE}/orders",
+            headers=headers,
+            json=payload,
+        )
+
+    async with httpx.AsyncClient(timeout=15) as c:
+        r3 = await c.post(
+            f"{dhan.DHAN_BASE}/fundlimit",
+            headers=headers,
+            json={},
+        )
+
+    async with httpx.AsyncClient(timeout=15) as c:
+        r4 = await c.get(f"{dhan.DHAN_BASE}/ip/getIP", headers=headers)
+
+    # Try re-setting IP via API — same IP, forces backend sync
+    async with httpx.AsyncClient(timeout=15) as c:
+        r5 = await c.post(
+            f"{dhan.DHAN_BASE}/ip/setIP",
+            headers=headers,
+            json={"dhanClientId": dhan._client(), "ip": "74.220.52.251", "ipFlag": "PRIMARY"},
+        )
+
+    # Try setting secondary IP (was NA/never set)
+    async with httpx.AsyncClient(timeout=15) as c:
+        r6 = await c.post(
+            f"{dhan.DHAN_BASE}/ip/setIP",
+            headers=headers,
+            json={"dhanClientId": dhan._client(), "ip": "74.220.52.251", "ipFlag": "SECONDARY"},
+        )
+
+    return {
+        "test1_GET_fundlimit": {"status": r1.status_code, "body": r1.text[:300]},
+        "test2_POST_orders": {"status": r2.status_code, "body": r2.text[:300]},
+        "test3_POST_fundlimit": {"status": r3.status_code, "body": r3.text[:300]},
+        "test4_GET_getIP": {"status": r4.status_code, "body": r4.text[:300]},
+        "test5_SET_primary_via_api": {"status": r5.status_code, "body": r5.text[:300]},
+        "test6_SET_secondary_via_api": {"status": r6.status_code, "body": r6.text[:300]},
     }
     async with httpx.AsyncClient(timeout=15) as c:
         r2 = await c.post(
