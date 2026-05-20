@@ -207,20 +207,19 @@ async def debug_dhan():
 
 @router.get("/debug/place-test")
 async def debug_place_test():
-    """Test placing a small RELIANCE buy order."""
+    """Test Dhan endpoint access patterns."""
     from app.services import dhanhq_service as dhan
     import httpx
 
     await dhan.ensure_security_map()
-    sid = dhan.get_security_id("RELIANCE")
-
     headers = {**dhan._headers(), "client-id": dhan._client()}
 
-    # Test 1: GET /fundlimit (should work - it does in /debug/dhan)
+    # Test GET fundlimit (Data API - no IP check)
     async with httpx.AsyncClient(timeout=15) as c:
         r1 = await c.get(f"{dhan.DHAN_BASE}/fundlimit", headers=headers)
 
-    # Test 2: POST to /orders (failing with DH-905)
+    # Test POST orders (Trading API - IP check)
+    sid = dhan.get_security_id("RELIANCE")
     payload = {
         "dhanClientId": dhan._client(),
         "transactionType": "BUY",
@@ -239,7 +238,11 @@ async def debug_place_test():
             json=payload,
         )
 
-    # Test 3: POST to /fundlimit (wrong method - should get different error)
+    # Test GET getIP - verify what IP Dhan has on record
+    async with httpx.AsyncClient(timeout=15) as c:
+        r4 = await c.get(f"{dhan.DHAN_BASE}/ip/getIP", headers=headers)
+
+    # Test POST to fundlimit (Data API - should pass IP check)
     async with httpx.AsyncClient(timeout=15) as c:
         r3 = await c.post(
             f"{dhan.DHAN_BASE}/fundlimit",
@@ -251,6 +254,7 @@ async def debug_place_test():
         "test1_GET_fundlimit": {"status": r1.status_code, "body": r1.text[:300]},
         "test2_POST_orders": {"status": r2.status_code, "body": r2.text[:300]},
         "test3_POST_fundlimit": {"status": r3.status_code, "body": r3.text[:300]},
+        "test4_GET_getIP": {"status": r4.status_code, "body": r4.text[:300]},
     }
 
 
