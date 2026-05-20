@@ -1,7 +1,7 @@
 # Session Context — Trading Dashboard
 
 ## Project
-Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + Groq AI explanations, deployed on Render, accessible via Telegram bot.
+Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + Groq AI explanations + 6 standalone analysis dashboards, deployed on Render, accessible via Telegram bot `@Signal_alpha267_bot`.
 
 ## Recent Work
 
@@ -12,48 +12,52 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 2. **Fixed Groq integration**: `_template_explain()` → `explain()` in `signal_monitor.py:47` and `market_realtime.py:141`
 3. **Expanded stock list**: 24 → ~100 (Nifty 50 + Next 50)
 4. **Yahoo rate limiting**: Added 2s delay between yfinance calls + custom User-Agent
-5. **Fixed curl_cffi conflict**: Removed custom `requests.Session` from yfinance calls — let yfinance manage its own (requires `curl_cffi` on Render)
-6. **Cached `/signals` endpoint**: Background loop writes results to `_signal_cache` dict; API reads from cache instead of live-fetching all 123 symbols (was timing out)
-7. **Fixed event loop blocking**: Wrapped `yf.Ticker().info` and `yf.download()` in `asyncio.to_thread()` + `asyncio.wait_for(15s)` — prevents yfinance from blocking the server (was causing health check failures)
-8. **Cached `/realtime` endpoint**: Same pattern as /signals — `_realtime_cache` populated by bg loop
-9. **Removed duplicates**: `itc` and `tcs` were in both Nifty 50 and Next 50 lists (123 unique symbols now)
-10. **Health endpoint**: Now returns cache stats (symbols cached, ages, fill %, started_at) for easy debugging
-11. **Fixed `_cache_start` scope bug**: Added `global` keyword — Python was shadowing module variable with local assignment
+5. **Fixed curl_cffi conflict**: Removed custom `requests.Session` from yfinance calls
+6. **Cached `/signals` endpoint**: Background loop writes results to `_signal_cache` dict
+7. **Fixed event loop blocking**: Wrapped yfinance calls in `asyncio.to_thread()` + `asyncio.wait_for(15s)`
+8. **Cached `/realtime` endpoint**: Same pattern as /signals
+9. **Removed duplicates**: 123 unique symbols now
+10. **Health endpoint**: Cache stats for debugging
+11. **Fixed `_cache_start` scope bug**: Added `global` keyword
 12. **Telegram bot**: `@Signal_alpha267_bot` working (chat_id: 5163568145, polling loop 3s)
-13. **Fixed circular import**: `_INDIAN_STOCKS` hardcoded in `telegram_notifier.py`
-14. **Pinned yfinance==0.2.65** in requirements.txt
-15. **Fixed circular import**: `signal_confirmer.py` imported `_INDIAN_STOCKS` from `signal_monitor.py`, but `signal_monitor.py` already imported `confirm_signal` from `signal_confirmer.py`. Fixed with lazy import inside the function instead of top-level import.
-16. **FII/DII card on main dashboard**: Added institutional flow card in `dashboard_live.html` between Market Edge and Signal Log sections. Shows FII net, DII net, combined signal (bullish/bearish/neutral), trend arrows, and "India Only" badge. Fetches from `/api/v1/edge/fiidii` + `/fiidii/trend`, refreshes every 2 min.
-17. **Efficiency overhaul (7 fixes)**:
-    - **Critical**: Pass pre-fetched 5m prices into `confirm_signal` + skip 1d MTF (saves 4 yfinance calls per confirmed signal)
-    - **Critical**: Parallel signal processing — Indian stocks processed in batches of 5 (12min full cycle → ~3min)
-    - **Critical**: Rate limiting (1.5s) + 5min TTL cache for `scan_all_stocks` in edge scanner
-    - **Medium**: Market-hours awareness — signal loop skips weekends/nights outside 9am-4pm IST (66% fewer useless cycles)
-    - **Medium**: News sentiment parallel processing for all 29 stocks; increased news cache TTL 45s→300s
-    - **Medium**: `_fetch_dashboard_data` reads from `_signal_cache`/`_realtime_cache` before live-fetching (saves ~15s on Telegram summary)
-    - **Low**: Lazy import `docker` in telegram_bot.py (no crash if Docker unavailable)
-    - Removed stale `GEMINI_API_KEY` from `.env` (Pydantic v2 validation error)
+13. **Fixed circular imports** in telegram_notifier.py, signal_confirmer.py
+14. **Pinned yfinance==0.2.65**
+15. **FII/DII card on main dashboard**: Institutional flow card in `dashboard_live.html`
+16. **Efficiency overhaul (7 fixes)**: Parallel processing, rate limiting, market-hours awareness, caching
 
-### May 19, 2026 — Persistence, Reliability & Stock List Consolidation
+### May 19-20, 2026 — Persistence, Standalone Pages, Stock List Consolidation
 
 **Done**:
-1. **Redeployed service**: Was returning 503 (down). Redeployed via Render hook, restored to healthy.
-2. **Persistent signal cache**: Added 3 new SQLite tables (`signal_cache`, `realtime_cache`, `sent_signals`) in `accuracy_tracker.py`. Signal data now survives restarts.
-3. **Render persistent disk**: Added 1GB disk mount at `/data` in `render.yaml` + `PERSISTENT_DIR=/data` env var so `signals.db` persists across deploys.
-4. **On-startup cache reload**: `signal_monitor.py` now loads `_signal_cache`, `_realtime_cache`, `_CONFIRMED_SENT` from DB on import — API serves cached data immediately, Telegram bot avoids duplicate alerts.
-5. **Config**: Added `persistent_dir` to `Settings` with fallback to project root.
-6. **Consolidated stock lists**: Created `app/data/stocks.py` as single source of truth for all 119 Indian stocks + 4 global assets. Removed duplicates from `signal_monitor.py`, `telegram_notifier.py`, `market_edge_service.py`, `signal_confirmer.py`.
-7. **Fixed edge scanner coverage**: Was only scanning 24 of 119 stocks. Now uses the full list via shared module.
-
-**Known Issues** (unchanged):
-1. **Groq quota**: 100K tokens/day free tier — exhausted. Only calls LLM for BUY/SELL ≥ 50% confidence. Resets ~24h cycle.
-2. **Yahoo rate limit**: 2s per-call delay still applies but parallelism (batch of 5) reduces effective wall-clock time.
+1. **Redeployed service**: Was 503 — restored via Render hook
+2. **Persistent signal cache**: 3 SQLite tables in `accuracy_tracker.py` — survives restarts
+3. **Render persistent disk**: 1GB at `/data` — `signals.db` persists across deploys
+4. **On-startup cache reload**: `signal_monitor.py` loads from DB on import
+5. **Config**: `persistent_dir` with fallback
+6. **Consolidated stock lists**: `app/data/stocks.py` = single source of truth (119 Indian + 4 global)
+7. **Fixed edge scanner coverage**: Was 24 → now full 119 stocks
+8. **Options Chain Analysis** at `/options-chain` — F&O bhavcopy, PCR, max pain, OI distribution, key levels
+9. **Insider Trading** at `/insider-trading` — bulk/block deals, top buyers/sellers, net flow
+10. **Sector Rotation Board** at `/sector-rotation` — 11 NSE sectoral indices, per-sector stock breakdown
+11. **AI Trading Agent** at `/ai-agent` — Groq LLM: news + price/technicals + FII/DII + social sentiment
+12. **Strategy Marketplace** at `/strategy-marketplace` — 6 curated strategies + backtest simulator
+13. **Congressional Trading** at `/politician-trades` — 11 business group bulk/block deals + FII/DII
+14. **8 Telegram bot commands**: `/agent`, `/options`, `/insider`, `/sectors`, `/politicians`, `/strategies`, `/backtest`, `/markets`
+15. **Breadth shows WHICH stocks**: `/breadth` lists top 5 above/below SMA20; `/breadth all` for full list
+16. **Sentiment shows WHICH stocks**: `/sentiment` lists top 5 bullish/bearish by score
+17. **`/stocks` command**: Lists all 119 monitored Indian stocks alphabetically
+18. **EMA 200 Bounce Scanner** (`app/services/ema_bounce_scanner.py`):
+    - Scans all 119 stocks on 1min timeframe
+    - Detects bounces off EMA 200 with S/R confirmation
+    - `/scalp` command shows **SCALP BUY** / **SCALP SELL** (separate from regular signals)
+    - Auto-scan every 5 min during market hours with push alerts
+    - Target: 10% ROI, intraday or weekend hold
 
 ### Current State
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
+- **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: e245d5f
+- **Git commit HEAD**: 3438177
 
 ### Key Files
 | File | Purpose |
@@ -63,25 +67,46 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `app/services/signal_monitor.py` | Bg loop, caches, 123 symbols, DB persistence |
 | `app/services/market_data_service.py` | yfinance calls in threads with 2s delay + 15s timeout |
 | `app/services/signal_explainer.py` | Groq LLM client + template fallback |
-| `app/services/telegram_bot.py` | Polling loop, command handlers |
+| `app/services/telegram_bot.py` | Polling loop, all command handlers |
 | `app/services/telegram_notifier.py` | Send messages |
 | `app/services/accuracy_tracker.py` | SQLite DB — signal history + cache/sent persistence |
 | `app/services/market_edge_service.py` | Edge scanner, FII/DII, breadth (full 119 stocks) |
+| `app/services/ema_bounce_scanner.py` | EMA 200 bounce scanner on 1min chart (SCALP signals) |
+| `app/services/options_chain_service.py` | F&O bhavcopy → option chain (PCR, max pain, key levels) |
+| `app/services/insider_service.py` | NSE bulk/block deals with summary aggregation |
+| `app/services/sector_service.py` | Sectoral index performance + industry→sector mapping |
+| `app/services/ai_agent_service.py` | Groq-based multi-modal stock analysis |
+| `app/services/strategy_marketplace.py` | 6 curated strategies + in-memory backtest simulator |
+| `app/services/politician_service.py` | 11 business group bulk/block deals + FII/DII |
 | `app/routes/market_realtime.py` | API endpoints (signals + realtime) |
-| `app/main.py` | FastAPI entry, lifespan tasks |
+| `app/main.py` | FastAPI entry, lifespan tasks, 6 new routers |
 | `render.yaml` | Render service config (Docker + persistent disk) |
-| `requirements.txt` | Pinned: yfinance==0.2.65, groq>=0.5.0 |
 
-### Environment Variables (set in Render dashboard)
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID=5163568145`
-- `GROQ_API_KEY`
-- `SYNC=false` (secrets managed manually)
+### Telegram Commands
+| Command | Description |
+|---------|-------------|
+| `summary` | Dashboard overview |
+| `edges` | Top 10 stocks by edge score |
+| `breadth` | Market breadth with top/bottom stocks list |
+| `breadth all` | Full list of stocks above SMA20 |
+| `sentiment` | Market sentiment with top bullish/bearish stocks |
+| `stocks` | All 119 monitored stocks |
+| `/scalp` | SCALP signals — EMA 200 bounces on 1min chart |
+| `/agent <sym>` | AI multi-modal analysis |
+| `/options <sym>` | Option chain with PCR & max pain |
+| `/insider` | Bulk & block deals |
+| `/sectors` | Sector rotation performance |
+| `/politicians` | Group political trades |
+| `/strategies` | Strategy marketplace |
+| `/backtest <id>` | Backtest a strategy |
+| `fiidii` | FII/DII institutional flow |
+| `social <sym>` | StockTwits + Reddit sentiment |
 
 ### Tech Stack
-- FastAPI + uvicorn
+- FastAPI + uvicorn (Render Docker, free tier)
 - yfinance (0.2.65) for Indian stock prices
-- Groq (llama-3.3-70b-versatile) for signal explanations
-- python-telegram-bot (polling)
-- async background loops for monitoring
-- SQLite + Render persistent disk for data persistence
+- nselib (2.5.1) for NSE data (FII/DII, bulk/block deals, sectoral indices, F&O bhavcopy)
+- Groq (llama-3.3-70b-versatile) for AI analysis
+- python-telegram-bot (polling via httpx)
+- SQLite + Render persistent disk (1GB at /data)
+- Chart.js for all standalone dashboards
