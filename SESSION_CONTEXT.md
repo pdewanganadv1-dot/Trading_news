@@ -76,12 +76,27 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 
 **Lesson**: Dhan scrip master CSV column `SYMBOL_NAME` doesn't exist — the correct column is `SEM_TRADING_SYMBOL` for the trading symbol. Must also filter to `NSE` + `E` segment only.
 
+### May 21, 2026 — DIY Strategy Builder (Pine Script Port) + 1-min OHLC
+
+**Done**:
+1. **`app/services/ohlc_builder.py`** — Aggregates Dhan WebSocket ticks into 1-minute OHLC bars per symbol. Tracks Open/High/Low/Close/Volume. Stores last 200 bars. Singleton `ohlc_builder`.
+2. **`app/services/strategy_builder.py`** — Full Python port of TradingView "DIY Custom Strategy Builder [ZP] - v1":
+   - **36 leading indicators**: Range Filter, Speedy Range, SuperTrend, HalfTrend, RSI V2, Stochastic V2, CCI V2, Williams %R V2, TSI, TDFI, Fisher V2, Inv Fisher, Coppock, MACD, Awesome Osc, Momentum, ROC, TRIX, Vortex, KAMA, Chandelier, DIY MA, DEMA, TEMA, Laguerre RSI, RSI 3/3/3, LinReg, Swing Index, Rainbow MA, Aroon, PSAR, ZLEMA, HMA, ALMA, JJMA, Tillson T3
+   - **23 confirmation filters**: EMA 20/50/100/200, SMA 20/50, Bollinger, Keltner, ADX, ATR Trail, Donchian, MACD, RSI, Stochastic, Volume, Price Action, MFI, OBV, Williams %R, Heikin Ashi, VWAP, Pivot, Divergence
+   - **Signal engine**: Leading indicator + confirmations vote → BUY/SELL/HOLD, configurable threshold/expiry/alt mode
+   - **Backtest/History**: `backtest()`, `get_signal_history()`, `format_signal_history()` — uses yfinance historical data
+   - **SQLite persistence**: Signal cache + active state tracking
+3. **`app/services/market_feed.py`** — Now calls `ohlc_builder.process_tick()` on every parsed packet
+4. **`app/main.py`** — Added `strategy_builder_loop` (scans all symbols every 3 min, auto-alerts)
+5. **Telegram commands**: `/strategy`, `/strategy_config`, `/strategy_leading`, `/strategy_threshold`, `/strategy_expiry`, `/strategy_alt`, `/strategy_bt`, `/strategy_signals`, `/signals_<sym>`
+6. **Backtest results** (RELIANCE, Range Filter, daily 1y): 239 signals, 16 trades, 25% win rate, -5.32% return
+
 ### Current State
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
-- **Deploy hook**: ~~POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI~~ **(broken — repo made private; manual deploy via Render dashboard required)**
-- **Git commit HEAD**: `76cef44`
+- **Deploy hook**: ~~broken (repo private)~~ — manual deploy via Render dashboard
+- **Git commit HEAD**: `066b2d2` (strategy builder)
 - **Repo**: **Private** on GitHub
 
 ### Key Files
@@ -104,6 +119,8 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `app/services/ai_agent_service.py` | Groq-based multi-modal stock analysis |
 | `app/services/strategy_marketplace.py` | 6 curated strategies + in-memory backtest simulator |
 | `app/services/politician_service.py` | 11 business group bulk/block deals + FII/DII |
+| `app/services/ohlc_builder.py` | 1-min OHLC bar builder from Dhan WebSocket tick stream |
+| `app/services/strategy_builder.py` | DIY Strategy Builder: 36 leading indicators, 23 confirmation filters, signal engine, backtest |
 | `app/routes/market_realtime.py` | API endpoints (signals + realtime) |
 | `app/main.py` | FastAPI entry, lifespan tasks, 6 new routers |
 | `render.yaml` | Render service config (Docker + persistent disk) |
@@ -133,6 +150,15 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `/politicians` | Group political trades |
 | `/strategies` | Strategy marketplace |
 | `/backtest <id>` | Backtest a strategy |
+| `/strategy` | DIY Strategy Builder dashboard (active BUY/SELL signals) |
+| `/strategy_config` | View current config + all indicators/filters |
+| `/strategy_leading <name>` | Set leading indicator (36 options) |
+| `/strategy_threshold <N>` | Min confirmations required (default 3) |
+| `/strategy_expiry <N>` | Signal expiry in bars (default 5) |
+| `/strategy_alt` | Toggle alternate signal mode |
+| `/strategy_bt <sym> [days] [1d\|1m]` | Backtest on historical data |
+| `/strategy_signals <sym> [days] [1d\|1m]` | Full BUY/SELL signal history |
+| `/signals_<sym> [days] [1d\|1m]` | Quick signal history shortcut |
 
 ### Tech Stack
 - FastAPI + uvicorn (Render Docker, free tier)
@@ -140,5 +166,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - nselib (2.5.1) for NSE data (FII/DII, bulk/block deals, sectoral indices, F&O bhavcopy)
 - Groq (llama-3.3-70b-versatile) for AI analysis
 - python-telegram-bot (polling via httpx)
+- DhanHQ WebSocket feed (9,457 NSE EQ symbols) for live ticks
 - SQLite + Render persistent disk (1GB at /data)
+- pandas for backtest calculations
 - Chart.js for all standalone dashboards
