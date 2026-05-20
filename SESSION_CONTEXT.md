@@ -50,6 +50,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
     - Detects bounces off EMA 200 with S/R confirmation
     - `/scalp` command shows **SCALP BUY** / **SCALP SELL** (separate from regular signals)
     - Auto-scan every 5 min during market hours with push alerts
+    - `/scalpbt` — Backtest strategy on 6mo daily data (buy on bounce, target +10%, stop -5%, max 20d hold)
     - Target: 10% ROI, intraday or weekend hold
 
 ### Current State
@@ -57,7 +58,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: 3438177
+- **Git commit HEAD**: a6da5e3
 
 ### Key Files
 | File | Purpose |
@@ -92,6 +93,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `sentiment` | Market sentiment with top bullish/bearish stocks |
 | `stocks` | All 119 monitored stocks |
 | `/scalp` | SCALP signals — EMA 200 bounces on 1min chart |
+| `/scalpbt` | Backtest SCALP strategy on 6mo daily data |
 | `/agent <sym>` | AI multi-modal analysis |
 | `/options <sym>` | Option chain with PCR & max pain |
 | `/insider` | Bulk & block deals |
