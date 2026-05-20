@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 import re
+import time
 from datetime import datetime
 from app.config import settings
 from app.services.market_data_service import market_data_service, TradingSignals
@@ -321,6 +322,31 @@ async def _handle_message(text: str, chat_id: int):
         for e in edges[:15]:
             direction = "🟢" if e["edge"] > 0 else "🔴"
             msg += f"{direction} `{e['symbol']:<12}` Edge: `{e['edge']:+.1f}` ₹{e['ltp']:,.2f} ({e['day_pct']:+.2f}%)\n"
+        return await telegram_notifier.send_message(msg)
+
+    if text in ('/feed', 'feed'):
+        from app.services.market_feed import _ws_connected, TRACKED_SYMBOLS, _live_prices
+        count = len(_live_prices)
+        tracked = len(TRACKED_SYMBOLS)
+        status = "🟢 Connected" if _ws_connected else "🔴 Disconnected"
+        if count and tracked:
+            pct = f" ({count*100//tracked}% populated)"
+        else:
+            pct = ""
+        msg = (
+            f"📡 *Market Feed Status*\n\n"
+            f"Status: {status}\n"
+            f"Tracking: `{tracked:,}` symbols\n"
+            f"Live prices: `{count:,}`{pct}\n"
+        )
+        if count:
+            sample = sorted(_live_prices.keys())[:5]
+            msg += f"\nSample: `{', '.join(sample)}`\n"
+        latest_ts = max((v.get("timestamp", 0) for v in _live_prices.values()), default=0)
+        from datetime import datetime
+        if latest_ts:
+            age = int(time.time() - latest_ts)
+            msg += f"Last update: `{age}s` ago"
         return await telegram_notifier.send_message(msg)
 
     if text in ('/scalpbt', 'scalpbt'):
