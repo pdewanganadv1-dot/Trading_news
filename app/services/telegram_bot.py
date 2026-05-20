@@ -127,6 +127,10 @@ def _build_help() -> str:
         "• `docker` — Container status\n"
         "• `/markets` — All feature overview\n"
         "• `/live <sym>` — Live market price via WebSocket\n"
+        "• `/gainers` — Top gainers (live)\n"
+        "• `/losers` — Top losers (live)\n"
+        "• `/breadth` — Live breadth: stocks above/below day open\n"
+        "• `/edges` — Live edge scores\n"
         "• `/help` — This message\n\n"
         "💡 *Tip:* Commands are case-insensitive. Alerts trigger automatically when price hits your target."
     )
@@ -308,18 +312,16 @@ async def _handle_message(text: str, chat_id: int):
         )
         return await telegram_notifier.send_message(msg)
 
-    if text == 'edges':
-        results = await scan_all_stocks()
-        top = results[:10]
-        lines = ["🔥 *Market Edge: Top 10*", ""]
-        for r in top:
-            signals = " | ".join(r.get("signals", [])[:2])
-            lines.append(
-                f"`{r['symbol']:<12}` Score: `{r['score']}/10` "
-                f"Vol: `{r.get('vol_ratio', '-')}x` "
-                f"{signals}"
-            )
-        return await telegram_notifier.send_message("\n".join(lines))
+    if text in ('edges', '/edges'):
+        from app.services.live_analysis import get_live_edges
+        edges = get_live_edges()
+        if not edges:
+            return await telegram_notifier.send_message("No live data yet.")
+        msg = "⚡ *Live Edge Scores*\n\n"
+        for e in edges[:15]:
+            direction = "🟢" if e["edge"] > 0 else "🔴"
+            msg += f"{direction} `{e['symbol']:<12}` Edge: `{e['edge']:+.1f}` ₹{e['ltp']:,.2f} ({e['day_pct']:+.2f}%)\n"
+        return await telegram_notifier.send_message(msg)
 
     if text in ('/scalpbt', 'scalpbt'):
         if not _ebs.scalp_enabled:
@@ -399,33 +401,32 @@ async def _handle_message(text: str, chat_id: int):
             msg = msg[:3900] + "\n\n... (truncated)"
         return await telegram_notifier.send_message(msg)
 
-    if text == 'breadth':
-        b = await get_market_breadth(top_n=20)
+    if text in ('breadth', '/breadth'):
+        from app.services.live_analysis import get_live_breadth
+        b = get_live_breadth()
+        if b["total"] == 0:
+            return await telegram_notifier.send_message("No live data yet.")
+        above_pct = round(b["above"] / max(b["total"], 1) * 100, 1)
         bar_len = 20
-        filled = int(b['pct_above'] / 100 * bar_len)
+        filled = int(above_pct / 100 * bar_len)
         bar = "🟩" * filled + "⬜" * (bar_len - filled)
         msg = (
-            f"📊 *Market Breadth*\n\n"
-            f"Stocks above 20d SMA: `{b['above_sma20']}/{b['total']}` ({b['pct_above']}%)\n"
+            f"📊 *Live Market Breadth*\n\n"
+            f"Above day open: 🟢 `{b['above']}/{b['total']}` ({above_pct}%)\n"
+            f"Below day open: 🔴 `{b['below']}/{b['total']}`\n"
             f"`{bar}`\n\n"
-            f"*Top 5 above SMA20:*\n"
         )
-        for s in b.get("top_above", []):
-            msg += f"🟢 `{s['symbol']:<12}` +{s['pct_above_sma']}%\n"
-        msg += f"\n*Bottom 5 below SMA20:*\n"
-        for s in b.get("top_below", []):
-            msg += f"🔴 `{s['symbol']:<12}` {s['pct_below_sma']}%\n"
-        msg += f"\n📌 >70% Overbought | <30% Oversold\n💡 `breadth all` for full list"
+        if b["stocks_above"]:
+            msg += "*Top Gainers:*\n"
+            for sym, pct in b["stocks_above"][:5]:
+                msg += f"🟢 `{sym:<12}` +{pct}%\n"
+        if b["stocks_below"]:
+            msg += "\n*Top Losers:*\n"
+            for sym, pct in b["stocks_below"][:5]:
+                msg += f"🔴 `{sym:<12}` {pct}%\n"
         return await telegram_notifier.send_message(msg)
 
-    if text == 'breadth all':
-        b = await get_market_breadth(top_n=50)
-        msg = f"📊 *Full Breadth List*\nAbove: `{b['above_sma20']}/{b['total']}`\n\n*Stocks above SMA20:*\n"
-        for s in b.get("stocks_above", []):
-            msg += f"🟢 `{s['symbol']:<12}` +{s['pct_above_sma']}%\n"
-        if len(msg) > 3500:
-            msg = msg[:3500] + "\n... (truncated)"
-        return await telegram_notifier.send_message(msg)
+
 
     if text in ('fiidii', '/fiidii'):
         d = await get_fii_dii_summary()
@@ -845,6 +846,46 @@ async def _handle_message(text: str, chat_id: int):
             chg = d.get("ltp", 0) - d.get("day_open", 0)
             msg += f"`{sym}` ₹{d['ltp']:,.2f} {chg:+.2f} Vol:{d.get('volume',0):,}\n"
         msg += "\nUse `/live <SYMBOL>` for a single stock"
+        return await telegram_notifier.send_message(msg)
+
+    if text in ('/gainers', 'gainers'):
+        from app.services.live_analysis import get_gainers_losers
+        gainers, _ = get_gainers_losers(10)
+        if not gainers:
+            return await telegram_notifier.send_message("No live data yet.")
+        msg = "🟢 *Top Gainers (Live)*\n\n"
+        for s in gainers:
+            msg += f"`{s['symbol']}` ₹{s['ltp']:,.2f} *+{s['change_pct']}%* (₹+{s['change']:,.2f}) Vol:{s['volume']:,}\n"
+        return await telegram_notifier.send_message(msg)
+
+    if text in ('/losers', 'losers'):
+        from app.services.live_analysis import get_gainers_losers
+        _, losers = get_gainers_losers(10)
+        if not losers:
+            return await telegram_notifier.send_message("No live data yet.")
+        msg = "🔴 *Top Losers (Live)*\n\n"
+        for s in losers:
+            msg += f"`{s['symbol']}` ₹{s['ltp']:,.2f} *{s['change_pct']}%* (₹{s['change']:,.2f}) Vol:{s['volume']:,}\n"
+        return await telegram_notifier.send_message(msg)
+
+    if text in ('/breadth', 'breadth'):
+        from app.services.live_analysis import get_live_breadth
+        b = get_live_breadth()
+        if b["total"] == 0:
+            return await telegram_notifier.send_message("No live data yet.")
+        msg = "📊 *Live Market Breadth*\n\n"
+        msg += f"Above Day Open: 🟢 `{b['above']}`\n"
+        msg += f"Below Day Open: 🔴 `{b['below']}`\n"
+        msg += f"Flat: `{b['flat']}`\n"
+        msg += f"Total: `{b['total']}`\n\n"
+        if b["stocks_above"]:
+            msg += "*Top Gainers:*\n"
+            for sym, pct in b["stocks_above"][:5]:
+                msg += f"🟢 `{sym}` +{pct}%\n"
+        if b["stocks_below"]:
+            msg += "\n*Top Losers:*\n"
+            for sym, pct in b["stocks_below"][:5]:
+                msg += f"🔴 `{sym}` {pct}%\n"
         return await telegram_notifier.send_message(msg)
 
     if text == '/markets':

@@ -36,12 +36,14 @@ async def lifespan(app: FastAPI):
     from app.services.news_sentiment_pipeline import sentiment_pipeline_loop
     from app.services.market_edge_service import auto_update_fii_dii
     from app.services.market_feed import feed_loop
+    from app.services.live_analysis import volume_spike_loop
     task1 = asyncio.create_task(signal_monitor_loop())
     task2 = asyncio.create_task(telegram_poll_loop())
     task3 = asyncio.create_task(daily_report_loop())
     task4 = asyncio.create_task(sentiment_pipeline_loop())
     task5 = asyncio.create_task(auto_update_fii_dii())
     task6 = asyncio.create_task(feed_loop())
+    task7 = asyncio.create_task(volume_spike_loop())
     yield
     task1.cancel()
     task2.cancel()
@@ -49,6 +51,7 @@ async def lifespan(app: FastAPI):
     task4.cancel()
     task5.cancel()
     task6.cancel()
+    task7.cancel()
 
 
 app = FastAPI(
