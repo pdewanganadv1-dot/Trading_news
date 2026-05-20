@@ -108,6 +108,17 @@ def _build_help() -> str:
         "• `/politicians` — 11 group/entity trade flows (6M)\n\n"
         "🔄 *Sector Rotation*\n"
         "• `/sectors` — 12 sector performance rankings\n\n"
+        "🧠 *DIY Strategy Builder*\n"
+        "• `/strategy` — Dashboard: active BUY/SELL signals\n"
+        "• `/strategy_config` — View current config & available indicators\n"
+        "• `/strategy_leading <name>` — Set leading indicator (37 options)\n"
+        "• `/strategy_threshold <N>` — Min confirmations required (default 3)\n"
+        "• `/strategy_expiry <N>` — Signal expiry in bars\n"
+        "• `/strategy_alt` — Toggle alternate signal mode\n"
+        "• `/strategy_bt <sym> [days] [1d|1m]` — Backtest on historical data (default 365d daily)\n"
+        "   e.g. `/strategy_bt RELIANCE 365 1d` or `/strategy_bt RELIANCE 7 1m`\n"
+        "• `/strategy_signals <sym> [days] [1d|1m]` — Full BUY/SELL signal history\n"
+        "• `/signals_<sym> [days] [1d|1m]` — Quick signal history (e.g. `/signals_reliance 365 1d`)\n\n"
         "📋 *Strategy Marketplace*\n"
         "• `/strategies` — Browse 6 seeded strategies\n"
         "• `/backtest <id>` — Run backtest on NIFTY (1y mock)\n\n"
@@ -698,6 +709,142 @@ async def _handle_message(text: str, chat_id: int):
             return await telegram_notifier.send_message(msg)
         except Exception as e:
             return await telegram_notifier.send_message(f"❌ Agent error: {e}")
+
+    if text in ('/strategy', 'strategy'):
+        from app.services.strategy_builder import strategy_builder, LEADING_NAMES, CONFIRMATION_NAMES
+        dashboard = strategy_builder.build_dashboard(15)
+        return await telegram_notifier.send_message(dashboard)
+
+    m = re.match(r'^/strategy_bt\s+(\w+)(?:\s+(\d+))?(?:\s+(\w+))?$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        sym = m.group(1).upper()
+        days = int(m.group(2)) if m.group(2) else 365
+        interval = m.group(3) if m.group(3) else "1d"
+        if interval not in ("1d", "1m"):
+            return await telegram_notifier.send_message("❌ Interval must be `1d` (daily) or `1m` (1-min)")
+        status_msg = await telegram_notifier.send_message(f"🔄 Backtesting {sym} ({interval}, {days}d)... ⏳")
+        try:
+            import asyncio
+            bt = await asyncio.to_thread(strategy_builder.backtest, sym, days, interval)
+            if "error" in bt:
+                return await telegram_notifier.send_message(f"❌ {bt['error']}")
+            if bt.get("total_trades", 0) == 0:
+                msg = (
+                    f"📊 *Backtest — {sym}* ({bt['timeframe']})\n\n"
+                    f"Leading: `{bt['leading']}` | Threshold: `{bt['threshold']}`\n"
+                    f"Bars analyzed: `{bt['bars_analyzed']}`\n"
+                    f"No trades generated."
+                )
+                return await telegram_notifier.send_message(msg)
+            msg = (
+                f"📊 *Backtest — {sym}* ({bt['timeframe']})\n"
+                f"Lead: `{bt['leading']}` | Thresh: `{bt['threshold']}` | Conf: `{len(bt['confirmations'])}`\n\n"
+                f"*Performance Summary*\n"
+                f"📈 Total Trades: `{bt['total_trades']}`\n"
+                f"🎯 Win Rate: `{bt['win_rate']}%`\n"
+                f"💰 Avg Return: `{bt['avg_return']:+.2f}%`\n"
+                f"🟢 Avg Win: `{bt['avg_win']:+.2f}%` | 🔴 Avg Loss: `{bt['avg_loss']:+.2f}%`\n"
+                f"📊 Total Return: `{bt['total_return']:+.2f}%`\n"
+                f"📈 Max Win: `{bt['max_win']:+.2f}%` | 📉 Max Loss: `{bt['max_loss']:+.2f}%`\n"
+                f"📊 Profit Factor: `{bt['profit_factor']}`\n"
+                f"🎲 Expectancy: `{bt['expectancy']:+.2f}%`\n"
+                f"🟢 BUY: `{bt['buy_trades']}` | 🔴 SELL: `{bt['sell_trades']}`\n\n"
+                f"*Recent Trades (last 10)*\n"
+            )
+            for t in bt.get("trades", [])[-10:]:
+                emoji = "🟢" if t['pnl_pct'] >= 0 else "🔴"
+                et = t['entry_time'][:16] if len(t['entry_time']) > 16 else t['entry_time']
+                xt = t['exit_time'][:16] if len(t['exit_time']) > 16 else t['exit_time']
+                msg += f"{emoji} {t['direction']} {t['entry_price']}→{t['exit_price']} ({t['pnl_pct']:+.2f}%)\n"
+            return await telegram_notifier.send_message(msg)
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Backtest error: {e}")
+
+    if text in ('/strategy_config', 'strategy_config'):
+        from app.services.strategy_builder import strategy_builder, LEADING_NAMES, CONFIRMATION_NAMES
+        lines = [
+            "⚙️ *Strategy Builder — Configuration*\n",
+            f"*Leading Indicator:* `{strategy_builder.selected_leading}`",
+            f"*Available:* `{len(LEADING_NAMES)}` total — use `/strategy_leading <name>` to change",
+            "",
+            f"*Confirmation Filters ({len(strategy_builder.selected_confirmations)} active):*",
+        ]
+        for name in CONFIRMATION_NAMES:
+            active = "✅" if name in strategy_builder.selected_confirmations else "⬜"
+            lines.append(f"{active} `{name}`")
+        lines.append("")
+        lines.append(f"*Threshold:* `{strategy_builder.signal_threshold}` / `{len(strategy_builder.selected_confirmations)}` — `/strategy_threshold <N>`")
+        lines.append(f"*Expiry:* `{strategy_builder.signal_expiry}` bars — `/strategy_expiry <N>`")
+        lines.append(f"*Alt Mode:* `{'ON' if strategy_builder.alt_signal_mode else 'OFF'}` — `/strategy_alt` to toggle")
+        return await telegram_notifier.send_message("\n".join(lines))
+
+    m = re.match(r'^/strategy_leading\s+(.+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder, LEADING_NAMES, LEADING_INDICATORS
+        name = m.group(1).strip()
+        all_names = set(LEADING_NAMES) | set(LEADING_INDICATORS.keys())
+        found = None
+        for n in all_names:
+            if n.lower() == name.lower():
+                found = n
+                break
+        if found:
+            strategy_builder.select_leading(found)
+            return await telegram_notifier.send_message(f"✅ Leading indicator set to `{found}`")
+        else:
+            return await telegram_notifier.send_message(
+                f"❌ Indicator not found. Available: `{', '.join(LEADING_NAMES)}`"
+            )
+
+    m = re.match(r'^/strategy_threshold\s+(\d+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        t = int(m.group(1))
+        strategy_builder.set_threshold(t)
+        return await telegram_notifier.send_message(f"✅ Signal threshold set to `{t}`")
+
+    m = re.match(r'^/strategy_expiry\s+(\d+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        e = int(m.group(1))
+        strategy_builder.set_expiry(e)
+        return await telegram_notifier.send_message(f"✅ Signal expiry set to `{e}` bars")
+
+    if text in ('/strategy_alt', 'strategy_alt'):
+        from app.services.strategy_builder import strategy_builder
+        strategy_builder.alt_signal_mode = not strategy_builder.alt_signal_mode
+        return await telegram_notifier.send_message(
+            f"✅ Alternate signal mode `{'ON' if strategy_builder.alt_signal_mode else 'OFF'}`"
+        )
+
+    m = re.match(r'^/signals_(\w+)(?:\s+(\d+))?(?:\s+(\w+))?$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        sym = m.group(1).upper()
+        days = int(m.group(2)) if m.group(2) else 365
+        interval = m.group(3) if m.group(3) else "1d"
+        status_msg = await telegram_notifier.send_message(f"🔄 Fetching signal history for {sym}... ⏳")
+        try:
+            import asyncio
+            msg = await asyncio.to_thread(strategy_builder.format_signal_history, sym, days, interval, 20)
+            return await telegram_notifier.send_message(msg)
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Signal history error: {e}")
+
+    m = re.match(r'^/strategy_signals\s+(\w+)(?:\s+(\d+))?(?:\s+(\w+))?$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        sym = m.group(1).upper()
+        days = int(m.group(2)) if m.group(2) else 365
+        interval = m.group(3) if m.group(3) else "1d"
+        status_msg = await telegram_notifier.send_message(f"🔄 Fetching signal history for {sym}... ⏳")
+        try:
+            import asyncio
+            msg = await asyncio.to_thread(strategy_builder.format_signal_history, sym, days, interval, 20)
+            return await telegram_notifier.send_message(msg)
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Signal history error: {e}")
 
     if text == '/strategies':
         strategies = strategy_marketplace_service.get_strategies()

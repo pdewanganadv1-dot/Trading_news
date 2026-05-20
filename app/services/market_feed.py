@@ -10,6 +10,7 @@ from app.config import settings
 from app.services.dhanhq_service import (
     _headers, _client, ensure_security_map, get_security_id,
 )
+from app.services.ohlc_builder import ohlc_builder
 
 WS_URL = "wss://api-feed.dhan.co"
 
@@ -157,6 +158,13 @@ async def _parse_packet(data: bytes):
         parsed["symbol"] = symbol
         async with _live_prices_lock:
             _live_prices[symbol] = parsed
+
+        # Feed ticks into 1-minute OHLC builder
+        price = parsed.get("ltp", 0)
+        volume = parsed.get("volume")
+        ts = parsed.get("timestamp", time.time())
+        if price:
+            ohlc_builder.process_tick(symbol, price, volume=volume, timestamp=ts)
 
 
 async def feed_loop():
