@@ -214,6 +214,13 @@ async def debug_place_test():
     await dhan.ensure_security_map()
     sid = dhan.get_security_id("RELIANCE")
 
+    headers = {**dhan._headers(), "client-id": dhan._client()}
+
+    # Test 1: GET /fundlimit (should work - it does in /debug/dhan)
+    async with httpx.AsyncClient(timeout=15) as c:
+        r1 = await c.get(f"{dhan.DHAN_BASE}/fundlimit", headers=headers)
+
+    # Test 2: POST to /orders (failing with DH-905)
     payload = {
         "dhanClientId": dhan._client(),
         "transactionType": "BUY",
@@ -226,23 +233,24 @@ async def debug_place_test():
         "price": 0,
     }
     async with httpx.AsyncClient(timeout=15) as c:
-        resp = await c.post(
+        r2 = await c.post(
             f"{dhan.DHAN_BASE}/orders",
-            headers={**dhan._headers(), "client-id": dhan._client()},
+            headers=headers,
             json=payload,
         )
-        raw = {
-            "status_code": resp.status_code,
-            "headers": dict(resp.headers),
-            "body": resp.text,
-        }
 
-    result = await dhan.place_order("RELIANCE", 1, "BUY")
+    # Test 3: POST to /fundlimit (wrong method - should get different error)
+    async with httpx.AsyncClient(timeout=15) as c:
+        r3 = await c.post(
+            f"{dhan.DHAN_BASE}/fundlimit",
+            headers=headers,
+            json={},
+        )
+
     return {
-        "security_id": sid,
-        "payload": payload,
-        "raw_response": raw,
-        "result": result,
+        "test1_GET_fundlimit": {"status": r1.status_code, "body": r1.text[:300]},
+        "test2_POST_orders": {"status": r2.status_code, "body": r2.text[:300]},
+        "test3_POST_fundlimit": {"status": r3.status_code, "body": r3.text[:300]},
     }
 
 
