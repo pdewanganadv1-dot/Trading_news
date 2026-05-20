@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     groq_api_key: Optional[str] = None
     groq_model: str = "llama-3.3-70b-versatile"
     persistent_dir: str = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    dhan_client_id: Optional[str] = None
+    dhan_access_token: Optional[str] = None
 
     class Config:
         env_file = ".env"

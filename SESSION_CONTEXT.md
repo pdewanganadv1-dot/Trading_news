@@ -45,6 +45,15 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 15. **Breadth shows WHICH stocks**: `/breadth` lists top 5 above/below SMA20; `/breadth all` for full list
 16. **Sentiment shows WHICH stocks**: `/sentiment` lists top 5 bullish/bearish by score
 17. **`/stocks` command**: Lists all 119 monitored Indian stocks alphabetically
+19. **DhanHQ Broker Integration** (`app/services/dhanhq_service.py`):
+    - Live Market Quote API (LTP/OHLC for all 119 stocks in 1 call)
+    - Order placement (BUY/SELL via Telegram `/buy`, `/sell`)
+    - Dashboard: funds, positions, order book, profile
+    - Auto-trading: SCALP scanner auto-places trades when enabled
+    - Auto-renew: background loop renews access token every 23h
+    - Toggle: `/dhanon` / `/dhanoff` to enable/disable
+    - Credentials stored in `.env` (gitignored, never committed)
+
 18. **EMA 200 Bounce Scanner** (`app/services/ema_bounce_scanner.py`):
     - Scans all 119 stocks on 1min timeframe
     - Detects bounces off EMA 200 with S/R confirmation
@@ -59,7 +68,8 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI
-- **Git commit HEAD**: (latest)
+- **Git commit HEAD**: (latest — see git log)
+- **Repo**: Make sure it's **private** on GitHub (Settings → General → Danger Zone → Change visibility)
 
 ### Key Files
 | File | Purpose |
@@ -74,6 +84,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `app/services/accuracy_tracker.py` | SQLite DB — signal history + cache/sent persistence |
 | `app/services/market_edge_service.py` | Edge scanner, FII/DII, breadth (full 119 stocks) |
 | `app/services/ema_bounce_scanner.py` | EMA 200 bounce scanner on 1min chart (SCALP signals) |
+| `app/services/dhanhq_service.py` | DhanHQ broker integration: market data, orders, funds, token mgmt |
 | `app/services/options_chain_service.py` | F&O bhavcopy → option chain (PCR, max pain, key levels) |
 | `app/services/insider_service.py` | NSE bulk/block deals with summary aggregation |
 | `app/services/sector_service.py` | Sectoral index performance + industry→sector mapping |
@@ -85,6 +96,10 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `render.yaml` | Render service config (Docker + persistent disk) |
 
 ### Telegram Commands
+| `/dhan` | DhanHQ dashboard (funds, account, data plan) |
+| `/dhanon` / `/dhanoff` | Toggle DhanHQ auto-trading |
+| `/buy <sym> <qty>` | Place BUY order via Dhan |
+| `/sell <sym> <qty>` | Place SELL order via Dhan |
 | Command | Description |
 |---------|-------------|
 | `summary` | Dashboard overview |
@@ -96,6 +111,9 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `/scalp` | SCALP signals — EMA 200 bounces on 1min chart |
 | `/scalpbt` | Backtest SCALP strategy on 6mo daily data |
 | `/scalpon` / `/scalpoff` | Toggle SCALP signals on/off (default: off) |
+| `/dhanon` / `/dhanoff` | Toggle DhanHQ auto-trading (default: off) |
+| `/buy <sym> <qty>` | Place BUY order via Dhan |
+| `/sell <sym> <qty>` | Place SELL order via Dhan |
 | `/agent <sym>` | AI multi-modal analysis |
 | `/options <sym>` | Option chain with PCR & max pain |
 | `/insider` | Bulk & block deals |

@@ -19,6 +19,11 @@ from app.services.ai_agent_service import ai_agent_service
 from app.services.strategy_marketplace import strategy_marketplace_service
 from app.services.ema_bounce_scanner import get_recent_bounces, run_backtest
 import app.services.ema_bounce_scanner as _ebs
+from app.services.dhanhq_service import (
+    get_dashboard, get_fund_limit, get_market_ltp, place_order,
+    get_order_book, get_positions, dhan_enabled,
+)
+import app.services.dhanhq_service as _dhan
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -80,6 +85,11 @@ def _build_help() -> str:
         "• `/scalpbt` — Backtest EMA 200 scalp strategy on 6mo daily data\n"
         "• `/scalpon` — Enable SCALP signals & auto-scan\n"
         "• `/scalpoff` — Disable SCALP signals & auto-scan\n"
+        "• `/dhan` — DhanHQ dashboard (funds, account, data plan)\n"
+        "• `/dhanon` — Enable DhanHQ auto-trading\n"
+        "• `/dhanoff` — Disable DhanHQ auto-trading\n"
+        "• `/buy <sym> <qty>` — Place BUY order via Dhan\n"
+        "• `/sell <sym> <qty>` — Place SELL order via Dhan\n"
         "• `breadth` — Market breadth: % of Nifty 100 above 20-day SMA\n"
         "• `fiidii` — FII/DII institutional flow + 5-day trend\n"
         "• `setfiidii <FII_buy> <FII_sell> <DII_buy> <DII_sell>` — Update FII/DII data\n\n"
@@ -818,10 +828,62 @@ async def _handle_message(text: str, chat_id: int):
         msg += "• `/backtest <id>` — Backtest a strategy\n"
         msg +=         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart\n"
         "• `/scalpbt` — Backtest SCALP strategy on 6mo daily data\n"
-        "• `/scalpon` / `/scalpoff` — Toggle SCALP signals\n\n"
+        "• `/scalpon` / `/scalpoff` — Toggle SCALP signals\n"
+        "• `/dhan` — DhanHQ dashboard\n"
+        "• `/dhanon` / `/dhanoff` — Toggle DhanHQ auto-trading\n"
+        "• `/buy <sym> <qty>` — Place BUY order\n"
+        "• `/sell <sym> <qty>` — Place SELL order\n\n"
         msg += "Or use any of these quick ones:\n"
         msg += "`/scalp` / `/scalpbt` / `/scalpon` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)
+
+    if text in ('/dhan', 'dhan'):
+        if not _dhan.dhan_enabled:
+            return await telegram_notifier.send_message("⚙️ DhanHQ is disabled. Use `/dhanon` to enable.")
+        dash = await get_dashboard()
+        p = dash.get("profile", {}) or {}
+        f = dash.get("funds", {}) or {}
+        msg = f"🏦 *DhanHQ Dashboard*\n\n"
+        msg += f"*Account:*\n"
+        msg += f"Client ID: `{p.get('dhanClientId', '--')}`\n"
+        msg += f"Active: `{p.get('activeSegment', '--')}`\n"
+        msg += f"DDPI: `{p.get('ddpi', '--')}`\n"
+        dp = p.get('dataPlan', '--')
+        msg += f"Data Plan: `{dp}`\n\n"
+        msg += f"*Funds:*\n"
+        msg += f"Available: `₹{f.get('availabelBalance', 0):,.2f}`\n"
+        msg += f"Used: `₹{f.get('utilizedAmount', 0):,.2f}`\n"
+        msg += f"Withdrawable: `₹{f.get('withdrawableBalance', 0):,.2f}`\n"
+        return await telegram_notifier.send_message(msg)
+
+    if text in ('/dhanon', 'dhanon'):
+        _dhan.dhan_enabled = True
+        return await telegram_notifier.send_message("✅ DhanHQ auto-trading enabled. Signals can now place live orders.")
+
+    if text in ('/dhanoff', 'dhanoff'):
+        _dhan.dhan_enabled = False
+        return await telegram_notifier.send_message("❌ DhanHQ auto-trading disabled.")
+
+    m = re.match(r'^/(buy|sell)\s+(\w+)\s+(\d+)$', text)
+    if m:
+        if not _dhan.dhan_enabled:
+            return await telegram_notifier.send_message("⚙️ DhanHQ is disabled. Use `/dhanon` to enable.")
+        action = m.group(1).upper()
+        symbol = m.group(2).upper()
+        qty = int(m.group(3))
+        status_msg = await telegram_notifier.send_message(f"⏳ Placing {action} order for {symbol} x{qty}...")
+        ttype = "BUY" if action == "BUY" else "SELL"
+        result = await place_order(symbol, qty, ttype)
+        if result and "error" not in result:
+            oid = result.get("orderId", "--")
+            ost = result.get("orderStatus", "--")
+            await telegram_notifier.send_message(
+                f"✅ *Order Placed*\n{action} `{symbol}` x{qty}\nID: `{oid}`\nStatus: `{ost}`"
+            )
+        else:
+            err = result.get("error", "Unknown") if result else "No response"
+            await telegram_notifier.send_message(f"❌ Order failed: {err}")
+        return
 
     # Forward unrecognized commands to AI agent queue
     if text and chat_id:
@@ -858,6 +920,15 @@ async def _auto_scalp_scan():
                         msg += f"{emoji} `{s['symbol']}` ₹{s['price']} EMA{s['ema200']} Str{s['strength']}\n"
                     msg += "\n💡 `/scalp` for full list"
                     await telegram_notifier.send_message(msg)
+                    # Auto-trade top signal if Dhan enabled
+                    if _dhan.dhan_enabled and signals:
+                        top = signals[0]
+                        qty = 10  # default qty
+                        ttype = "BUY" if top['direction'] == 'BUY' else "SELL"
+                        await telegram_notifier.send_message(
+                            f"🤖 Auto-trading: {ttype} {top['symbol']} x{qty} via DhanHQ..."
+                        )
+                        await place_order(top['symbol'], qty, ttype)
         except Exception as e:
             print(f"Auto scalp error: {e}")
         await asyncio.sleep(300)
@@ -867,6 +938,7 @@ async def telegram_poll_loop():
     offset = 0
     check_counter = 0
     asyncio.create_task(_auto_scalp_scan())
+    asyncio.create_task(_dhan.auto_renew_loop())
 
     while True:
         try:
