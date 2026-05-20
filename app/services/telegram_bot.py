@@ -75,7 +75,7 @@ def _build_help() -> str:
         "🔥 *Edge Scanner*\n"
         "• `edges` — Top 10 stocks ranked by edge score (0-10)\n"
         "• `edge <symbol>` — Edge scan for any stock (e.g. `edge reliance`)\n"
-        "• `/scalp` — EMA 200 bounce scanner on 1min chart across all 119 stocks\n"
+        "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart across all 119 stocks\n"
         "• `breadth` — Market breadth: % of Nifty 100 above 20-day SMA\n"
         "• `fiidii` — FII/DII institutional flow + 5-day trend\n"
         "• `setfiidii <FII_buy> <FII_sell> <DII_buy> <DII_sell>` — Update FII/DII data\n\n"
@@ -304,16 +304,16 @@ async def _handle_message(text: str, chat_id: int):
         return await telegram_notifier.send_message("\n".join(lines))
 
     if text in ('/scalp', 'scalp'):
-        status_msg = await telegram_notifier.send_message("🔍 Scanning all 119 stocks on 1m chart for EMA200 bounces... ⏳")
+        status_msg = await telegram_notifier.send_message("🔍 SCALP scan on 119 stocks (1m EMA200)... ⏳")
         signals = await get_recent_bounces(min_strength=0.3)
         buys = [s for s in signals if s['direction'] == 'BUY']
         sells = [s for s in signals if s['direction'] == 'SELL']
-        lines = ["⚡ *EMA 200 Bounce Scanner (1min)*", ""]
-        lines.append(f"Found *{len(signals)}* active signals")
-        lines.append(f"🟢 BUY: `{len(buys)}`  🔴 SELL: `{len(sells)}`")
+        lines = ["⚡ *SCALP Signals*", ""]
+        lines.append(f"Found *{len(signals)}* active scalp setups")
+        lines.append(f"🟢 SCALP BUY: `{len(buys)}`  🔴 SCALP SELL: `{len(sells)}`")
         lines.append("")
         if buys:
-            lines.append("*🟢 BUY Signals (bounce up from EMA200):*")
+            lines.append("*🟢 SCALP BUY (bounce up from EMA200):*")
             for s in buys[:8]:
                 lines.append(
                     f"`{s['symbol']:<12}` ₹{s['price']:<8} "
@@ -325,7 +325,7 @@ async def _handle_message(text: str, chat_id: int):
                     lines.append(f"  └ {s['reason'][:80]}")
             lines.append("")
         if sells:
-            lines.append("*🔴 SELL Signals (break below EMA200):*")
+            lines.append("*🔴 SCALP SELL (break below EMA200):*")
             for s in sells[:8]:
                 lines.append(
                     f"`{s['symbol']:<12}` ₹{s['price']:<8} "
@@ -336,7 +336,7 @@ async def _handle_message(text: str, chat_id: int):
                 if s.get('reason'):
                     lines.append(f"  └ {s['reason'][:80]}")
         lines.append("")
-        lines.append("🎯 Target: 10% | ⏱ TF: 1min intraday/weekend hold")
+        lines.append("🎯 Target: 10% | ⏱ 1min TF | Intraday/weekend hold")
         msg = "\n".join(lines)
         if len(msg) > 4000:
             msg = msg[:3900] + "\n\n... (truncated)"
@@ -773,7 +773,7 @@ async def _handle_message(text: str, chat_id: int):
         msg += "• `/politicians` — Group political trades\n"
         msg += "• `/strategies` — Strategy marketplace\n"
         msg += "• `/backtest <id>` — Backtest a strategy\n"
-        msg += "• `/scalp` — EMA 200 bounce scanner on 1min chart\n\n"
+        msg +=         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart\n\n"
         msg += "Or use any of these quick ones:\n"
         msg += "`/scalp` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)
@@ -805,7 +805,7 @@ async def _auto_scalp_scan():
                 buys = [s for s in signals if s['direction'] == 'BUY']
                 sells = [s for s in signals if s['direction'] == 'SELL']
                 if buys or sells:
-                    msg = f"⚡ *Auto Scalp Scan*\n🟢 BUY: `{len(buys)}`  🔴 SELL: `{len(sells)}`\n\n"
+                    msg = f"⚡ *SCALP Alert*\n🟢 SCALP BUY: `{len(buys)}`  🔴 SCALP SELL: `{len(sells)}`\n\n"
                     for s in (buys + sells)[:5]:
                         emoji = "🟢" if s['direction'] == 'BUY' else "🔴"
                         msg += f"{emoji} `{s['symbol']}` ₹{s['price']} EMA{s['ema200']} Str{s['strength']}\n"
