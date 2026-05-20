@@ -891,7 +891,11 @@ async def _handle_message(text: str, chat_id: int):
             )
         else:
             err = result.get("error", "Unknown") if result else "No response"
-            await telegram_notifier.send_message(f"❌ Order failed: {err}")
+            detail = result.get("detail", "") if result else ""
+            msg = f"❌ Order failed: {err}"
+            if detail:
+                msg += f"\n`{detail[:500]}`"
+            await telegram_notifier.send_message(msg)
         return
 
     # Unrecognized command — silent ignore

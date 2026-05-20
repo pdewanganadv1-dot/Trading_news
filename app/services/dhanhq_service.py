@@ -256,10 +256,12 @@ async def place_order(
         "orderType": order_type.upper(),
         "validity": "DAY",
         "securityId": sid,
-        "quantity": str(qty),
+        "quantity": qty,
     }
     if order_type.upper() == "LIMIT" and price > 0:
-        payload["price"] = str(price)
+        payload["price"] = price
+    else:
+        payload["price"] = 0
 
     return await _post("/orders", payload)
 

@@ -205,6 +205,20 @@ async def debug_dhan():
     }
 
 
+@router.get("/debug/place-test")
+async def debug_place_test():
+    """Test placing a small RELIANCE buy order."""
+    from app.services.dhanhq_service import place_order, ensure_security_map, get_security_id
+
+    await ensure_security_map()
+    sid = get_security_id("RELIANCE")
+    result = await place_order("RELIANCE", 1, "BUY")
+    return {
+        "security_id": sid,
+        "result": result,
+    }
+
+
 @router.get("/debug/ip")
 async def debug_ip():
     """Show the server's public IP for DhanHQ whitelisting."""
