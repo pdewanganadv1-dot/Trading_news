@@ -9,6 +9,9 @@ from app.data.stocks import INDIAN_STOCKS
 
 _INDIAN = INDIAN_STOCKS
 
+# Toggle: set False to disable all scalp scanning
+scalp_enabled = False
+
 _scan_cache: List[Dict] = []
 _scan_cache_ts: float = 0
 _SCAN_TTL = 300

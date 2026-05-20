@@ -18,6 +18,7 @@ from app.services.politician_service import politician_trades_service
 from app.services.ai_agent_service import ai_agent_service
 from app.services.strategy_marketplace import strategy_marketplace_service
 from app.services.ema_bounce_scanner import get_recent_bounces, run_backtest
+import app.services.ema_bounce_scanner as _ebs
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -77,6 +78,8 @@ def _build_help() -> str:
         "• `edge <symbol>` — Edge scan for any stock (e.g. `edge reliance`)\n"
         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart across all 119 stocks\n"
         "• `/scalpbt` — Backtest EMA 200 scalp strategy on 6mo daily data\n"
+        "• `/scalpon` — Enable SCALP signals & auto-scan\n"
+        "• `/scalpoff` — Disable SCALP signals & auto-scan\n"
         "• `breadth` — Market breadth: % of Nifty 100 above 20-day SMA\n"
         "• `fiidii` — FII/DII institutional flow + 5-day trend\n"
         "• `setfiidii <FII_buy> <FII_sell> <DII_buy> <DII_sell>` — Update FII/DII data\n\n"
@@ -305,6 +308,8 @@ async def _handle_message(text: str, chat_id: int):
         return await telegram_notifier.send_message("\n".join(lines))
 
     if text in ('/scalpbt', 'scalpbt'):
+        if not _ebs.scalp_enabled:
+            return await telegram_notifier.send_message("⚙️ SCALP backtest is disabled. Use `/scalpon` to enable.")
         bt = await run_backtest()
         if bt.get("status") == "empty":
             return await telegram_notifier.send_message("📊 Backtest: No trades generated.")
@@ -331,7 +336,17 @@ async def _handle_message(text: str, chat_id: int):
             msg += f"{emoji} `{t['symbol']}` {t['direction']} {t['return_pct']:+.2f}% ({t['exit_reason']})\n"
         return await telegram_notifier.send_message(msg)
 
+    if text in ('/scalpon', 'scalpon'):
+        _ebs.scalp_enabled = True
+        return await telegram_notifier.send_message("✅ SCALP signals enabled. `/scalp` and auto-scan are now active.")
+
+    if text in ('/scalpoff', 'scalpoff'):
+        _ebs.scalp_enabled = False
+        return await telegram_notifier.send_message("❌ SCALP signals disabled. Use `/scalpon` to re-enable later.")
+
     if text in ('/scalp', 'scalp'):
+        if not _ebs.scalp_enabled:
+            return await telegram_notifier.send_message("⚙️ SCALP signals are disabled. Use `/scalpon` to enable.")
         status_msg = await telegram_notifier.send_message("🔍 SCALP scan on 119 stocks (1m EMA200)... ⏳")
         signals = await get_recent_bounces(min_strength=0.3)
         buys = [s for s in signals if s['direction'] == 'BUY']
@@ -802,9 +817,10 @@ async def _handle_message(text: str, chat_id: int):
         msg += "• `/strategies` — Strategy marketplace\n"
         msg += "• `/backtest <id>` — Backtest a strategy\n"
         msg +=         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart\n"
-        "• `/scalpbt` — Backtest SCALP strategy on 6mo daily data\n\n"
+        "• `/scalpbt` — Backtest SCALP strategy on 6mo daily data\n"
+        "• `/scalpon` / `/scalpoff` — Toggle SCALP signals\n\n"
         msg += "Or use any of these quick ones:\n"
-        msg += "`/scalp` / `/scalpbt` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
+        msg += "`/scalp` / `/scalpbt` / `/scalpon` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)
 
     # Forward unrecognized commands to AI agent queue
@@ -825,9 +841,11 @@ async def _auto_scalp_scan():
     """Background scanner: runs EMA200 bounce scan every 5 min during market hours."""
     while True:
         try:
+            if not _ebs.scalp_enabled:
+                await asyncio.sleep(300)
+                continue
             now = datetime.now()
             utc_h = now.hour
-            # Market hours roughly 3:30 UTC to 10:00 UTC (9 AM - 3:30 PM IST)
             is_market_open = 3 <= utc_h <= 10
             if is_market_open:
                 signals = await get_recent_bounces(min_strength=0.3)
