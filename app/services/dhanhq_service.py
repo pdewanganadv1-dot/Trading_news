@@ -34,6 +34,10 @@ def _init():
     _access_token = settings.dhan_access_token
 
 
+# Auto-init on import
+_init()
+
+
 def _headers() -> Dict[str, str]:
     return {
         "access-token": _access_token or "",

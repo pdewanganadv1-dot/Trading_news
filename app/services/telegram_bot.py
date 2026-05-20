@@ -846,17 +846,23 @@ async def _handle_message(text: str, chat_id: int):
         dash = await get_dashboard()
         p = dash.get("profile", {}) or {}
         f = dash.get("funds", {}) or {}
+        p_err = p.get("error") if isinstance(p, dict) else None
+        f_err = f.get("error") if isinstance(f, dict) else None
         msg = f"🏦 *DhanHQ Dashboard*\n\n"
         msg += f"*Account:*\n"
         msg += f"Client ID: `{p.get('dhanClientId', '--')}`\n"
         msg += f"Active: `{p.get('activeSegment', '--')}`\n"
         msg += f"DDPI: `{p.get('ddpi', '--')}`\n"
         dp = p.get('dataPlan', '--')
-        msg += f"Data Plan: `{dp}`\n\n"
-        msg += f"*Funds:*\n"
+        msg += f"Data Plan: `{dp}`\n"
+        if p_err and p_err != "TOKEN_EXPIRED":
+            msg += f"⚠️ Profile error: `{p_err}`\n"
+        msg += f"\n*Funds:*\n"
         msg += f"Available: `₹{f.get('availabelBalance', 0):,.2f}`\n"
         msg += f"Used: `₹{f.get('utilizedAmount', 0):,.2f}`\n"
         msg += f"Withdrawable: `₹{f.get('withdrawableBalance', 0):,.2f}`\n"
+        if f_err:
+            msg += f"⚠️ Funds error: `{f_err}`\n"
         return await telegram_notifier.send_message(msg)
 
     if text in ('/dhanon', 'dhanon'):
