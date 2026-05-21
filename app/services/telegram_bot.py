@@ -993,7 +993,7 @@ async def _handle_message(text: str, chat_id: int):
         msg += f"\n📈 *{len(INDIAN_STOCKS)}* Indian stocks tracked"
         return await telegram_notifier.send_message(msg)
 
-    if text in ('/live', 'live') or re.match(r'^/live\s+\w+$', text):
+    if text in ('/live', 'live') or re.match(r'^/?live\s+\w+$', text):
         from app.services.market_feed import get_live_price, get_all_live_prices, _ws_connected
         parts = text.split(maxsplit=1)
         if len(parts) > 1:
@@ -1070,14 +1070,14 @@ async def _handle_message(text: str, chat_id: int):
         msg += "• `/politicians` — Group political trades\n"
         msg += "• `/strategies` — Strategy marketplace\n"
         msg += "• `/backtest <id>` — Backtest a strategy\n"
-        msg +=         "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart\n"
-        "• `/scalpbt` — Backtest SCALP strategy on 6mo daily data\n"
-        "• `/scalpon` / `/scalpoff` — Toggle SCALP signals\n"
-        "• `/dhan` — DhanHQ dashboard\n"
-        "• `/dhanon` / `/dhanoff` — Toggle DhanHQ auto-trading\n"
-        "• `/buy <sym> <qty>` — Place BUY order\n"
-        "• `/sell <sym> <qty>` — Place SELL order\n"
-        "• `/live <sym>` — Live price via WebSocket feed\n\n"
+        msg += "• `/scalp` — SCALP signals: EMA 200 bounce on 1min chart\n"
+        msg += "• `/scalpbt` — Backtest SCALP strategy on 6mo daily data\n"
+        msg += "• `/scalpon` / `/scalpoff` — Toggle SCALP signals\n"
+        msg += "• `/dhan` — DhanHQ dashboard\n"
+        msg += "• `/dhanon` / `/dhanoff` — Toggle DhanHQ auto-trading\n"
+        msg += "• `/buy <sym> <qty>` — Place BUY order\n"
+        msg += "• `/sell <sym> <qty>` — Place SELL order\n"
+        msg += "• `/live <sym>` — Live price via WebSocket feed\n\n"
         msg += "Or use any of these quick ones:\n"
         msg += "`/scalp` / `/scalpbt` / `/scalpon` / `stocks` / `fiidii` / `edges` / `breadth` / `sentiment` / `summary`"
         return await telegram_notifier.send_message(msg)
@@ -1168,12 +1168,14 @@ async def _auto_scalp_scan():
                     # Auto-trade top signal if Dhan enabled
                     if _dhan.dhan_enabled and signals:
                         top = signals[0]
-                        qty = 10  # default qty
+                        qty = max(1, min(100, int(20000 / max(top['price'], 1))))
                         ttype = "BUY" if top['direction'] == 'BUY' else "SELL"
                         await telegram_notifier.send_message(
                             f"🤖 Auto-trading: {ttype} {top['symbol']} x{qty} via DhanHQ..."
                         )
-                        await place_order(top['symbol'], qty, ttype)
+                        result = await place_order(top['symbol'], qty, ttype)
+                        if result and "error" in result:
+                            await telegram_notifier.send_message(f"❌ {ttype} {top['symbol']} failed: {result['error']}")
         except Exception as e:
             print(f"Auto scalp error: {e}")
         await asyncio.sleep(300)
@@ -1183,7 +1185,6 @@ async def telegram_poll_loop():
     offset = 0
     check_counter = 0
     asyncio.create_task(_auto_scalp_scan())
-    asyncio.create_task(_dhan.auto_renew_loop())
 
     while True:
         try:

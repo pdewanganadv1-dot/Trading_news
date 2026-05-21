@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import time
 import yfinance as yf
 import numpy as np
@@ -17,6 +18,7 @@ _scan_cache_ts: float = 0
 _SCAN_TTL = 300
 
 _yf_last_call_ts: float = 0
+_yf_rate_lock = threading.Lock()
 
 
 def _yf_ticker(symbol: str) -> str:
@@ -45,10 +47,11 @@ def _detect_bounce(symbol: str) -> Optional[Dict]:
     ticker = _yf_ticker(symbol)
 
     now = time.time()
-    since_last = now - _yf_last_call_ts
-    if since_last < 1.0:
-        time.sleep(1.0 - since_last)
-    _yf_last_call_ts = time.time()
+    with _yf_rate_lock:
+        since_last = now - _yf_last_call_ts
+        if since_last < 1.0:
+            time.sleep(1.0 - since_last)
+        _yf_last_call_ts = time.time()
 
     try:
         stock = yf.Ticker(ticker)

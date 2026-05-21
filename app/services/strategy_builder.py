@@ -141,6 +141,22 @@ def sma(values: List[float], period: int) -> List[float]:
     return result
 
 
+def wma(values: List[float], period: int) -> List[float]:
+    """Weighted Moving Average (linear weights)."""
+    if not values or period < 1:
+        return []
+    result = []
+    wsum = period * (period + 1) / 2
+    for i in range(len(values)):
+        if i < period - 1:
+            result.append(values[i])
+        else:
+            window = values[i - period + 1:i + 1]
+            weighted = sum(w * (j + 1) for j, w in enumerate(window))
+            result.append(weighted / wsum)
+    return result
+
+
 def rma(values: List[float], period: int) -> List[float]:
     """Moving average used by RSI (Wilder smoothing)."""
     if not values or period < 1:
@@ -397,7 +413,7 @@ def leading_rsi(o, h, l, c, v, period=14):
     rsi_vals = [100 - 100 / (1 + r) for r in rs]
     rsi_val = rsi_vals[-1] if rsi_vals else 50
     direction = "LONG" if rsi_val > 50 else "SHORT" if rsi_val < 50 else "NEUTRAL"
-    return {"direction": direction, "value": rsi_val}
+    return {"direction": direction, "value": rsi_val, "series": rsi_vals}
 
 
 def leading_stochastic(o, h, l, c, v, k_period=14, d_period=3):
@@ -689,12 +705,12 @@ def leading_diy_ma(o, h, l, c, v, period=20, ma_type="ema"):
                 ma_vals.append(weights / wsum)
     elif ma_type == "hma":
         half = period // 2
-        wma_half = sma(c, half)
-        wma_full = sma(c, period)
+        wma_half = wma(c, max(half, 2))
+        wma_full = wma(c, max(period, 2))
         if not wma_half or not wma_full:
             return {"direction": "NEUTRAL", "value": 0}
         diff = [2 * wma_half[i] - wma_full[i] for i in range(min(len(wma_half), len(wma_full)))]
-        ma_vals = sma(diff, int(math.sqrt(period)))
+        ma_vals = wma(diff, max(int(math.sqrt(period)), 2))
     else:
         ma_vals = ema(c, period)
     if not ma_vals:
@@ -786,7 +802,14 @@ def leading_swing_index(o, h, l, c, v, period=14):
     for i in range(1, len(c)):
         k = max(h[i] - c[i - 1], l[i] - c[i - 1])
         tr_val = true_range(o[i], h[i], l[i], c[i], c[i - 1])
-        r = (h[i] - c[i - 1]) - 0.5 * (l[i] - c[i - 1]) + 0.25 * (c[i - 1] - o[i - 1])
+        hc = h[i] - c[i - 1]
+        lc = l[i] - c[i - 1]
+        if hc >= lc and hc > 0:
+            r = hc
+        elif lc > hc and lc > 0:
+            r = lc
+        else:
+            r = hc - 0.5 * lc + 0.25 * (c[i - 1] - o[i - 1])
         si = 50 * (c[i] - c[i - 1] + 0.5 * (c[i - 1] - o[i - 1]) + 0.25 * (c[i] - o[i])) / (r + 1e-10) * k / (tr_val + 1e-10)
         si_vals.append(si)
     if len(si_vals) < period:
@@ -879,17 +902,17 @@ def leading_zlema(o, h, l, c, v, period=14):
 
 
 def leading_hma(o, h, l, c, v, period=14):
-    """Hull Moving Average."""
+    """Hull Moving Average (uses WMA internally)."""
     if len(c) < period:
         return {"direction": "NEUTRAL", "value": 0}
     half = period // 2
     sqrt_period = int(math.sqrt(period))
-    wma_half = sma(c, max(half, 2))
-    wma_full = sma(c, max(period, 2))
+    wma_half = wma(c, max(half, 2))
+    wma_full = wma(c, max(period, 2))
     if not wma_half or not wma_full:
         return {"direction": "NEUTRAL", "value": 0}
     diff = [2 * wma_half[i] - wma_full[i] for i in range(min(len(wma_half), len(wma_full)))]
-    hma_vals = sma(diff, max(sqrt_period, 2))
+    hma_vals = wma(diff, max(sqrt_period, 2))
     if not hma_vals:
         return {"direction": "NEUTRAL", "value": 0}
     direction = "LONG" if c[-1] > hma_vals[-1] else "SHORT" if c[-1] < hma_vals[-1] else "NEUTRAL"
@@ -1144,8 +1167,8 @@ def confirm_adx(o, h, l, c, v, period=14):
     atr_vals = atr(h, l, c, period)
     if not atr_vals:
         return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
-    plus_dm = [max(h[i] - h[i - 1], 0) if i > 0 and h[i] - h[i - 1] > l[i - 1] - l[i] else 0 for i in range(len(c))]
-    minus_dm = [max(l[i - 1] - l[i], 0) if i > 0 and l[i - 1] - l[i] > h[i] - h[i - 1] else 0 for i in range(len(c))]
+    plus_dm = [max(h[i] - h[i - 1], 0) if i > 0 and h[i] - h[i - 1] > max(l[i - 1] - l[i], 0) else 0 for i in range(len(c))]
+    minus_dm = [max(l[i - 1] - l[i], 0) if i > 0 and l[i - 1] - l[i] > max(h[i] - h[i - 1], 0) else 0 for i in range(len(c))]
     pdi = rma(plus_dm, period)
     mdi = rma(minus_dm, period)
     if not pdi or not mdi:
@@ -1354,20 +1377,27 @@ def confirm_pivot(o, h, l, c, v):
 
 
 def confirm_divergence(o, h, l, c, v, period=14):
-    """RSI divergence detection."""
+    """RSI divergence detection using full RSI series."""
     if len(c) < period * 2:
         return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
     r = leading_rsi(o, h, l, c, v, period)
-    rsi_vals = [r["value"]]
+    rsi_series = r.get("series", [r["value"]])
+    if len(rsi_series) < period * 2:
+        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
     # Bullish divergence: price makes lower low, RSI makes higher low
     price_ll = lowest(l, period)
-    rsi_period = rsi_vals[-period:] if len(rsi_vals) >= period else rsi_vals
-    rsi_ll = min(rsi_period) if rsi_period else 0
     price_prev = lowest(l, period, period)
-    rsi_prev_period = rsi_vals[-period * 2:-period] if len(rsi_vals) >= period * 2 else rsi_vals
-    rsi_prev_low = min(rsi_prev_period) if rsi_prev_period else 0
+    rsi_period = rsi_series[-period:]
+    rsi_prev_period = rsi_series[-period * 2:-period]
+    rsi_ll = min(rsi_period)
+    rsi_prev_low = min(rsi_prev_period)
     bullish_div = price_ll < price_prev and rsi_ll > rsi_prev_low
-    bearish_div = price_ll > price_prev and rsi_ll < rsi_prev_low
+    # Bearish divergence: price makes higher high, RSI makes lower high
+    price_hh = highest(h, period)
+    price_prev_hh = highest(h, period, period)
+    rsi_hh = max(rsi_period)
+    rsi_prev_high = max(rsi_prev_period)
+    bearish_div = price_hh > price_prev_hh and rsi_hh < rsi_prev_high
     if bullish_div:
         return {"confirmed": True, "direction": "LONG", "value": 1, "pattern": "bullish_div"}
     elif bearish_div:

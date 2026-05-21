@@ -3,6 +3,7 @@ import asyncio
 import time
 from typing import Dict, List, Optional
 from datetime import datetime
+import numpy as np
 import pandas as pd
 from stockstats import wrap
 import yfinance as yf
@@ -239,6 +240,10 @@ class MarketDataService:
         if base_price is None:
             return []  # No mock data for unknown symbols — skip signal
         prices = []
+        for i in range(limit):
+            variation = (i % 10 - 5) * 0.02
+            prices.append(base_price * (1 + variation))
+        return prices
 
     def _get_ohlc_builder_closes(self, symbol: str, interval: str, limit: int) -> Optional[List[float]]:
         """Resample 1-min OHLC builder bars to target interval and return close prices."""
@@ -257,10 +262,6 @@ class MarketDataService:
         except Exception as e:
             print(f"OHLC builder error for {symbol}: {e}")
             return None
-        for i in range(limit):
-            variation = (i % 10 - 5) * 0.02
-            prices.append(base_price * (1 + variation))
-        return prices
 
 
 class TechnicalIndicators:

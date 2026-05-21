@@ -13,8 +13,10 @@ DB_PATH = os.path.join(_persistent_dir, 'signals.db')
 
 
 def _get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS signals (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,12 +109,14 @@ def get_accuracy_stats() -> Dict:
     avg = conn.execute("SELECT COALESCE(AVG(pnl_pct), 0) as a FROM signals WHERE resolved = 1").fetchone()['a']
     conn.close()
 
+    total_resolved = wins + losses
     return {
         'total_signals': total,
         'resolved': resolved,
         'wins': wins,
         'losses': losses,
-        'win_rate': round(wins / resolved * 100, 1) if resolved else 0,
+        'neutral': resolved - total_resolved,
+        'win_rate': round(wins / total_resolved * 100, 1) if total_resolved else 0,
         'avg_pnl': round(avg, 2),
         'by_symbol': {},
     }

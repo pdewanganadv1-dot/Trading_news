@@ -28,6 +28,29 @@ from app.services.signal_monitor import get_cache_stats
 import asyncio
 
 
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+_background_tasks: list = []
+
+
+def _safe_task(coro, name: str):
+    """Create a background task that logs crashes and restarts."""
+    async def wrapper():
+        while True:
+            try:
+                await coro
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logging.error(f"Background task '{name}' crashed: {e}", exc_info=True)
+            await asyncio.sleep(30)  # restart delay
+    t = asyncio.create_task(wrapper())
+    _background_tasks.append(t)
+    return t
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.services.signal_monitor import signal_monitor_loop
@@ -38,23 +61,19 @@ async def lifespan(app: FastAPI):
     from app.services.market_feed import feed_loop
     from app.services.live_analysis import volume_spike_loop
     from app.services.strategy_builder import strategy_builder_loop
-    task1 = asyncio.create_task(signal_monitor_loop())
-    task2 = asyncio.create_task(telegram_poll_loop())
-    task3 = asyncio.create_task(daily_report_loop())
-    task4 = asyncio.create_task(sentiment_pipeline_loop())
-    task5 = asyncio.create_task(auto_update_fii_dii())
-    task6 = asyncio.create_task(feed_loop())
-    task7 = asyncio.create_task(volume_spike_loop())
-    task8 = asyncio.create_task(strategy_builder_loop())
+    from app.services.dhanhq_service import auto_renew_loop
+    _safe_task(signal_monitor_loop(), "signal_monitor")
+    _safe_task(telegram_poll_loop(), "telegram_poll")
+    _safe_task(daily_report_loop(), "daily_report")
+    _safe_task(sentiment_pipeline_loop(), "sentiment_pipeline")
+    _safe_task(auto_update_fii_dii(), "fii_dii")
+    _safe_task(feed_loop(), "market_feed")
+    _safe_task(volume_spike_loop(), "volume_spike")
+    _safe_task(strategy_builder_loop(), "strategy_builder")
+    _safe_task(auto_renew_loop(), "dhan_token_renew")
     yield
-    task1.cancel()
-    task2.cancel()
-    task3.cancel()
-    task4.cancel()
-    task5.cancel()
-    task6.cancel()
-    task7.cancel()
-    task8.cancel()
+    for t in _background_tasks:
+        t.cancel()
 
 
 app = FastAPI(

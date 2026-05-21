@@ -195,7 +195,7 @@ async def _edge_scan():
 
 def _is_market_hours() -> bool:
     """Check if Indian market is open (weekday 9:15am-3:30pm IST = UTC 3:45-10:00)."""
-    now = datetime.utcnow()
+    now = datetime.now()
     if now.weekday() >= 5:
         return False
     utc_hour = now.hour + now.minute / 60.0
@@ -218,9 +218,9 @@ async def signal_monitor_loop():
             if resolve_counter >= 30:
                 resolve_counter = 0
                 await resolve_signals()
-            if edge_counter >= 15:  # Edge scan every ~30 min during market hours
+            if edge_counter >= 15:  # Edge scan every ~150 min during market hours
                 edge_counter = 0
-                _ = asyncio.create_task(_edge_scan())
+                asyncio.ensure_future(_edge_scan())
             await asyncio.sleep(max(60, settings.signal_check_interval_seconds - elapsed))
         else:
             await asyncio.sleep(300)  # Check every 5min outside market hours

@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     database_url: Optional[str] = None
     tradingview_api_key: Optional[str] = None
     secret_key: str = "dev-secret-key-change-in-production"
-    telegram_bot_token: str = "7424796820:AAFwug5i-Q1CoAe-4qkIHfRPLdwAysFc-pY"
-    telegram_chat_id: str = "5163568145"
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
     signal_confidence_threshold: float = 0.65
     signal_check_interval_seconds: int = 600
     groq_api_key: Optional[str] = None

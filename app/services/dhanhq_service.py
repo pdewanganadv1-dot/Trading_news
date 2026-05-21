@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import io
+import os
 import time
 import httpx
 from datetime import datetime, timedelta
@@ -39,7 +40,7 @@ _init()
 
 
 def _headers() -> Dict[str, str]:
-    token = settings.dhan_access_token or _access_token or ""
+    token = _access_token or settings.dhan_access_token or ""
     return {
         "access-token": token,
         "Content-Type": "application/json",
@@ -299,7 +300,7 @@ async def get_dashboard() -> Dict:
 
 
 async def auto_renew_loop():
-    """Background loop: renew Dhan access token every 23 hours."""
+    """Background loop: renew Dhan access token every 23 hours (retry 5min on failure)."""
     while True:
         try:
             token = _headers()["access-token"]
@@ -307,8 +308,14 @@ async def auto_renew_loop():
                 success = await renew_token()
                 if success:
                     print(f"Dhan token renewed at {datetime.now().isoformat()}")
+                else:
+                    print(f"Dhan token renewal failed, retrying in 5min")
+                    await asyncio.sleep(300)
+                    continue
         except Exception as e:
-            print(f"Dhan token renew error: {e}")
+            print(f"Dhan token renew error: {e}, retrying in 5min")
+            await asyncio.sleep(300)
+            continue
         await asyncio.sleep(82800)  # 23 hours
 
 
