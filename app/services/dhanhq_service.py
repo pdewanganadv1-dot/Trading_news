@@ -85,9 +85,13 @@ def get_security_id(symbol: str) -> Optional[str]:
     return None
 
 
+# Lock to prevent concurrent security map downloads
+_security_map_lock = asyncio.Lock()
+
 async def ensure_security_map():
-    if not _security_map:
-        await _load_security_map()
+    async with _security_map_lock:
+        if not _security_map:
+            await _load_security_map()
 
 
 async def _get(endpoint: str) -> Optional[Dict]:

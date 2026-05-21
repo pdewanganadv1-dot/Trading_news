@@ -35,9 +35,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _background_tasks: list = []
 
 
-def _safe_task(coro, name: str):
-    """Create a background task that logs crashes and restarts."""
+def _safe_task(coro, name: str, delay: int = 0):
+    """Create a background task that logs crashes and restarts (staggered start)."""
     async def wrapper():
+        if delay:
+            await asyncio.sleep(delay)
         while True:
             try:
                 await coro
@@ -62,15 +64,15 @@ async def lifespan(app: FastAPI):
     from app.services.live_analysis import volume_spike_loop
     from app.services.strategy_builder import strategy_builder_loop
     from app.services.dhanhq_service import auto_renew_loop
-    _safe_task(signal_monitor_loop(), "signal_monitor")
-    _safe_task(telegram_poll_loop(), "telegram_poll")
-    _safe_task(daily_report_loop(), "daily_report")
-    _safe_task(sentiment_pipeline_loop(), "sentiment_pipeline")
-    _safe_task(auto_update_fii_dii(), "fii_dii")
-    _safe_task(feed_loop(), "market_feed")
-    _safe_task(volume_spike_loop(), "volume_spike")
-    _safe_task(strategy_builder_loop(), "strategy_builder")
-    _safe_task(auto_renew_loop(), "dhan_token_renew")
+    _safe_task(signal_monitor_loop(), "signal_monitor", delay=0)
+    _safe_task(telegram_poll_loop(), "telegram_poll", delay=5)
+    _safe_task(daily_report_loop(), "daily_report", delay=10)
+    _safe_task(sentiment_pipeline_loop(), "sentiment_pipeline", delay=15)
+    _safe_task(auto_update_fii_dii(), "fii_dii", delay=20)
+    _safe_task(feed_loop(), "market_feed", delay=25)
+    _safe_task(volume_spike_loop(), "volume_spike", delay=30)
+    _safe_task(strategy_builder_loop(), "strategy_builder", delay=35)
+    _safe_task(auto_renew_loop(), "dhan_token_renew", delay=40)
     yield
     for t in _background_tasks:
         t.cancel()
