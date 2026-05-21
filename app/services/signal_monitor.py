@@ -23,9 +23,9 @@ _realtime_cache: Dict[str, Dict] = load_realtime_cache()
 _last_sent: Dict[str, str] = {}
 _CONFIRMED_SENT: Dict[str, str] = load_sent_signals()
 def _ist_now_str() -> str:
-    """Current time as ISO string in IST."""
+    """Current time as ISO string in IST (no tz suffix)."""
     from datetime import timezone, timedelta
-    return (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).isoformat()
+    return (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%dT%H:%M:%S")
 
 _cache_start: str = _ist_now_str()
 _initial_scan_done: bool = False
