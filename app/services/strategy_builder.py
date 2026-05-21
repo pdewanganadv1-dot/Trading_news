@@ -919,6 +919,17 @@ def leading_alma(o, h, l, c, v, period=9, sigma=6, offset=0.85):
     return {"direction": direction, "value": alma_vals[-1]}
 
 
+def leading_speedy_alma(o, h, l, c, v):
+    """Composite: Speedy Range + ALMA — both must agree."""
+    sr = leading_speedyRange(o, h, l, c, v)
+    al = leading_alma(o, h, l, c, v)
+    if sr["direction"] == "NEUTRAL" or al["direction"] == "NEUTRAL":
+        return {"direction": "NEUTRAL", "value": 0}
+    if sr["direction"] == al["direction"]:
+        return {"direction": sr["direction"], "value": (sr.get("value", 0) + al.get("value", 0)) / 2}
+    return {"direction": "NEUTRAL", "value": 0}
+
+
 def leading_jjma(o, h, l, c, v, period=7, phase=0):
     """Jurik Moving Average (simplified approximation)."""
     if len(c) < period:
@@ -1010,6 +1021,7 @@ LEADING_INDICATORS: Dict[str, Callable] = {
     "ZLEMA": leading_zlema,
     "HMA": leading_hma,
     "ALMA": leading_alma,
+    "Speedy+ALMA": leading_speedy_alma,
     "JJMA": leading_jjma,
     "Tillson T3": leading_tillson_t3,
 }
@@ -1457,7 +1469,7 @@ class StrategyBuilder:
         self.signal_expiry = 5  # 1-min bars before signal expires
         self.alt_signal_mode = False
         self.alt_counter: Dict[str, int] = {}
-        self.selected_leading = "SuperTrend"  # default leading indicator
+        self.selected_leading = "Speedy+ALMA"  # default leading indicator
         self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action"]
         self.signal_threshold = 3  # min confirmations needed
         self.min_bars = 20  # minimum 1-min bars required
@@ -1590,16 +1602,21 @@ class StrategyBuilder:
         return result
 
     def scan_all(self) -> List[Dict]:
-        """Run update on all symbols with 1-min OHLC data."""
+        """Run update on all symbols with 1-min OHLC data (parallel via threads)."""
         symbols = ohlc_builder.get_all_symbols_with_bars(min_bars=self.min_bars)
+        if not symbols:
+            return []
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         results = []
-        for sym in symbols:
-            try:
-                r = self.update(sym)
-                if r and r["final_signal"] in ("BUY", "SELL"):
-                    results.append(r)
-            except Exception:
-                continue
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            fut_map = {pool.submit(self.update, sym): sym for sym in symbols}
+            for fut in as_completed(fut_map):
+                try:
+                    r = fut.result()
+                    if r and r["final_signal"] in ("BUY", "SELL"):
+                        results.append(r)
+                except Exception:
+                    continue
         return results
 
     def get_active_signals(self) -> List[Dict]:
