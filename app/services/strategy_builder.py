@@ -1975,13 +1975,43 @@ strategy_builder = StrategyBuilder()
 
 # ─── Background Loop ────────────────────────────────────────────────
 
+_sent_speedy_alerts: Dict[str, str] = {}  # symbol -> "BUY_ts" dedup
+
 async def strategy_builder_loop():
-    """Background loop: scan all symbols on 1-min timeframe every 3 min."""
+    """Background loop: scan all symbols on 1-min timeframe every 3 min.
+    Sends batch summary + individual alerts for Speedy+ALMA signals."""
     while True:
         try:
             signals = strategy_builder.scan_all()
             if signals:
                 from app.services.telegram_notifier import telegram_notifier
+                # Individual alerts for Speedy+ALMA
+                for s in signals:
+                    sym = s["symbol"]
+                    sig = s["final_signal"]
+                    ts = s.get("timestamp", "")
+                    dedup_key = f"{sig}_{ts[:16]}"
+                    last = _sent_speedy_alerts.get(sym)
+                    if last == dedup_key:
+                        continue
+                    _sent_speedy_alerts[sym] = dedup_key
+                    if len(_sent_speedy_alerts) > 500:
+                        _sent_speedy_alerts.clear()
+                    conf_count = s.get("confirmation_count", 0)
+                    total_possible = s.get("total_possible", 7)
+                    confidence = conf_count / max(total_possible, 1)
+                    reasons = [c["name"] + ":" + c["direction"][0] for c in s.get("confirmations", [])]
+                    explanation = (
+                        f"Speedy+ALMA composite → {s.get('leading_direction', '?')} "
+                        f"| {conf_count}/{total_possible} confirmations "
+                        f"| Threshold: {s.get('signal_threshold', 3)}"
+                    )
+                    await telegram_notifier.send_signal_alert(
+                        sym, sig, confidence, s.get("price", 0),
+                        reasons[:3], explanation=explanation,
+                    )
+
+                # Batch summary
                 msg = f"🧠 *1-min Strategy Signals*\n\nFound `{len(signals)}` active signals on `1m` chart\n\n"
                 for s in signals[:5]:
                     emoji = "🟢" if s["final_signal"] == "BUY" else "🔴"
