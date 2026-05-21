@@ -5,6 +5,7 @@ Aggregates WebSocket ticks into 1-minute candles for strategy calculations.
 import time
 from collections import deque, defaultdict
 from typing import Dict, List, Optional
+from app.data.stocks import MONITORED_SYMBOLS_SET as _TRACKED
 
 
 class MinuteBar:
@@ -44,7 +45,7 @@ class OHLCBuilder:
     Maintains a ring buffer of recent bars per symbol.
     """
 
-    def __init__(self, max_bars: int = 200):
+    def __init__(self, max_bars: int = 100):
         self.max_bars = max_bars
         # symbol -> current active minute bar
         self._current: Dict[str, MinuteBar] = {}
@@ -65,6 +66,8 @@ class OHLCBuilder:
         Call this for every incoming packet.
         """
         symbol = symbol.upper()
+        if symbol not in _TRACKED:
+            return
         ts = timestamp if timestamp else time.time()
         minute_key = self._get_minute_key(ts)
 

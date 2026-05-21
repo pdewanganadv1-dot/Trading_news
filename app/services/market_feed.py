@@ -11,6 +11,7 @@ from app.services.dhanhq_service import (
     _headers, _client, ensure_security_map, get_security_id,
 )
 from app.services.ohlc_builder import ohlc_builder
+from app.data.stocks import MONITORED_SYMBOLS_SET as _TRACKED
 
 WS_URL = "wss://api-feed.dhan.co"
 
@@ -156,8 +157,10 @@ async def _parse_packet(data: bytes):
 
     if parsed:
         parsed["symbol"] = symbol
-        async with _live_prices_lock:
-            _live_prices[symbol] = parsed
+        # Only cache monitored symbols (skip the other ~9,300)
+        if symbol.upper() in _TRACKED:
+            async with _live_prices_lock:
+                _live_prices[symbol] = parsed
 
         # Feed ticks into 1-minute OHLC builder
         price = parsed.get("ltp", 0)
