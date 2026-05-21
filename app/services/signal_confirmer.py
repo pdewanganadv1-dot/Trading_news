@@ -6,6 +6,7 @@ from app.services.market_data_service import market_data_service, TechnicalIndic
 from app.services.market_edge_service import scan_stock, get_market_breadth, get_fii_dii_summary
 from app.services.real_news import real_news_service
 from app.services.social_sentiment import fetch_stocktwits, fetch_reddit
+from app.data.stocks import INDIAN_STOCKS_SET
 
 
 async def get_multiframe_prices(symbol: str) -> Tuple[List[float], List[float], List[float]]:
@@ -186,8 +187,7 @@ async def confirm_signal(
             warnings.append(f"Social sentiment conflicts ({social_direction})")
 
     # 6. Combined FII + DII institutional flow (Indian stocks only)
-    from app.data.stocks import INDIAN_STOCKS_SET as _is_set
-    is_indian = symbol_lower in _is_set
+    is_indian = symbol_lower in INDIAN_STOCKS_SET
     if is_indian:
         try:
             fiidii = await get_fii_dii_summary()

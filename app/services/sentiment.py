@@ -148,7 +148,7 @@ class SentimentAnalysis:
             "AAPL": ["apple", "aapl"]
         }
 
-        keywords = symbol_keywords.get(symbol_upper, [symbol_lower := symbol.lower()])
+        keywords = symbol_keywords.get(symbol_upper, [symbol.lower()])
 
         for item in news_items:
             text = f"{item.get('title', '')} {item.get('description', '')}".lower()
