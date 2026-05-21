@@ -30,21 +30,25 @@ async def _process_symbol(symbol: str) -> None:
     try:
         price_data = await market_data_service.get_price_data(symbol)
         if not price_data:
+            # Cache as unavailable so it's not permanently PENDING
+            _cache_fallback(symbol, None)
             return
+
+        price = price_data['price']
 
         prices_5m = await market_data_service.get_5min_prices(symbol, 100)
         if not prices_5m or len(prices_5m) < 20:
-            return  # Not enough data for a signal
+            # Cache price only (no signal data available — e.g. market closed)
+            _cache_realtime_only(symbol, price_data)
+            return
 
         signal_data = TradingSignals.generate_signal(prices_5m, price_data['price'])
 
         sig = signal_data['signal']
         conf = signal_data['confidence']
-        price = price_data['price']
 
         await record_signal(symbol, sig, conf, price, signal_data.get('reasons', []))
 
-        # Only use Groq LLM for signals that may trigger alerts (BUY/SELL ≥ 50%)
         uses_llm = sig in ('BUY', 'SELL') and conf >= 0.5
         if uses_llm:
             explanation = signal_explainer.explain(
@@ -70,7 +74,6 @@ async def _process_symbol(symbol: str) -> None:
             'notified': False,
         }
 
-        # Primary gate: base signal must cross threshold
         should_alert = sig in ('BUY', 'SELL') and conf >= settings.signal_confidence_threshold
         if should_alert:
             confirmed = await confirm_signal(symbol, sig, conf, signal_data.get('reasons', []), price, prices_5m=prices_5m)
@@ -108,17 +111,7 @@ async def _process_symbol(symbol: str) -> None:
         _signal_cache[symbol] = cache_entry
         save_signal_cache(symbol, cache_entry)
 
-        global _cache_start
-        if not _cache_start:
-            _cache_start = datetime.now().isoformat()
-
-        rt_entry = {
-            "symbol": symbol.upper(),
-            "price": price_data,
-            "timestamp": datetime.now().isoformat(),
-        }
-        _realtime_cache[symbol] = rt_entry
-        save_realtime_cache(symbol, rt_entry)
+        _cache_realtime_only(symbol, price_data)
 
         signal_log.insert(0, entry)
         if len(signal_log) > 100:
@@ -128,12 +121,41 @@ async def _process_symbol(symbol: str) -> None:
         print(f"Signal monitor error for {symbol}: {e}")
 
 
+def _cache_fallback(symbol: str, price_data):
+    fallback_entry = {
+        "symbol": symbol.upper(),
+        "signal": "NODATA",
+        "confidence": 0,
+        "price": None,
+        "reasons": ["Price data unavailable"],
+        "timestamp": datetime.now().isoformat(),
+    }
+    _signal_cache[symbol] = fallback_entry
+
+
+def _cache_realtime_only(symbol: str, price_data):
+    rt_entry = {
+        "symbol": symbol.upper(),
+        "price": price_data,
+        "timestamp": datetime.now().isoformat(),
+    }
+    _realtime_cache[symbol] = rt_entry
+    save_realtime_cache(symbol, rt_entry)
+
+
 async def check_and_notify():
-    """Process all monitored symbols with limited parallelism (Yahoo rate-limits parallel requests).
-    Processes BTC/ETH/GOLD/SILVER first sequentially (metals use fallback, crypto uses Binance),
-    then Indian stocks in parallel batches of 5."""
+    """Process all monitored symbols. Uses Dhan bulk OHLC for Indian stocks (1 API call vs 119 yfinance calls)."""
+    # Pre-warm Dhan price cache with a single bulk call
+    try:
+        from app.services.dhanhq_service import get_market_ohlc
+        if _INDIAN_STOCKS:
+            await get_market_ohlc(_INDIAN_STOCKS)
+    except Exception:
+        pass
+
     for symbol in ('btc', 'eth', 'gold', 'silver'):
         await _process_symbol(symbol)
+
     tasks = []
     for symbol in _INDIAN_STOCKS:
         tasks.append(_process_symbol(symbol))

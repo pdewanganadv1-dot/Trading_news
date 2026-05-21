@@ -73,11 +73,16 @@ class MarketDataService:
             except Exception as e:
                 print(f"CoinGecko API error: {e}")
 
-        # Try yfinance for Indian stocks and other non-crypto assets
+        # Try DhanHQ for Indian stocks (one bulk call, much faster than 119 individual yfinance calls)
+        ticker = symbol.upper()
+        if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
+            dhan_price = await self._get_dhan_price(ticker)
+            if dhan_price:
+                return dhan_price
+
+        # Fallback to yfinance for Indian stocks
         try:
-            ticker = symbol.upper()
             if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
-                # Rate-limit: 1 request per 2s minimum
                 now = time.time()
                 since_last = now - self._yf_last_call
                 if since_last < 2.0:
@@ -106,6 +111,30 @@ class MarketDataService:
         except Exception as e:
             print(f"Yahoo Finance error for {symbol}: {e}")
 
+        return None
+
+    async def _get_dhan_price(self, symbol: str) -> Optional[Dict]:
+        """Fetch price from DhanHQ OHLC endpoint for a single symbol."""
+        try:
+            from app.services.dhanhq_service import get_market_ohlc
+            result = await get_market_ohlc([symbol])
+            data = result.get(symbol)
+            if data and data.get("ltp"):
+                ltp = data["ltp"]
+                close = data.get("close", ltp)
+                change = ((ltp - close) / close * 100) if close else 0
+                return {
+                    'symbol': symbol,
+                    'price': ltp,
+                    'change': round(change, 2),
+                    'high': data.get("high", ltp),
+                    'low': data.get("low", ltp),
+                    'open': data.get("open", ltp),
+                    'volume': 0,
+                    'source': 'DhanHQ',
+                }
+        except Exception as e:
+            print(f"Dhan price error for {symbol}: {e}")
         return None
 
     async def _get_metals_price(self, symbol: str) -> Dict:
@@ -181,6 +210,19 @@ class MarketDataService:
                     closes = data['Close'].tolist()
                     if closes:
                         return closes[-limit:]
+                # Fallback: if intraday data fails (market closed), try daily data
+                if interval != '1d':
+                    data = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            lambda: yf.download(f"{ticker}.NS", period='1mo', interval='1d', progress=False, multi_level_index=False)
+                        ),
+                        timeout=15.0,
+                    )
+                    if data is not None and not data.empty:
+                        data = data.reset_index()
+                        closes = data['Close'].tolist()
+                        if closes:
+                            return closes[-limit:]
         except Exception as e:
             print(f"Yahoo Finance klines error for {symbol}: {e}")
 
