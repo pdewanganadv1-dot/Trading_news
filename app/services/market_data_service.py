@@ -170,7 +170,7 @@ class MarketDataService:
         return await self._get_klines(symbol, '5m', limit)
 
     async def _get_klines(self, symbol: str, interval: str, limit: int) -> List[float]:
-        """Fetch klines/candles from Binance."""
+        """Fetch klines/candles. Prefers Dhan WebSocket OHLC bars, then Binance, then yfinance."""
         symbol_map = {
             'btc': 'BTCUSDT',
             'eth': 'ETHUSDT',
@@ -178,22 +178,29 @@ class MarketDataService:
 
         exchange_symbol = symbol_map.get(symbol.lower(), symbol.upper() + 'USDT')
 
-        try:
-            url = f"https://api.binance.com/api/v3/klines?symbol={exchange_symbol}&interval={interval}&limit={limit}"
-            response = await self.session.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                return [float(candle[4]) for candle in data]  # Close prices
-        except Exception as e:
-            print(f"Klines error ({interval}): {e}")
+        # Try Binance first (for crypto)
+        if symbol.lower() in ('btc', 'eth'):
+            try:
+                url = f"https://api.binance.com/api/v3/klines?symbol={exchange_symbol}&interval={interval}&limit={limit}"
+                response = await self.session.get(url)
+                if response.status_code == 200:
+                    data = response.json()
+                    return [float(candle[4]) for candle in data]
+            except Exception as e:
+                print(f"Klines error ({interval}): {e}")
 
-        # Try yfinance for Indian stocks
+        # Try Dhan WebSocket OHLC bars for Indian stocks
+        ticker = symbol.upper()
+        if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
+            ohlc_closes = self._get_ohlc_builder_closes(ticker, interval, limit)
+            if ohlc_closes:
+                return ohlc_closes
+
+        # Fallback to yfinance for Indian stocks
         try:
-            ticker = symbol.upper()
             if ticker not in ['BTC', 'ETH', 'GOLD', 'SILVER']:
                 interval_map = {'5m': ('5d', '5m'), '15m': ('5d', '15m'), '1h': ('1mo', '1h'), '1d': ('1mo', '1d')}
                 yf_period, yf_interval = interval_map.get(interval, ('1mo', '1d'))
-                # Rate-limit: 1 request per 2s minimum
                 now = time.time()
                 since_last = now - self._yf_last_call
                 if since_last < 2.0:
@@ -210,7 +217,7 @@ class MarketDataService:
                     closes = data['Close'].tolist()
                     if closes:
                         return closes[-limit:]
-                # Fallback: if intraday data fails (market closed), try daily data
+                # If intraday data fails (market closed), try daily data
                 if interval != '1d':
                     data = await asyncio.wait_for(
                         asyncio.to_thread(
@@ -232,6 +239,24 @@ class MarketDataService:
         if base_price is None:
             return []  # No mock data for unknown symbols — skip signal
         prices = []
+
+    def _get_ohlc_builder_closes(self, symbol: str, interval: str, limit: int) -> Optional[List[float]]:
+        """Resample 1-min OHLC builder bars to target interval and return close prices."""
+        try:
+            from app.services.ohlc_builder import ohlc_builder
+            bars = ohlc_builder.get_bars(symbol, limit * 2)
+            if not bars or len(bars) < 20:
+                return None
+            step = {'5m': 5, '15m': 15, '1h': 60, '1d': 375}.get(interval, 5)
+            grouped = []
+            for i in range(0, len(bars), step):
+                chunk = bars[i:i + step]
+                if chunk:
+                    grouped.append(chunk[-1]["close"])
+            return grouped[-limit:] if len(grouped) >= 20 else None
+        except Exception as e:
+            print(f"OHLC builder error for {symbol}: {e}")
+            return None
         for i in range(limit):
             variation = (i % 10 - 5) * 0.02
             prices.append(base_price * (1 + variation))
