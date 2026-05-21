@@ -275,31 +275,6 @@ async def debug_place_test():
         "test5_SET_primary_via_api": {"status": r5.status_code, "body": r5.text[:300]},
         "test6_SET_secondary_via_api": {"status": r6.status_code, "body": r6.text[:300]},
     }
-    async with httpx.AsyncClient(timeout=15) as c:
-        r2 = await c.post(
-            f"{dhan.DHAN_BASE}/orders",
-            headers=headers,
-            json=payload,
-        )
-
-    # Test GET getIP - verify what IP Dhan has on record
-    async with httpx.AsyncClient(timeout=15) as c:
-        r4 = await c.get(f"{dhan.DHAN_BASE}/ip/getIP", headers=headers)
-
-    # Test POST to fundlimit (Data API - should pass IP check)
-    async with httpx.AsyncClient(timeout=15) as c:
-        r3 = await c.post(
-            f"{dhan.DHAN_BASE}/fundlimit",
-            headers=headers,
-            json={},
-        )
-
-    return {
-        "test1_GET_fundlimit": {"status": r1.status_code, "body": r1.text[:300]},
-        "test2_POST_orders": {"status": r2.status_code, "body": r2.text[:300]},
-        "test3_POST_fundlimit": {"status": r3.status_code, "body": r3.text[:300]},
-        "test4_GET_getIP": {"status": r4.status_code, "body": r4.text[:300]},
-    }
 
 
 @router.get("/debug/ip")

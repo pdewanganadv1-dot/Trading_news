@@ -147,6 +147,19 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 
 **Key insight**: Daily timeframe backtest shows Speedy+ALMA composite should outperform old SuperTrend default during live market hours.
 
+### May 22, 2026 — Session Recovery + Sanity Fixes + Redeploy
+
+**Done**:
+1. **Recovered local repo**: Synced 52 commits behind from GitHub (merged origin-https/main)
+2. **Switched remote to HTTPS**: SSH had no key access
+3. **Made GitHub repo public**: Enabled deploy hook access
+4. **Redeployed to Render**: Triggered deploy hook → app back online (HTTP 200, 100% cache)
+5. **Fixed dead code** in `app/routes/debug.py:278-302`: Removed unreachable duplicate code block after early return
+6. **Updated `.env.example`**: Now lists all required vars (Telegram, Groq, Dhan, PERSISTENT_DIR, etc.)
+7. **Updated `docker-compose.yml`**: Passes through `GROQ_API_KEY`, `DHAN_CLIENT_ID`, `DHAN_ACCESS_TOKEN`, `PERSISTENT_DIR`
+8. **Updated `render.yaml`**: Added `DHAN_CLIENT_ID` and `DHAN_ACCESS_TOKEN` env vars (sync: false)
+9. **Pushed fixes to GitHub**
+
 ### May 21, 2026 (Night) — Speedy+ALMA 1m Backtest + Threshold Comparison + Individual Telegram Alerts
 
 **Done**:
