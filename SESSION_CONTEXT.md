@@ -1,5 +1,16 @@
 # Session Context — Trading Dashboard
 
+## ⚠️ CRITICAL: Dhan Token Expires Daily ⚠️
+The Dhan access token (`DHAN_ACCESS_TOKEN`) expires **every 24 hours**. Every time you start a new session, the **first thing** you must do is:
+1. Get a new token from Dhan
+2. Update it in **both** places:
+   - `./.env` (local — `DHAN_ACCESS_TOKEN=...`)
+   - **Render dashboard** → Environment Variables → `DHAN_ACCESS_TOKEN`
+3. Then trigger a Render deploy: `curl -X POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI`
+4. The app also has an `auto_renew_loop()` that tries to renew every 23h, but a manual renew is still needed after 24h.
+
+## Project
+
 ## Project
 Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + Groq AI explanations + 6 standalone analysis dashboards, deployed on Render, accessible via Telegram bot `@Signal_alpha267_bot`.
 
