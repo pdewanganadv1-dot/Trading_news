@@ -99,6 +99,16 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Git commit HEAD**: `(latest)`
 - **Repo**: **Private** on GitHub
 
+### May 21, 2026 (Evening) — Dhan WebSocket Signals + Expanded Stock List
+
+**Done**:
+1. **Stock list expanded**: 119 → **149 Indian stocks** (full Nifty 100 + 22 extras). Fixed 50+ bad symbol names. Sourced from `nifty100.json`.
+2. **Dhan OHLC for prices**: Single API call for all stocks bypasses slow yfinance calls.
+3. **OHLC builder for signals**: Resamples WebSocket 1-min bars to 5m/15m for technical indicators (RSI, MACD, etc).
+4. **yfinance → fallback only**: Used only when Dhan data unavailable (cold start / market closed).
+5. **Startup scan**: Runs immediately after deploy, not just during market hours.
+6. **Market-closed cache**: Realtime price cached even when 5min data unavailable.
+
 ### May 21, 2026 (Evening) — Robustness Fixes
 
 **Done**:
