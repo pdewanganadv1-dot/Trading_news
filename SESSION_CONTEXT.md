@@ -96,8 +96,18 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
 - **Deploy hook**: ~~broken (repo private)~~ — manual deploy via Render dashboard
-- **Git commit HEAD**: `066b2d2` (strategy builder)
+- **Git commit HEAD**: `(latest)`
 - **Repo**: **Private** on GitHub
+
+### May 21, 2026 (Evening) — Robustness Fixes
+
+**Done**:
+1. **Fixed `persistent_dir` default** (`app/config.py`): Now resolves to `<project>/data/` instead of root. Render env var `PERSISTENT_DIR=/data` still overrides for persistent disk.
+2. **Fixed `_cache_start`**: Always set to app startup time (was `""` when cache empty), so health endpoint always shows when the app started.
+3. **Fixed market-hours first-run bug** (`app/services/signal_monitor.py`): Signal loop now runs **at least once on every deploy/startup**, regardless of market hours. Ensures cache is populated immediately after deploy. Subsequent iterations respect `_is_market_hours()`.
+4. **Corrected market hours**: 9:15 AM–3:30 PM IST (was 9:00–16:00).
+5. **Auto-create `data/` dir**: `accuracy_tracker.py` now creates the DB directory on import if missing. Added `data/` to `.gitignore`.
+6. **SSH deploy key**: Added `~/.ssh/github_deploy` for pushing to private repo.
 
 ### Key Files
 | File | Purpose |

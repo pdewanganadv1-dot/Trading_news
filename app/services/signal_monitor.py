@@ -22,7 +22,8 @@ _signal_cache: Dict[str, Dict] = load_signal_cache()
 _realtime_cache: Dict[str, Dict] = load_realtime_cache()
 _last_sent: Dict[str, str] = {}
 _CONFIRMED_SENT: Dict[str, str] = load_sent_signals()
-_cache_start: str = datetime.now().isoformat() if _signal_cache else ""
+_cache_start: str = datetime.now().isoformat()
+_initial_scan_done: bool = False
 
 async def _process_symbol(symbol: str) -> None:
     """Process a single symbol: fetch data, generate signal, explain, alert."""
@@ -171,21 +172,23 @@ async def _edge_scan():
 
 
 def _is_market_hours() -> bool:
-    """Check if Indian market is open (weekday 9:00am-4:00pm IST = UTC 3:30-10:30)."""
+    """Check if Indian market is open (weekday 9:15am-3:30pm IST = UTC 3:45-10:00)."""
     now = datetime.utcnow()
     if now.weekday() >= 5:
         return False
     utc_hour = now.hour + now.minute / 60.0
     ist_hour = utc_hour + 5.5
-    return 9 <= ist_hour < 16
+    return 9.25 <= ist_hour < 15.5
 
 
 async def signal_monitor_loop():
+    global _initial_scan_done
     resolve_counter = 0
     edge_counter = 0
     while True:
-        if _is_market_hours():
+        if _is_market_hours() or not _initial_scan_done:
             start = datetime.now()
+            _initial_scan_done = True
             await check_and_notify()
             elapsed = (datetime.now() - start).total_seconds()
             resolve_counter += 1

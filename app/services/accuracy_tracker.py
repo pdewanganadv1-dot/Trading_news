@@ -7,7 +7,9 @@ from app.services.market_data_service import market_data_service
 from app.config import settings
 
 
-DB_PATH = os.path.join(settings.persistent_dir, 'signals.db')
+_persistent_dir = settings.persistent_dir
+os.makedirs(_persistent_dir, exist_ok=True)
+DB_PATH = os.path.join(_persistent_dir, 'signals.db')
 
 
 def _get_db():
