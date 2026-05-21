@@ -147,6 +147,20 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 
 **Key insight**: Daily timeframe backtest shows Speedy+ALMA composite should outperform old SuperTrend default during live market hours.
 
+### May 21, 2026 (Night) — Speedy+ALMA 1m Backtest + Threshold Comparison + Individual Telegram Alerts
+
+**Done**:
+1. **7-day 1-minute Speedy+ALMA backtest** (133 stocks, 57s): 121K signals, 41.4% WR 1m — **no predictive edge on 1-minute noise**
+2. **Threshold comparison (3/4/5/6)**: Raising threshold doesn't improve WR:
+   - Thresh 3: 121K sigs, 41.9% WR, -0.005% avg
+   - Thresh 4: 29K sigs, 41.4% WR, -0.006% avg  
+   - Thresh 5: 1.7K sigs, 40.6% WR, -0.012% avg
+   - Thresh 6: 0 sigs — impossible to get all 6/6
+3. **Individual Telegram alerts for Speedy+ALMA**: `strategy_builder_loop()` now sends per-signal alerts via `send_signal_alert()` (deduplicated by symbol+timestamp) in addition to batch summary
+4. **Deployed**: Commit `73b8a04` → Render deploy `dep-d87jduhkh4rs73an3g00` (health: 200, 100% cache)
+
+**Key insight**: Speedy+ALMA works on daily data (75% WR, 30d batch) but is random on 1-minute. Composite needs longer timeframe to have edge. Individual alerts active during market hours.
+
 ### Key Files
 | File | Purpose |
 |------|---------|
