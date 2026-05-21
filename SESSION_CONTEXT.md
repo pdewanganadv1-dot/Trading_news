@@ -119,7 +119,50 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 5. **Auto-create `data/` dir**: `accuracy_tracker.py` now creates the DB directory on import if missing. Added `data/` to `.gitignore`.
 6. **SSH deploy key**: Added `~/.ssh/github_deploy` for pushing to private repo.
 
+### May 21, 2026 (Night) — Batch Backtest + Speedy+ALMA Composite Strategy
+
+**Backtest Results (36 indicators × 133 stocks, 30-day daily)**:
+- Ran in 30s (data cached locally), 187 total signals
+- **Top by 5-day win rate**: Speedy Range (100%, 3 sigs), ALMA (75%, 4 sigs), DIY MA (67%, 6 sigs)
+- Default SuperTrend scored lowest among active indicators: 50% win rate, +2.46% avg P&L
+- CSV with timestamps (market close 15:30 IST) sent to Telegram
+
+**Changes**:
+1. **`scan_all()` parallelized**: `ThreadPoolExecutor(max_workers=10)` instead of sequential loop (`strategy_builder.py:1592`)
+2. **New composite indicator** `leading_speedy_alma()`: Requires both Speedy Range & ALMA to agree on direction. Registered as `"Speedy+ALMA"` in `LEADING_INDICATORS`.
+3. **Default leading indicator changed**: `SuperTrend` → `Speedy+ALMA` in `StrategyBuilder.__init__`
+4. **Created** `backtest_batch.py`, `send_backtest_report.py` (standalone scripts)
+5. **Deployed**: Commit `39155e2` → Render deploy hook triggered
+
+**Key insight**: Daily timeframe backtest shows Speedy+ALMA composite should outperform old SuperTrend default during live market hours.
+
 ### Key Files
+| File | Purpose |
+|------|---------|
+| `app/config.py` | Settings (groq_api_key, signal_check_interval=600s, persistent_dir) |
+| `app/data/stocks.py` | Single source of truth for stock lists (INDIAN_STOCKS, MONITORED_SYMBOLS) |
+| `app/services/signal_monitor.py` | Bg loop, caches, 123 symbols, DB persistence |
+| `app/services/market_data_service.py` | yfinance calls in threads with 2s delay + 15s timeout |
+| `app/services/signal_explainer.py` | Groq LLM client + template fallback |
+| `app/services/telegram_bot.py` | Polling loop, all command handlers |
+| `app/services/telegram_notifier.py` | Send messages |
+| `app/services/accuracy_tracker.py` | SQLite DB — signal history + cache/sent persistence |
+| `app/services/market_edge_service.py` | Edge scanner, FII/DII, breadth (full 119 stocks) |
+| `app/services/ema_bounce_scanner.py` | EMA 200 bounce scanner on 1min chart (SCALP signals) |
+| `app/services/dhanhq_service.py` | DhanHQ broker integration: market data, orders, funds, token mgmt |
+| `app/services/options_chain_service.py` | F&O bhavcopy → option chain (PCR, max pain, key levels) |
+| `app/services/insider_service.py` | NSE bulk/block deals with summary aggregation |
+| `app/services/sector_service.py` | Sectoral index performance + industry→sector mapping |
+| `app/services/ai_agent_service.py` | Groq-based multi-modal stock analysis |
+| `app/services/strategy_marketplace.py` | 6 curated strategies + in-memory backtest simulator |
+| `app/services/politician_service.py` | 11 business group bulk/block deals + FII/DII |
+| `app/services/ohlc_builder.py` | 1-min OHLC bar builder from Dhan WebSocket tick stream |
+| `app/services/strategy_builder.py` | DIY Strategy Builder: 36 leading indicators, 23 confirmation filters, signal engine, backtest |
+| `app/routes/market_realtime.py` | API endpoints (signals + realtime) |
+| `app/main.py` | FastAPI entry, lifespan tasks, 6 new routers |
+| `render.yaml` | Render service config (Docker + persistent disk) |
+| `backtest_batch.py` | Batch backtest: all 36 indicators on 149 stocks with win rate tracking |
+| `send_backtest_report.py` | Send backtest CSV + summary to Telegram |
 | File | Purpose |
 |------|---------|
 | `app/config.py` | Settings (groq_api_key, signal_check_interval=600s, persistent_dir) |
