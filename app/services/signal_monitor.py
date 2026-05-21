@@ -22,7 +22,12 @@ _signal_cache: Dict[str, Dict] = load_signal_cache()
 _realtime_cache: Dict[str, Dict] = load_realtime_cache()
 _last_sent: Dict[str, str] = {}
 _CONFIRMED_SENT: Dict[str, str] = load_sent_signals()
-_cache_start: str = datetime.now().isoformat()
+def _ist_now_str() -> str:
+    """Current time as ISO string in IST."""
+    from datetime import timezone, timedelta
+    return (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).isoformat()
+
+_cache_start: str = _ist_now_str()
 _initial_scan_done: bool = False
 
 async def _process_symbol(symbol: str) -> None:
