@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     persistent_dir: str = _DEFAULT_PERSISTENT_DIR
     dhan_client_id: Optional[str] = None
     dhan_access_token: Optional[str] = None
+    render_api_key: Optional[str] = None
 
     class Config:
         env_file = ".env"

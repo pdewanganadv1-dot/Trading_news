@@ -426,6 +426,7 @@ async def debug_backtest(symbol: str, days: int = 365, interval: str = "1d", buy
     """Run backtest with current strategy config."""
     import asyncio
     from app.services.strategy_builder import strategy_builder
+    from app.services.ohlc_builder import ohlc_builder
     orig_buy_only = strategy_builder.buy_only
     if not buy_only:
         strategy_builder.buy_only = False
@@ -449,6 +450,41 @@ async def debug_backtest(symbol: str, days: int = 365, interval: str = "1d", buy
         "max_win": bt.get("max_win", 0),
         "max_loss": bt.get("max_loss", 0),
         "trades": bt.get("trades", [])[-20:],
+    }
+
+
+@router.get("/debug/backtest-batch")
+async def debug_backtest_batch(days: int = 90, interval: str = "1d", buy_only: bool = True):
+    """Run backtest across all stocks in INDIAN_STOCKS list."""
+    import asyncio
+    import time
+    from app.services.strategy_builder import strategy_builder
+    from app.data.stocks import INDIAN_STOCKS
+    orig_buy_only = strategy_builder.buy_only
+    if not buy_only:
+        strategy_builder.buy_only = False
+    results = []
+    totals = {"trades": 0, "wins": 0, "return": 0}
+    for sym in INDIAN_STOCKS[:30]:
+        bt = await asyncio.to_thread(strategy_builder.backtest, sym, days, interval)
+        if "error" not in bt and bt.get("total_trades", 0) > 0:
+            results.append({
+                "symbol": sym,
+                "trades": bt["total_trades"],
+                "win_rate": bt["win_rate"],
+                "total_return": bt["total_return"],
+                "profit_factor": bt["profit_factor"],
+            })
+            totals["trades"] += bt["total_trades"]
+            totals["return"] += bt["total_return"]
+    strategy_builder.buy_only = orig_buy_only
+    results.sort(key=lambda r: r["total_return"], reverse=True)
+    return {
+        "total_stocks_scanned": min(30, len(INDIAN_STOCKS)),
+        "stocks_with_signals": len(results),
+        "total_trades": totals["trades"],
+        "total_return_all": round(totals["return"], 2),
+        "results": results[:20],
     }
 
 
