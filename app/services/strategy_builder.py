@@ -1582,8 +1582,8 @@ class StrategyBuilder:
         self.signal_expiry = 5  # 1-min bars before signal expires
         self.alt_signal_mode = False
         self.alt_counter: Dict[str, int] = {}
-        self.selected_preset = "ZLEMA-Optimized"
-        p = self.STRATEGY_PRESETS["ZLEMA-Optimized"]
+        self.selected_preset = "PSAR-Default"
+        p = self.STRATEGY_PRESETS["PSAR-Default"]
         self.selected_leading = p["leading"]
         self.selected_confirmations: List[str] = list(p["confirmations"])
         self.signal_threshold = p["threshold"]

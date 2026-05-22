@@ -227,17 +227,24 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 
 **Key insight**: Speedy+ALMA works on daily data (75% WR, 30d batch) but is random on 1-minute. Composite needs longer timeframe to have edge. Individual alerts active during market hours.
 
-### May 23, 2026 — Strategy Presets (PSAR-Default + ZLEMA-Optimized)
+### May 23, 2026 — Strategy Presets + Timeframe Comparison + Default Switch to PSAR
 
 **Done**:
 1. **Strategy optimization report**: Tested 35 indicators × 133 stocks, 180-day daily backtest with 84 permutation combos
-2. **Winner**: **ZLEMA + light confirmations (threshold=2)** — WR: 40.5%, RR: **6.94:1**, PF: 9.32
+2. **Winner on daily**: **ZLEMA + light confirmations (threshold=2)** — WR: 40.5%, RR: **6.94:1**, PF: 9.32
 3. **Named presets** in `strategy_builder.py`:
-   - `ZLEMA-Optimized` (new default) — ZLEMA + 5 light confirmations + threshold=2
-   - `PSAR-Default` — PSAR + 9 confirmations + threshold=3 (old default)
+   - `ZLEMA-Optimized` — ZLEMA + 5 light confirmations + threshold=2 (best for daily/positional)
+   - `PSAR-Default` — PSAR + 9 confirmations + threshold=3 (best for intraday/1m)
 4. **Telegram commands**: `/strategy_presets` (list), `/strategy_preset <name>` (switch)
 5. **HTTP endpoints**: `GET /debug/presets`, `POST /debug/presets/{name}`
-6. **Full report**: `data/opt_report_20260523_023444.md`
+6. **Full optimization report**: `data/opt_report_20260523_023444.md`
+7. **Timeframe comparison** (`timeframe_comparison.py`): Ran both presets on 1m vs 1d across all 149 stocks:
+   - ZLEMA-Optimized 1m: 56.9% WR, +125.4% return, 1.40 RR
+   - ZLEMA-Optimized 1d: 43.0% WR, +577.8% return, 2.27 RR
+   - **PSAR-Default 1m: 60.3% WR, +172.1% return, 1.60 RR** 🏆
+   - PSAR-Default 1d: 42.0% WR, +535.6% return, 2.04 RR
+8. **Default preset changed to PSAR-Default**: Live engine now uses PSAR on 1m intraday (60.3% WR beats ZLEMA's 56.9% on 1m)
+9. **Full comparison report**: `data/tf_compare_20260523_032215.md`
 
 ### May 22, 2026 (Late Night) — SL/TP, Whitelist/Blocklist, Batch Backtest Tuning
 
