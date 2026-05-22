@@ -349,6 +349,30 @@ async def debug_cancel_order(order_id: str):
     return {"order_id": order_id, "result": result}
 
 
+@router.get("/debug/strategy-signals")
+async def debug_strategy_signals():
+    """Show today's 1m strategy signals."""
+    from app.services.strategy_builder import strategy_builder
+    dashboard = strategy_builder.build_dashboard(50)
+    signals = strategy_builder.get_active_signals()
+    return {
+        "dashboard": dashboard,
+        "count": len(signals),
+        "signals": [
+            {
+                "symbol": s["symbol"],
+                "signal": s["final_signal"],
+                "price": s.get("price"),
+                "leading": s.get("leading_name"),
+                "confirmations": s.get("confirmation_count"),
+                "threshold": s.get("signal_threshold"),
+                "timestamp": s.get("timestamp"),
+            }
+            for s in signals[:50]
+        ],
+    }
+
+
 @router.get("/dashboard/unified")
 async def dashboard_unified():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_unified.html")
