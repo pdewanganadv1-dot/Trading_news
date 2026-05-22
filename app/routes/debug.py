@@ -341,6 +341,14 @@ async def debug_test_amo():
     }
 
 
+@router.post("/debug/cancel-order/{order_id}")
+async def debug_cancel_order(order_id: str):
+    """Cancel a pending Dhan order by order ID."""
+    from app.services.dhanhq_service import cancel_order
+    result = await cancel_order(order_id)
+    return {"order_id": order_id, "result": result}
+
+
 @router.get("/dashboard/unified")
 async def dashboard_unified():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_unified.html")
