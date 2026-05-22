@@ -421,6 +421,13 @@ async def debug_signal_history(symbol: str):
     }
 
 
+@router.get("/debug/accuracy")
+async def debug_accuracy():
+    """Live signal accuracy stats from signals.db."""
+    from app.services.accuracy_tracker import get_accuracy_stats
+    return get_accuracy_stats()
+
+
 @router.get("/debug/backtest/{symbol}")
 async def debug_backtest(symbol: str, days: int = 365, interval: str = "1d", buy_only: bool = True):
     """Run backtest with current strategy config."""
