@@ -380,30 +380,35 @@ async def debug_signal_history(symbol: str):
     """Show signal history for a specific symbol from the strategy_signals DB."""
     import sqlite3
     import json
-    from app.services.strategy_builder import strategy_builder
-    DB_PATH = os.path.join(settings.persistent_dir, 'strategy_signals.db')
-    sym = symbol.upper()
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT * FROM strategy_signals WHERE symbol = ? ORDER BY timestamp DESC LIMIT 100",
-        (sym,),
-    ).fetchall()
-    conn.close()
-    signals = []
-    for r in rows:
-        d = dict(r)
-        for field in ("confirmations", "metadata"):
-            try:
-                d[field] = json.loads(d[field]) if d.get(field) else None
-            except (json.JSONDecodeError, TypeError):
-                pass
-        signals.append(d)
-    return {
-        "symbol": sym,
-        "total_signals": len(signals),
-        "signals": signals,
-    }
+    import traceback
+    try:
+        from app.config import settings as s
+        db_path = os.path.join(s.persistent_dir, 'strategy_signals.db')
+        sym = symbol.upper()
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM strategy_signals WHERE symbol = ? ORDER BY timestamp DESC LIMIT 100",
+            (sym,),
+        ).fetchall()
+        conn.close()
+        signals = []
+        for r in rows:
+            d = dict(r)
+            for field in ("confirmations", "metadata"):
+                try:
+                    d[field] = json.loads(d[field]) if d.get(field) else None
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            signals.append(d)
+        return {
+            "symbol": sym,
+            "total_signals": len(signals),
+            "db_path": db_path,
+            "signals": signals,
+        }
+    except Exception as e:
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 @router.get("/dashboard/unified")
