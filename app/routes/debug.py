@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 import os
 
+from app.config import settings
+
 router = APIRouter(tags=["debug"])
 
 
@@ -378,7 +380,8 @@ async def debug_signal_history(symbol: str):
     """Show signal history for a specific symbol from the strategy_signals DB."""
     import sqlite3
     import json
-    from app.services.strategy_builder import DB_PATH
+    from app.services.strategy_builder import strategy_builder
+    DB_PATH = os.path.join(settings.persistent_dir, 'strategy_signals.db')
     sym = symbol.upper()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
