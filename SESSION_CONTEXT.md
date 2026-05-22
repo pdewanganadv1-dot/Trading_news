@@ -106,9 +106,18 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
-- **Deploy hook**: ~~broken (repo private)~~ — manual deploy via Render dashboard
 - **Git commit HEAD**: `(latest)`
-- **Repo**: **Private** on GitHub
+- **Repo**: **Public** on GitHub
+- **Render API Key**: `rnd_oOQmH6cdn0LjgNkhpRUUrv2Mw7Pw` (stored locally, never committed)
+
+### Render API (opencode access)
+- **Service ID**: `srv-d8514l3rjlhs73dj5ul0`
+- **API Key**: `rnd_oOQmH6cdn0LjgNkhpRUUrv2Mw7Pw`
+- **API Base**: `https://api.render.com/v1`
+- **Deploy via API**: `curl -X POST -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/deploys" -H "Content-Type: application/json" -d '{}'`
+- **Check deploys**: `curl -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/deploys?limit=5"`
+- **View env vars**: `curl -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/env-vars"`
+- **View logs**: `curl -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/deploys/DEPLOY_ID/logs"`
 
 ### May 21, 2026 (Evening) — Dhan WebSocket Signals + Expanded Stock List
 
