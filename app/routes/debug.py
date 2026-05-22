@@ -373,6 +373,44 @@ async def debug_strategy_signals():
     }
 
 
+@router.get("/debug/signal-history/{symbol}")
+async def debug_signal_history(symbol: str):
+    """Show signal history for a specific symbol from the strategy_signals DB."""
+    import sqlite3
+    import json
+    from datetime import datetime
+    from app.services.strategy_builder import DB_PATH
+    sym = symbol.upper()
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM strategy_signals WHERE symbol = ? ORDER BY timestamp DESC LIMIT 50",
+        (sym,),
+    ).fetchall()
+    conn.close()
+    signals = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["confirmations"] = json.loads(d["confirmations"]) if d.get("confirmations") else []
+        except (json.JSONDecodeError, TypeError):
+            pass
+        try:
+            d["metadata"] = json.loads(d["metadata"]) if d.get("metadata") else {}
+        except (json.JSONDecodeError, TypeError):
+            pass
+        signals.append(d)
+    # Also check active state
+    from app.services.strategy_builder import _get_active_state
+    active = _get_active_state(sym)
+    return {
+        "symbol": sym,
+        "total_signals": len(signals),
+        "signals": signals,
+        "active_state": active,
+    }
+
+
 @router.get("/dashboard/unified")
 async def dashboard_unified():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_unified.html")
