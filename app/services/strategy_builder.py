@@ -1871,6 +1871,10 @@ class StrategyBuilder:
             else:
                 signal = "HOLD"
 
+            # Buy-only override
+            if self.buy_only and signal == "SELL":
+                signal = "HOLD"
+
             price = c[-1]
 
             signals_log.append({
