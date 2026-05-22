@@ -201,7 +201,17 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 4. **Successfully placed AMO order**: YESBANK x1 (`orderId: 2252605229284`, status: `TRANSIT`)
 5. **Added cancel-order debug endpoint**: `POST /debug/cancel-order/{order_id}`
 6. **Successfully cancelled the order**: `orderId: 2252605229284` → `orderStatus: CANCELLED`
-7. **Verified full order pipeline**: Place (TRANSIT) → Cancel (CANCELLED) — both work end-to-end**
+7. **Verified full order pipeline**: Place (TRANSIT) → Cancel (CANCELLED) — both work end-to-end
+
+**Part 4 — Strategy Enhancement (May 22 night)**:
+1. **Audited all Telegram commands**: Every command in `/help` has a working handler ✅
+2. **Removed dead duplicate code**: Deleted second unreachable `/breadth` handler at `telegram_bot.py:1043`
+3. **Added `debug/signal-history/{symbol}` endpoint**: Unified view of 1m strategy signals + 5min cached signal + realtime cache
+4. **New confirmation filters** added to `strategy_builder.py`:
+   - **Market Trend** — checks OHLC builder for >55% stocks moving up/down; hard-override blocks BUY in bearish market, SELL in bullish
+   - **Liquidity Sweep** — detects stop hunts (price breaks swing high/low then reverses inside)
+   - **Market Structure** — detects trend via higher highs/lows or lower highs/lows sequence
+5. **Default confirmations now 9**: EMA 20, EMA 50, MACD, RSI, Volume, Price Action, Market Trend, Liquidity Sweep, Market Structure**
 
 ### May 21, 2026 (Night) — Speedy+ALMA 1m Backtest + Threshold Comparison + Individual Telegram Alerts
 
