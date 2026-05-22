@@ -901,6 +901,22 @@ def leading_zlema(o, h, l, c, v, period=14):
     return {"direction": direction, "value": zlema_vals[-1]}
 
 
+def confirm_psar(o, h, l, c, v):
+    """PSAR as a confirmation filter (wraps leading_psar)."""
+    result = leading_psar(o, h, l, c, v)
+    if result["direction"] == "NEUTRAL":
+        return {"confirmed": False, "direction": "NEUTRAL", "value": result["value"]}
+    return {"confirmed": True, "direction": result["direction"], "value": result["value"]}
+
+
+def confirm_zlema(o, h, l, c, v):
+    """ZLEMA as a confirmation filter (wraps leading_zlema)."""
+    result = leading_zlema(o, h, l, c, v)
+    if result["direction"] == "NEUTRAL":
+        return {"confirmed": False, "direction": "NEUTRAL", "value": result["value"]}
+    return {"confirmed": True, "direction": result["direction"], "value": result["value"]}
+
+
 def leading_hma(o, h, l, c, v, period=14):
     """Hull Moving Average (uses WMA internally)."""
     if len(c) < period:
@@ -1498,6 +1514,8 @@ CONFIRMATION_FILTERS: Dict[str, Callable] = {
     "Market Trend": confirm_market_trend,
     "Liquidity Sweep": confirm_liquidity_sweep,
     "Market Structure": confirm_market_structure,
+    "PSAR": confirm_psar,
+    "ZLEMA": confirm_zlema,
 }
 
 CONFIRMATION_NAMES = list(CONFIRMATION_FILTERS.keys())
@@ -1569,6 +1587,32 @@ class StrategyBuilder:
             "confirmations": ["EMA 20", "MACD", "RSI", "Volume", "Price Action"],
             "threshold": 2,
         },
+        "PSAR-Light": {
+            "leading": "PSAR",
+            "confirmations": ["EMA 20", "RSI", "Volume", "Price Action"],
+            "threshold": 2,
+        },
+        "ZLEMA-Heavy": {
+            "leading": "ZLEMA",
+            "confirmations": ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure"],
+            "threshold": 3,
+        },
+        "PSAR+ZLEMA-Conf": {
+            "leading": "PSAR",
+            "confirmations": ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure", "ZLEMA"],
+            "threshold": 3,
+        },
+        "ZLEMA+PSAR-Conf": {
+            "leading": "ZLEMA",
+            "confirmations": ["EMA 20", "MACD", "RSI", "Volume", "Price Action", "PSAR"],
+            "threshold": 2,
+        },
+        "Composite Both": {
+            "leading": "PSAR",
+            "confirmations": ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure"],
+            "threshold": 3,
+            "composite": True,
+        },
     }
 
     """
@@ -1582,12 +1626,16 @@ class StrategyBuilder:
         self.signal_expiry = 5  # 1-min bars before signal expires
         self.alt_signal_mode = False
         self.alt_counter: Dict[str, int] = {}
-        self.selected_preset = "PSAR-Default"
-        p = self.STRATEGY_PRESETS["PSAR-Default"]
+        self.buy_only = True
+        self.composite_mode = False
+        self.composite_secondary = None
+        self.selected_preset = "Composite Both"
+        p = self.STRATEGY_PRESETS["Composite Both"]
         self.selected_leading = p["leading"]
         self.selected_confirmations: List[str] = list(p["confirmations"])
         self.signal_threshold = p["threshold"]
-        self.buy_only = True  # only generate BUY signals, block SELL
+        self.composite_mode = p.get("composite", False)
+        self.composite_secondary = "ZLEMA" if self.composite_mode else None
         self.min_bars = 20  # minimum 1-min bars required
         self.sl_pct = 5.0  # stop-loss % (trailing for backtest)
         self.tp_pct = 0.0  # take-profit % (0 = disabled)
@@ -1606,6 +1654,8 @@ class StrategyBuilder:
             self.selected_leading = p["leading"]
             self.selected_confirmations = list(p["confirmations"])
             self.signal_threshold = p["threshold"]
+            self.composite_mode = p.get("composite", False)
+            self.composite_secondary = "ZLEMA" if self.composite_mode else None
             return True
         return False
 
@@ -1691,6 +1741,17 @@ class StrategyBuilder:
         if leading_dir == "NEUTRAL":
             return None
 
+        # 1b. Composite mode — secondary leading indicator must agree
+        if self.composite_mode and self.composite_secondary:
+            secondary_func = LEADING_INDICATORS.get(self.composite_secondary)
+            if secondary_func:
+                try:
+                    sd = secondary_func(opens, highs, lows, closes, volumes)
+                except Exception:
+                    sd = {"direction": "NEUTRAL"}
+                if sd.get("direction") != leading_dir:
+                    return None
+
         # 2. Confirmation filters
         confirmations = []
         conf_long = 0
@@ -1760,6 +1821,8 @@ class StrategyBuilder:
             "leading_name": self.selected_leading,
             "leading_direction": leading_dir,
             "leading_value": float(leading_val),
+            "composite_mode": self.composite_mode,
+            "composite_secondary": self.composite_secondary,
             "confirmations": confirmations,
             "confirmation_count": len(confirmations),
             "total_possible": total_possible,
