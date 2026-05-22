@@ -119,6 +119,11 @@ def _build_help() -> str:
         "• `/strategy_sl <pct>` — Set stop-loss %% (default 5.0, 0=off)\n"
         "• `/strategy_tp <pct>` — Set take-profit %% (default 0=off)\n"
         "• `/strategy_sl_trailing` — Toggle trailing vs fixed stop-loss\n"
+        "• `/whitelist_add <sym>` — Add stock to whitelist (multi: space/comma)\n"
+        "• `/whitelist_remove <sym>` — Remove from whitelist\n"
+        "• `/whitelist_toggle` — Enforce whitelist ON/OFF\n"
+        "• `/blocklist_add <sym>` — Block stock from trading\n"
+        "• `/blocklist_remove <sym>` — Unblock stock\n"
         "• `/strategy_bt <sym> [days] [1d|1m]` — Backtest on historical data (default 365d daily)\n"
         "   e.g. `/strategy_bt RELIANCE 365 1d` or `/strategy_bt RELIANCE 7 1m`\n"
         "• `/strategy_signals <sym> [days] [1d|1m]` — Full BUY/SELL signal history\n"
@@ -784,6 +789,14 @@ async def _handle_message(text: str, chat_id: int):
         lines.append(f"*Buy Only:* `{'ON' if strategy_builder.buy_only else 'OFF'}` — `/strategy_buyonly` to toggle")
         lines.append(f"*Stop-Loss:* `{strategy_builder.sl_pct}%` {'trailing' if strategy_builder.trailing_sl else 'fixed'} — `/strategy_sl <pct>`")
         lines.append(f"*Take-Profit:* `{strategy_builder.tp_pct}%` (0=off) — `/strategy_tp <pct>`")
+        wl = strategy_builder.stock_whitelist
+        bl = strategy_builder.stock_blocklist
+        if wl:
+            lines.append(f"*Whitelist:* `{'ON` — ' if strategy_builder.whitelist_only else '` (inactive) — '}{', '.join(wl)}")
+        else:
+            lines.append(f"*Whitelist:* empty — `/whitelist_add <sym>`")
+        if bl:
+            lines.append(f"*Blocklist:* `{', '.join(bl)}` — `/blocklist_remove <sym>`")
         return await telegram_notifier.send_message("\n".join(lines))
 
     m = re.match(r'^/strategy_leading\s+(.+)$', text)
@@ -852,6 +865,41 @@ async def _handle_message(text: str, chat_id: int):
         return await telegram_notifier.send_message(
             f"✅ Trailing stop-loss `{'ON' if strategy_builder.trailing_sl else 'OFF'}`"
         )
+
+    if text in ('/whitelist_toggle', 'whitelist_toggle'):
+        from app.services.strategy_builder import strategy_builder
+        strategy_builder.whitelist_only = not strategy_builder.whitelist_only
+        return await telegram_notifier.send_message(
+            f"✅ Whitelist enforcement `{'ON' if strategy_builder.whitelist_only else 'OFF'}`"
+        )
+
+    m = re.match(r'^/whitelist_add\s+(.+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        for sym in m.group(1).upper().replace(',', ' ').split():
+            strategy_builder.whitelist_add(sym.strip())
+        return await telegram_notifier.send_message(f"✅ Added to whitelist")
+
+    m = re.match(r'^/whitelist_remove\s+(.+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        for sym in m.group(1).upper().replace(',', ' ').split():
+            strategy_builder.whitelist_remove(sym.strip())
+        return await telegram_notifier.send_message(f"✅ Removed from whitelist")
+
+    m = re.match(r'^/blocklist_add\s+(.+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        for sym in m.group(1).upper().replace(',', ' ').split():
+            strategy_builder.blocklist_add(sym.strip())
+        return await telegram_notifier.send_message(f"✅ Added to blocklist")
+
+    m = re.match(r'^/blocklist_remove\s+(.+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        for sym in m.group(1).upper().replace(',', ' ').split():
+            strategy_builder.blocklist_remove(sym.strip())
+        return await telegram_notifier.send_message(f"✅ Removed from blocklist")
 
     m = re.match(r'^/signals_(\w+)(?:\s+(\d+))?(?:\s+(\w+))?$', text)
     if m:

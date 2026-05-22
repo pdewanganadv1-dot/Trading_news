@@ -1576,6 +1576,9 @@ class StrategyBuilder:
         self.sl_pct = 5.0  # stop-loss % (trailing for backtest)
         self.tp_pct = 0.0  # take-profit % (0 = disabled)
         self.trailing_sl = True  # use trailing stop-loss
+        self.stock_whitelist: List[str] = []  # empty = allow all
+        self.whitelist_only: bool = False  # enforce whitelist when True
+        self.stock_blocklist: List[str] = []  # explicitly blocked stocks
 
     def select_leading(self, name: str) -> bool:
         if name in LEADING_NAMES or name in LEADING_INDICATORS:
@@ -1601,9 +1604,40 @@ class StrategyBuilder:
     def set_trailing_sl(self, enabled: bool):
         self.trailing_sl = enabled
 
+    def whitelist_add(self, symbol: str):
+        sym = symbol.upper()
+        if sym not in self.stock_whitelist:
+            self.stock_whitelist.append(sym)
+
+    def whitelist_remove(self, symbol: str):
+        sym = symbol.upper()
+        self.stock_whitelist = [s for s in self.stock_whitelist if s != sym]
+
+    def blocklist_add(self, symbol: str):
+        sym = symbol.upper()
+        if sym not in self.stock_blocklist:
+            self.stock_blocklist.append(sym)
+
+    def blocklist_remove(self, symbol: str):
+        sym = symbol.upper()
+        self.stock_blocklist = [s for s in self.stock_blocklist if s != sym]
+
+    def _is_allowed(self, symbol: str) -> bool:
+        """Check if symbol passes whitelist/blocklist filtering."""
+        sym = symbol.upper()
+        if sym in self.stock_blocklist:
+            return False
+        if self.whitelist_only and self.stock_whitelist:
+            return sym in self.stock_whitelist
+        return True
+
     def update(self, symbol: str) -> Optional[Dict]:
         """Compute signals from 1-min OHLC bars. Returns signal dict or None."""
         sym = symbol.upper()
+
+        # Whitelist/blocklist filter
+        if not self._is_allowed(sym):
+            return None
 
         # Get 1-minute OHLC bars from the live feed tick aggregator
         ohlc = ohlc_builder.to_lists(sym, min_bars=self.min_bars)
