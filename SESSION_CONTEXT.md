@@ -116,7 +116,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
-- **Git commit HEAD**: `1886502`
+- **Git commit HEAD**: `27f7e31`
 - **Repo**: **Public** on GitHub
 - **Render API Key**: `rnd_oOQmH6cdn0LjgNkhpRUUrv2Mw7Pw` (stored locally, never committed)
 
@@ -227,6 +227,22 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 
 **Key insight**: Speedy+ALMA works on daily data (75% WR, 30d batch) but is random on 1-minute. Composite needs longer timeframe to have edge. Individual alerts active during market hours.
 
+### May 22, 2026 (Late Night) — SL/TP, Whitelist/Blocklist, Batch Backtest Tuning
+
+**Done**:
+1. **Trailing stop-loss + take-profit in backtest**: Added `sl_pct` (default 5%), `tp_pct` (0=off), `trailing_sl` (True) to strategy builder. Tracks peak/trough since entry. Configurable via Telegram.
+2. **Batch backtest (180d daily, buy+sell, SL=5% trailing, 19 stocks)**:
+   - 14/19 profitable, total portfolio return +101.23%
+   - **Top**: SBIN (+41.38%, PF 11.9), MOTHERSON (+23.77%), ASIANPAINT (+18.56%), HCLTECH (+17.67%), HDFCBANK (+15.61%)
+   - **Worst**: RELIANCE (-19.63%), INFY (-16.37%), BHARTIARTL (-13.23%), NTPC (-9.15%), ICICIBANK (-6.99%)
+3. **Stock whitelist/blocklist**: Added `stock_whitelist` (10 stocks), `stock_blocklist` (5 stocks), `whitelist_only` toggle. Filters in `update()`. Telegram commands for management.
+4. **Telegram commands added**: `/strategy_sl`, `/strategy_tp`, `/strategy_sl_trailing`, `/whitelist_add`, `/whitelist_remove`, `/whitelist_toggle`, `/blocklist_add`, `/blocklist_remove`
+5. **Pre-populated whitelist**: SBIN, MOTHERSON, HDFCBANK, ASIANPAINT, HCLTECH, KOTAKBANK, LT, MARUTI, SUNPHARMA, TCS
+6. **Pre-populated blocklist**: RELIANCE, BHARTIARTL, INFY, NTPC, ICICIBANK
+7. **Deployed**: Commit `27f7e31` → Render deploy triggered
+
+**Key insight**: Strategy has clear sector bias — financials and manufacturing outperform, IT large-caps and RELIANCE underperform. Whitelist filters out the losers automatically. SL effect minimal on daily data (gap between bars) but critical for 1-min live trading.
+
 ### Key Files
 | File | Purpose |
 |------|---------|
@@ -248,7 +264,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `app/services/strategy_marketplace.py` | 6 curated strategies + in-memory backtest simulator |
 | `app/services/politician_service.py` | 11 business group bulk/block deals + FII/DII |
 | `app/services/ohlc_builder.py` | 1-min OHLC bar builder from Dhan WebSocket tick stream |
-| `app/services/strategy_builder.py` | DIY Strategy Builder: 36 leading indicators, 23 confirmation filters, signal engine, backtest |
+| `app/services/strategy_builder.py` | DIY Strategy Builder: 37 leading indicators, 26 confirmation filters, signal engine, backtest with SL/TP, whitelist/blocklist |
 | `app/routes/market_realtime.py` | API endpoints (signals + realtime) |
 | `app/routes/debug.py` | Debug endpoints: Dhan status, IP, place-test, test-amo, cancel-order |
 | `app/main.py` | FastAPI entry, lifespan tasks, 6 new routers |
@@ -289,7 +305,14 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `/strategy_alt` | Toggle alternate signal mode |
 | `/strategy_bt <sym> [days] [1d\|1m]` | Backtest on historical data |
 | `/strategy_signals <sym> [days] [1d\|1m]` | Full BUY/SELL signal history |
-| `/signals_<sym> [days] [1d\|1m]` | Quick signal history shortcut |
+| `/strategy_sl <pct>` | Set stop-loss % (default 5.0, trailing) |
+| `/strategy_tp <pct>` | Set take-profit % (default 0=off) |
+| `/strategy_sl_trailing` | Toggle trailing vs fixed stop-loss |
+| `/whitelist_add <sym>` | Add stock to whitelist (multi: space/comma) |
+| `/whitelist_remove <sym>` | Remove from whitelist |
+| `/whitelist_toggle` | Toggle whitelist enforcement ON/OFF |
+| `/blocklist_add <sym>` | Block stock from trading |
+| `/blocklist_remove <sym>` | Unblock stock |
 
 ### Tech Stack
 - FastAPI + uvicorn (Render Docker, free tier)
