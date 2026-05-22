@@ -116,6 +116,9 @@ def _build_help() -> str:
         "• `/strategy_expiry <N>` — Signal expiry in bars\n"
         "• `/strategy_alt` — Toggle alternate signal mode\n"
         "• `/strategy_buyonly` — Toggle BUY-only mode (no SELL)\n"
+        "• `/strategy_sl <pct>` — Set stop-loss %% (default 5.0, 0=off)\n"
+        "• `/strategy_tp <pct>` — Set take-profit %% (default 0=off)\n"
+        "• `/strategy_sl_trailing` — Toggle trailing vs fixed stop-loss\n"
         "• `/strategy_bt <sym> [days] [1d|1m]` — Backtest on historical data (default 365d daily)\n"
         "   e.g. `/strategy_bt RELIANCE 365 1d` or `/strategy_bt RELIANCE 7 1m`\n"
         "• `/strategy_signals <sym> [days] [1d|1m]` — Full BUY/SELL signal history\n"
@@ -779,6 +782,8 @@ async def _handle_message(text: str, chat_id: int):
         lines.append(f"*Expiry:* `{strategy_builder.signal_expiry}` bars — `/strategy_expiry <N>`")
         lines.append(f"*Alt Mode:* `{'ON' if strategy_builder.alt_signal_mode else 'OFF'}` — `/strategy_alt` to toggle")
         lines.append(f"*Buy Only:* `{'ON' if strategy_builder.buy_only else 'OFF'}` — `/strategy_buyonly` to toggle")
+        lines.append(f"*Stop-Loss:* `{strategy_builder.sl_pct}%` {'trailing' if strategy_builder.trailing_sl else 'fixed'} — `/strategy_sl <pct>`")
+        lines.append(f"*Take-Profit:* `{strategy_builder.tp_pct}%` (0=off) — `/strategy_tp <pct>`")
         return await telegram_notifier.send_message("\n".join(lines))
 
     m = re.match(r'^/strategy_leading\s+(.+)$', text)
@@ -825,6 +830,27 @@ async def _handle_message(text: str, chat_id: int):
         strategy_builder.buy_only = not strategy_builder.buy_only
         return await telegram_notifier.send_message(
             f"✅ Buy-only mode `{'ON' if strategy_builder.buy_only else 'OFF'}` — {'BUY signals only' if strategy_builder.buy_only else 'BUY + SELL both allowed'}"
+        )
+
+    m = re.match(r'^/strategy_sl\s+([\d.]+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        pct = float(m.group(1))
+        strategy_builder.set_sl(pct)
+        return await telegram_notifier.send_message(f"✅ Stop-loss set to `{pct}%` ({'trailing' if strategy_builder.trailing_sl else 'fixed'})")
+
+    m = re.match(r'^/strategy_tp\s+([\d.]+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        pct = float(m.group(1))
+        strategy_builder.set_tp(pct)
+        return await telegram_notifier.send_message(f"✅ Take-profit set to `{pct}%`")
+
+    if text in ('/strategy_sl_trailing', 'strategy_sl_trailing'):
+        from app.services.strategy_builder import strategy_builder
+        strategy_builder.trailing_sl = not strategy_builder.trailing_sl
+        return await telegram_notifier.send_message(
+            f"✅ Trailing stop-loss `{'ON' if strategy_builder.trailing_sl else 'OFF'}`"
         )
 
     m = re.match(r'^/signals_(\w+)(?:\s+(\d+))?(?:\s+(\w+))?$', text)

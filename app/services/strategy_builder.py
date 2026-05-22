@@ -1573,6 +1573,9 @@ class StrategyBuilder:
         self.signal_threshold = 3  # min confirmations needed
         self.buy_only = True  # only generate BUY signals, block SELL
         self.min_bars = 20  # minimum 1-min bars required
+        self.sl_pct = 5.0  # stop-loss % (trailing for backtest)
+        self.tp_pct = 0.0  # take-profit % (0 = disabled)
+        self.trailing_sl = True  # use trailing stop-loss
 
     def select_leading(self, name: str) -> bool:
         if name in LEADING_NAMES or name in LEADING_INDICATORS:
@@ -1588,6 +1591,15 @@ class StrategyBuilder:
 
     def set_expiry(self, bars: int):
         self.signal_expiry = max(1, bars)
+
+    def set_sl(self, pct: float):
+        self.sl_pct = max(0, min(pct, 50))
+
+    def set_tp(self, pct: float):
+        self.tp_pct = max(0, min(pct, 100))
+
+    def set_trailing_sl(self, enabled: bool):
+        self.trailing_sl = enabled
 
     def update(self, symbol: str) -> Optional[Dict]:
         """Compute signals from 1-min OHLC bars. Returns signal dict or None."""
@@ -1893,22 +1905,69 @@ class StrategyBuilder:
                     entry_price = price
                     entry_time = dates[i]
                     entry_signal = "BUY"
+                    entry_high = price
+                    entry_low = price
                 elif signal == "SELL":
                     in_position = True
                     entry_price = price
                     entry_time = dates[i]
                     entry_signal = "SELL"
+                    entry_high = price
+                    entry_low = price
             else:
+                # Track peak/trough for trailing stop
+                if entry_signal == "BUY":
+                    entry_high = max(entry_high, price)
+                else:
+                    entry_low = min(entry_low, price)
+
+                # Check trailing stop-loss
+                sl_hit = False
+                if self.sl_pct > 0:
+                    if entry_signal == "BUY":
+                        if self.trailing_sl:
+                            sl_price = entry_high * (1 - self.sl_pct / 100)
+                        else:
+                            sl_price = entry_price * (1 - self.sl_pct / 100)
+                        if price <= sl_price:
+                            sl_hit = True
+                    else:  # SELL
+                        if self.trailing_sl:
+                            sl_price = entry_low * (1 + self.sl_pct / 100)
+                        else:
+                            sl_price = entry_price * (1 + self.sl_pct / 100)
+                        if price >= sl_price:
+                            sl_hit = True
+
+                # Check take-profit
+                tp_hit = False
+                if self.tp_pct > 0:
+                    if entry_signal == "BUY":
+                        tp_price = entry_price * (1 + self.tp_pct / 100)
+                        if price >= tp_price:
+                            tp_hit = True
+                    else:  # SELL
+                        tp_price = entry_price * (1 - self.tp_pct / 100)
+                        if price <= tp_price:
+                            tp_hit = True
+
                 exit_signal = False
+                exit_reason = "signal"
                 if entry_signal == "BUY" and signal == "SELL":
                     exit_signal = True
                 elif entry_signal == "SELL" and signal == "BUY":
                     exit_signal = True
+                if sl_hit:
+                    exit_signal = True
+                    exit_reason = "stop_loss"
+                if tp_hit:
+                    exit_signal = True
+                    exit_reason = "take_profit"
 
                 if exit_signal:
                     pnl_pct = ((price - entry_price) / entry_price) * 100
                     if entry_signal == "SELL":
-                        pnl_pct = -pnl_pct  # reverse for short
+                        pnl_pct = -pnl_pct
                     trades.append({
                         "entry_time": entry_time,
                         "exit_time": dates[i],
@@ -1917,6 +1976,7 @@ class StrategyBuilder:
                         "exit_price": round(price, 2),
                         "pnl_pct": round(pnl_pct, 2),
                         "bars_held": signals_log[-1]["index"] - next((s["index"] for s in signals_log[::-1] if s["signal"] == entry_signal), 0),
+                        "exit_reason": exit_reason,
                     })
                     in_position = False
                     entry_price = 0
@@ -1935,6 +1995,7 @@ class StrategyBuilder:
                 "exit_price": round(price, 2),
                 "pnl_pct": round(pnl_pct, 2),
                 "bars_held": len(closes) - next((s["index"] for s in signals_log[::-1] if s["signal"] == entry_signal), 0),
+                "exit_reason": "end_of_data",
             })
 
         # Calculate metrics
@@ -1977,6 +2038,9 @@ class StrategyBuilder:
             "confirmations": self.selected_confirmations,
             "threshold": self.signal_threshold,
             "timeframe": interval,
+            "sl_pct": self.sl_pct,
+            "tp_pct": self.tp_pct,
+            "trailing_sl": self.trailing_sl,
             "bars_analyzed": len(closes),
             "total_trades": total_trades,
             "win_rate": round(win_rate, 1),
