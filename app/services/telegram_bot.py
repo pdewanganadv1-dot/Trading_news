@@ -1040,26 +1040,6 @@ async def _handle_message(text: str, chat_id: int):
             msg += f"`{s['symbol']}` ₹{s['ltp']:,.2f} *{s['change_pct']}%* (₹{s['change']:,.2f}) Vol:{s['volume']:,}\n"
         return await telegram_notifier.send_message(msg)
 
-    if text in ('/breadth', 'breadth'):
-        from app.services.live_analysis import get_live_breadth
-        b = get_live_breadth()
-        if b["total"] == 0:
-            return await telegram_notifier.send_message("No live data yet.")
-        msg = "📊 *Live Market Breadth*\n\n"
-        msg += f"Above Day Open: 🟢 `{b['above']}`\n"
-        msg += f"Below Day Open: 🔴 `{b['below']}`\n"
-        msg += f"Flat: `{b['flat']}`\n"
-        msg += f"Total: `{b['total']}`\n\n"
-        if b["stocks_above"]:
-            msg += "*Top Gainers:*\n"
-            for sym, pct in b["stocks_above"][:5]:
-                msg += f"🟢 `{sym}` +{pct}%\n"
-        if b["stocks_below"]:
-            msg += "\n*Top Losers:*\n"
-            for sym, pct in b["stocks_below"][:5]:
-                msg += f"🔴 `{sym}` {pct}%\n"
-        return await telegram_notifier.send_message(msg)
-
     if text == '/markets':
         msg = "📊 *Market Overview — All Features*\n\n"
         msg += "Use these commands for detailed analysis:\n"
