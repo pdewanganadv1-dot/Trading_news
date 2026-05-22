@@ -421,6 +421,33 @@ async def debug_signal_history(symbol: str):
     }
 
 
+@router.get("/debug/backtest/{symbol}")
+async def debug_backtest(symbol: str, days: int = 365, interval: str = "1d"):
+    """Run backtest with current strategy config."""
+    import asyncio
+    from app.services.strategy_builder import strategy_builder
+    sym = symbol.upper()
+    bt = await asyncio.to_thread(strategy_builder.backtest, sym, days, interval)
+    if "error" in bt:
+        return {"error": bt["error"]}
+    return {
+        "symbol": sym,
+        "timeframe": bt.get("timeframe"),
+        "leading": bt.get("leading"),
+        "threshold": bt.get("threshold"),
+        "confirmations": len(bt.get("confirmations", [])),
+        "bars_analyzed": bt.get("bars_analyzed", 0),
+        "total_trades": bt.get("total_trades", 0),
+        "win_rate": bt.get("win_rate", 0),
+        "avg_return": bt.get("avg_return", 0),
+        "total_return": bt.get("total_return", 0),
+        "profit_factor": bt.get("profit_factor", 0),
+        "max_win": bt.get("max_win", 0),
+        "max_loss": bt.get("max_loss", 0),
+        "trades": bt.get("trades", [])[-20:],
+    }
+
+
 @router.get("/dashboard/unified")
 async def dashboard_unified():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_unified.html")
