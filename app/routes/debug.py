@@ -422,12 +422,16 @@ async def debug_signal_history(symbol: str):
 
 
 @router.get("/debug/backtest/{symbol}")
-async def debug_backtest(symbol: str, days: int = 365, interval: str = "1d"):
+async def debug_backtest(symbol: str, days: int = 365, interval: str = "1d", buy_only: bool = True):
     """Run backtest with current strategy config."""
     import asyncio
     from app.services.strategy_builder import strategy_builder
+    orig_buy_only = strategy_builder.buy_only
+    if not buy_only:
+        strategy_builder.buy_only = False
     sym = symbol.upper()
     bt = await asyncio.to_thread(strategy_builder.backtest, sym, days, interval)
+    strategy_builder.buy_only = orig_buy_only
     if "error" in bt:
         return {"error": bt["error"]}
     return {
