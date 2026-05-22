@@ -246,6 +246,7 @@ async def place_order(
     product_type: str = "INTRADAY",
     order_type: str = "MARKET",
     price: float = 0,
+    after_market: bool = False,
 ) -> Optional[Dict]:
     """Place an order via DhanHQ."""
     await ensure_security_map()
@@ -265,7 +266,7 @@ async def place_order(
         "disclosedQuantity": 0,
         "price": 0.0,
         "triggerPrice": 0.0,
-        "afterMarketOrder": False,
+        "afterMarketOrder": after_market,
         "boProfitValue": None,
         "boStopLossValue": None,
     }

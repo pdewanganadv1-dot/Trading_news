@@ -311,6 +311,30 @@ async def dashboard_v2():
     return FileResponse(path)
 
 
+@router.get("/debug/test-amo")
+async def debug_test_amo():
+    """Test After Market Order (AMO) — buys 1 share YESBANK via AMO."""
+    from app.services.dhanhq_service import (
+        ensure_security_map, dhan_enabled, place_order,
+    )
+
+    await ensure_security_map()
+
+    sym = "YESBANK"
+    qty = 1
+
+    result = await place_order(sym, qty, "BUY", after_market=True)
+
+    return {
+        "dhan_enabled": dhan_enabled,
+        "symbol": sym,
+        "quantity": qty,
+        "type": "BUY",
+        "after_market": True,
+        "result": result,
+    }
+
+
 @router.get("/dashboard/unified")
 async def dashboard_unified():
     path = os.path.join(os.path.dirname(__file__), "../templates/dashboard_unified.html")
