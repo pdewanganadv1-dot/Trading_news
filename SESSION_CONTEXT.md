@@ -227,6 +227,18 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 
 **Key insight**: Speedy+ALMA works on daily data (75% WR, 30d batch) but is random on 1-minute. Composite needs longer timeframe to have edge. Individual alerts active during market hours.
 
+### May 23, 2026 — Strategy Presets (PSAR-Default + ZLEMA-Optimized)
+
+**Done**:
+1. **Strategy optimization report**: Tested 35 indicators × 133 stocks, 180-day daily backtest with 84 permutation combos
+2. **Winner**: **ZLEMA + light confirmations (threshold=2)** — WR: 40.5%, RR: **6.94:1**, PF: 9.32
+3. **Named presets** in `strategy_builder.py`:
+   - `ZLEMA-Optimized` (new default) — ZLEMA + 5 light confirmations + threshold=2
+   - `PSAR-Default` — PSAR + 9 confirmations + threshold=3 (old default)
+4. **Telegram commands**: `/strategy_presets` (list), `/strategy_preset <name>` (switch)
+5. **HTTP endpoints**: `GET /debug/presets`, `POST /debug/presets/{name}`
+6. **Full report**: `data/opt_report_20260523_023444.md`
+
 ### May 22, 2026 (Late Night) — SL/TP, Whitelist/Blocklist, Batch Backtest Tuning
 
 **Done**:

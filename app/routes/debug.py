@@ -428,6 +428,24 @@ async def debug_accuracy():
     return get_accuracy_stats()
 
 
+@router.get("/debug/presets")
+async def debug_presets():
+    """List available strategy presets."""
+    from app.services.strategy_builder import strategy_builder
+    return {
+        "active_preset": strategy_builder.selected_preset,
+        "presets": strategy_builder.get_presets(),
+    }
+
+
+@router.post("/debug/presets/{name}")
+async def debug_set_preset(name: str):
+    """Switch to a named strategy preset."""
+    from app.services.strategy_builder import strategy_builder
+    ok = strategy_builder.select_preset(name)
+    return {"success": ok, "active_preset": strategy_builder.selected_preset if ok else None}
+
+
 @router.get("/debug/backtest/{symbol}")
 async def debug_backtest(symbol: str, days: int = 365, interval: str = "1d", buy_only: bool = True):
     """Run backtest with current strategy config."""

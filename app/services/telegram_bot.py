@@ -111,6 +111,8 @@ def _build_help() -> str:
         "🧠 *DIY Strategy Builder*\n"
         "• `/strategy` — Dashboard: active BUY/SELL signals\n"
         "• `/strategy_config` — View current config & available indicators\n"
+        "• `/strategy_presets` — List named strategy presets\n"
+        "• `/strategy_preset <name>` — Switch to a preset (e.g. ZLEMA-Optimized, PSAR-Default)\n"
         "• `/strategy_leading <name>` — Set leading indicator (37 options)\n"
         "• `/strategy_threshold <N>` — Min confirmations required (default 3)\n"
         "• `/strategy_expiry <N>` — Signal expiry in bars\n"
@@ -798,6 +800,35 @@ async def _handle_message(text: str, chat_id: int):
         if bl:
             lines.append(f"*Blocklist:* `{', '.join(bl)}` — `/blocklist_remove <sym>`")
         return await telegram_notifier.send_message("\n".join(lines))
+
+    if text in ('/strategy_presets', 'strategy_presets'):
+        from app.services.strategy_builder import strategy_builder
+        presets = strategy_builder.get_presets()
+        lines = ["📋 *Strategy Presets*\n"]
+        for name, cfg in presets.items():
+            active = "✅" if cfg.get("is_active") else "⬜"
+            lines.append(f"{active} *{name}*")
+            lines.append(f"   Leading: `{cfg['leading']}` | Conf: `{len(cfg['confirmations'])}` | Thr: `{cfg['threshold']}`")
+        lines.append("")
+        lines.append("💡 Use `/strategy_preset <name>` to switch")
+        return await telegram_notifier.send_message("\n".join(lines))
+
+    m = re.match(r'^/strategy_preset\s+(.+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        name = m.group(1).strip()
+        found = None
+        for k in strategy_builder.STRATEGY_PRESETS:
+            if k.lower() == name.lower():
+                found = k
+                break
+        if found:
+            strategy_builder.select_preset(found)
+            return await telegram_notifier.send_message(f"✅ Switched to *{found}* preset\n"
+                                                        f" Leading: `{strategy_builder.selected_leading}` | "
+                                                        f"Threshold: `{strategy_builder.signal_threshold}`\n"
+                                                        f"Use `/strategy_config` to see full config")
+        return await telegram_notifier.send_message(f"❌ Unknown preset `{name}`. Use `/strategy_presets` to list available.")
 
     m = re.match(r'^/strategy_leading\s+(.+)$', text)
     if m:

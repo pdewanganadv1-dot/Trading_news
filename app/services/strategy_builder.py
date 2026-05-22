@@ -1557,6 +1557,20 @@ def calc_supply_demand(opens, highs, lows, closes) -> Dict[str, List]:
 # ─── Strategy Builder Engine ────────────────────────────────────────
 
 class StrategyBuilder:
+    # ─── Named Strategy Presets ──────────────────────────────
+    STRATEGY_PRESETS = {
+        "PSAR-Default": {
+            "leading": "PSAR",
+            "confirmations": ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure"],
+            "threshold": 3,
+        },
+        "ZLEMA-Optimized": {
+            "leading": "ZLEMA",
+            "confirmations": ["EMA 20", "MACD", "RSI", "Volume", "Price Action"],
+            "threshold": 2,
+        },
+    }
+
     """
     Main strategy builder engine.
     Computes selected leading indicator + confirmation filters on 1-minute OHLC bars
@@ -1568,9 +1582,11 @@ class StrategyBuilder:
         self.signal_expiry = 5  # 1-min bars before signal expires
         self.alt_signal_mode = False
         self.alt_counter: Dict[str, int] = {}
-        self.selected_leading = "PSAR"  # default leading indicator — optimized (See PB: 2026-05-22)
-        self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure"]
-        self.signal_threshold = 3  # min confirmations needed
+        self.selected_preset = "ZLEMA-Optimized"
+        p = self.STRATEGY_PRESETS["ZLEMA-Optimized"]
+        self.selected_leading = p["leading"]
+        self.selected_confirmations: List[str] = list(p["confirmations"])
+        self.signal_threshold = p["threshold"]
         self.buy_only = True  # only generate BUY signals, block SELL
         self.min_bars = 20  # minimum 1-min bars required
         self.sl_pct = 5.0  # stop-loss % (trailing for backtest)
@@ -1579,6 +1595,19 @@ class StrategyBuilder:
         self.stock_whitelist: List[str] = []  # empty = allow all
         self.whitelist_only: bool = False  # enforce whitelist when True
         self.stock_blocklist: List[str] = []  # explicitly blocked stocks
+
+    def get_presets(self) -> dict:
+        return {k: {**v, "is_active": k == self.selected_preset} for k, v in self.STRATEGY_PRESETS.items()}
+
+    def select_preset(self, name: str) -> bool:
+        if name in self.STRATEGY_PRESETS:
+            p = self.STRATEGY_PRESETS[name]
+            self.selected_preset = name
+            self.selected_leading = p["leading"]
+            self.selected_confirmations = list(p["confirmations"])
+            self.signal_threshold = p["threshold"]
+            return True
+        return False
 
     def select_leading(self, name: str) -> bool:
         if name in LEADING_NAMES or name in LEADING_INDICATORS:
