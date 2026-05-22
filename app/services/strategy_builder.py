@@ -1571,6 +1571,7 @@ class StrategyBuilder:
         self.selected_leading = "Speedy+ALMA"  # default leading indicator
         self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure"]
         self.signal_threshold = 3  # min confirmations needed
+        self.buy_only = True  # only generate BUY signals, block SELL
         self.min_bars = 20  # minimum 1-min bars required
 
     def select_leading(self, name: str) -> bool:
@@ -1665,7 +1666,11 @@ class StrategyBuilder:
                 except Exception:
                     pass
 
-        # 5. Alternate signal mode
+        # 5. Buy-only mode — block all SELL signals
+        if self.buy_only and final_signal == "SELL":
+            final_signal = "HOLD"
+
+        # 6. Alternate signal mode
         if self.alt_signal_mode and final_signal != "HOLD":
             self.alt_counter[sym] = self.alt_counter.get(sym, 0) + 1
             if self.alt_counter[sym] % 3 != 0:
@@ -1745,10 +1750,11 @@ class StrategyBuilder:
         """Build a formatted dashboard string of active signals."""
         signals = self.get_active_signals()
         if not signals:
-            return f"📊 *Strategy Builder — No Active Signals*\n\nNo BUY/SELL signals on 1-min timeframe.\n⏳ Waiting for more data..."
+            return f"📊 *Strategy Builder — No Active Signals*\n\nNo BUY signals on 1-min timeframe.\n⏳ Waiting for more data..."
         lines = [f"📊 *Strategy Builder — 1-min Signals*", ""]
         lines.append(f"Leading: `{self.selected_leading}` | Threshold: `{self.signal_threshold}` | Expiry: `{self.signal_expiry}` bars")
         lines.append(f"Confirmations: `{len(self.selected_confirmations)}` active | Timeframe: `1-min`")
+        lines.append(f"Mode: `{'BUY ONLY' if self.buy_only else 'BUY+SELL'}` | Alt: `{'ON' if self.alt_signal_mode else 'OFF'}`")
         lines.append("")
         lines.append(f"*Active Signals ({len(signals)} total)*")
         lines.append("")

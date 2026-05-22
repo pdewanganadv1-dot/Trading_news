@@ -115,6 +115,7 @@ def _build_help() -> str:
         "• `/strategy_threshold <N>` — Min confirmations required (default 3)\n"
         "• `/strategy_expiry <N>` — Signal expiry in bars\n"
         "• `/strategy_alt` — Toggle alternate signal mode\n"
+        "• `/strategy_buyonly` — Toggle BUY-only mode (no SELL)\n"
         "• `/strategy_bt <sym> [days] [1d|1m]` — Backtest on historical data (default 365d daily)\n"
         "   e.g. `/strategy_bt RELIANCE 365 1d` or `/strategy_bt RELIANCE 7 1m`\n"
         "• `/strategy_signals <sym> [days] [1d|1m]` — Full BUY/SELL signal history\n"
@@ -777,6 +778,7 @@ async def _handle_message(text: str, chat_id: int):
         lines.append(f"*Threshold:* `{strategy_builder.signal_threshold}` / `{len(strategy_builder.selected_confirmations)}` — `/strategy_threshold <N>`")
         lines.append(f"*Expiry:* `{strategy_builder.signal_expiry}` bars — `/strategy_expiry <N>`")
         lines.append(f"*Alt Mode:* `{'ON' if strategy_builder.alt_signal_mode else 'OFF'}` — `/strategy_alt` to toggle")
+        lines.append(f"*Buy Only:* `{'ON' if strategy_builder.buy_only else 'OFF'}` — `/strategy_buyonly` to toggle")
         return await telegram_notifier.send_message("\n".join(lines))
 
     m = re.match(r'^/strategy_leading\s+(.+)$', text)
@@ -816,6 +818,13 @@ async def _handle_message(text: str, chat_id: int):
         strategy_builder.alt_signal_mode = not strategy_builder.alt_signal_mode
         return await telegram_notifier.send_message(
             f"✅ Alternate signal mode `{'ON' if strategy_builder.alt_signal_mode else 'OFF'}`"
+        )
+
+    if text in ('/strategy_buyonly', 'strategy_buyonly'):
+        from app.services.strategy_builder import strategy_builder
+        strategy_builder.buy_only = not strategy_builder.buy_only
+        return await telegram_notifier.send_message(
+            f"✅ Buy-only mode `{'ON' if strategy_builder.buy_only else 'OFF'}` — {'BUY signals only' if strategy_builder.buy_only else 'BUY + SELL both allowed'}"
         )
 
     m = re.match(r'^/signals_(\w+)(?:\s+(\d+))?(?:\s+(\w+))?$', text)
