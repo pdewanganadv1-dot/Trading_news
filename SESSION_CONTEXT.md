@@ -5,11 +5,21 @@ The Dhan access token (`DHAN_ACCESS_TOKEN`) expires **every 24 hours**. Every ti
 1. Get a new token from Dhan
 2. Update it in **both** places:
    - `./.env` (local — `DHAN_ACCESS_TOKEN=...`)
-   - **Render dashboard** → Environment Variables → `DHAN_ACCESS_TOKEN`
-3. Then trigger a Render deploy: `curl -X POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI`
-4. The app also has an `auto_renew_loop()` that tries to renew every 23h, but a manual renew is still needed after 24h.
-
-## Project
+   - **Render API** (quicker than dashboard):
+     ```
+     curl -X PUT -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json" \
+       "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/env-vars/DHAN_ACCESS_TOKEN" \
+       -d '{"value":"NEW_TOKEN"}'
+     ```
+   - Or Render dashboard → Environment Variables → `DHAN_ACCESS_TOKEN`
+3. Then trigger a Render deploy:
+   ```
+   curl -X POST -H "Authorization: Bearer $RENDER_API_KEY" \
+     "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/deploys" \
+     -H "Content-Type: application/json" -d '{}'
+   ```
+   Or via hook: `curl -X POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI`
+4. The app also has an `auto_renew_loop()` that tries to renew every 23h, but a manual renewal is still needed if >24h passes without restart.
 
 ## Project
 Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + Groq AI explanations + 6 standalone analysis dashboards, deployed on Render, accessible via Telegram bot `@Signal_alpha267_bot`.
@@ -106,7 +116,7 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Deployed at**: https://trading-dashboard-e0us.onrender.com/
 - **Live pages**: `/options-chain`, `/insider-trading`, `/sector-rotation`, `/ai-agent`, `/strategy-marketplace`, `/politician-trades`
 - **GitHub**: git@github.com:pdewanganadv1-dot/Trading_news.git (main branch)
-- **Git commit HEAD**: `(latest)`
+- **Git commit HEAD**: `1886502`
 - **Repo**: **Public** on GitHub
 - **Render API Key**: `rnd_oOQmH6cdn0LjgNkhpRUUrv2Mw7Pw` (stored locally, never committed)
 
@@ -118,6 +128,9 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - **Check deploys**: `curl -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/deploys?limit=5"`
 - **View env vars**: `curl -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/env-vars"`
 - **View logs**: `curl -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/deploys/DEPLOY_ID/logs"`
+- **Update env var**: `curl -X PUT -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d8514l3rjlhs73dj5ul0/env-vars/DHAN_ACCESS_TOKEN" -H "Content-Type: application/json" -d '{"value":"NEW_TOKEN"}'`
+- **Deploy hook**: `curl -X POST https://api.render.com/deploy/srv-d8514l3rjlhs73dj5ul0?key=dKh3Te8CRXI`
+- **GitHub SSH push**: `GIT_SSH_COMMAND="ssh -i ~/.ssh/github_deploy" git push origin main`
 
 ### May 21, 2026 (Evening) — Dhan WebSocket Signals + Expanded Stock List
 
@@ -156,9 +169,9 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 
 **Key insight**: Daily timeframe backtest shows Speedy+ALMA composite should outperform old SuperTrend default during live market hours.
 
-### May 22, 2026 — Session Recovery + Sanity Fixes + Redeploy
+### May 22, 2026 — Session Recovery + Sanity Fixes + Dhan Order Pipeline
 
-**Done**:
+**Part 1 — Recovery & Sanity Fixes**:
 1. **Recovered local repo**: Synced 52 commits behind from GitHub (merged origin-https/main)
 2. **Switched remote to HTTPS**: SSH had no key access
 3. **Made GitHub repo public**: Enabled deploy hook access
@@ -168,6 +181,27 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 7. **Updated `docker-compose.yml`**: Passes through `GROQ_API_KEY`, `DHAN_CLIENT_ID`, `DHAN_ACCESS_TOKEN`, `PERSISTENT_DIR`
 8. **Updated `render.yaml`**: Added `DHAN_CLIENT_ID` and `DHAN_ACCESS_TOKEN` env vars (sync: false)
 9. **Pushed fixes to GitHub**
+10. **Configuration & setup**:
+    - Configured SSH config (`~/.ssh/config`) pointing to `github_deploy` key
+    - Switched remote from HTTPS back to SSH with identity file
+    - Got SSH push working: `GIT_SSH_COMMAND="ssh -i ~/.ssh/github_deploy" git push origin main`
+
+**Part 2 — Code Quality Fixes (May 22 afternoon)**:
+1. **Removed dead dependencies** from `requirements.txt`: `sqlalchemy`, `asyncpg`, `alembic`, `python-multipart`
+2. **Fixed `app/data/market_data.py` stub**: Rewired `routes/market.py` to use real `market_data_service`
+3. **Fixed `sentiment.py:151`**: Removed unused walrus operator assignment
+4. **Hoisted `INDIAN_STOCKS_SET` import** to top in `signal_confirmer.py`
+5. **Fixed WebSocket `ConnectionManager.disconnect()`**: Added `ValueError` catch on removal
+6. **Updated `SESSION_CONTEXT.md`**: Added Render API key, commands, and May 22 session
+
+**Part 3 — Dhan Order Pipeline (May 22 evening)**:
+1. **Generated new Dhan access token** from user, decoded JWT (exp: 2026-05-23T15:14:29 UTC)
+2. **Updated `DHAN_ACCESS_TOKEN` on Render** via API `PUT /v1/services/srv-d8514l3rjlhs73dj5ul0/env-vars/DHAN_ACCESS_TOKEN` (avoids manual dashboard entry)
+3. **Fixed AMO order placement**: Added `amoTime` field to `dhanhq_service.place_order()` — Dhan API requires `"PRE_OPEN"` for AMO orders (rejects `null` or `""`)
+4. **Successfully placed AMO order**: YESBANK x1 (`orderId: 2252605229284`, status: `TRANSIT`)
+5. **Added cancel-order debug endpoint**: `POST /debug/cancel-order/{order_id}`
+6. **Successfully cancelled the order**: `orderId: 2252605229284` → `orderStatus: CANCELLED`
+7. **Verified full order pipeline**: Place (TRANSIT) → Cancel (CANCELLED) — both work end-to-end**
 
 ### May 21, 2026 (Night) — Speedy+ALMA 1m Backtest + Threshold Comparison + Individual Telegram Alerts
 
@@ -206,34 +240,11 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `app/services/ohlc_builder.py` | 1-min OHLC bar builder from Dhan WebSocket tick stream |
 | `app/services/strategy_builder.py` | DIY Strategy Builder: 36 leading indicators, 23 confirmation filters, signal engine, backtest |
 | `app/routes/market_realtime.py` | API endpoints (signals + realtime) |
+| `app/routes/debug.py` | Debug endpoints: Dhan status, IP, place-test, test-amo, cancel-order |
 | `app/main.py` | FastAPI entry, lifespan tasks, 6 new routers |
 | `render.yaml` | Render service config (Docker + persistent disk) |
 | `backtest_batch.py` | Batch backtest: all 36 indicators on 149 stocks with win rate tracking |
-| `send_backtest_report.py` | Send backtest CSV + summary to Telegram |
-| File | Purpose |
-|------|---------|
-| `app/config.py` | Settings (groq_api_key, signal_check_interval=600s, persistent_dir) |
-| `app/data/stocks.py` | Single source of truth for stock lists (INDIAN_STOCKS, MONITORED_SYMBOLS) |
-| `app/services/signal_monitor.py` | Bg loop, caches, 123 symbols, DB persistence |
-| `app/services/market_data_service.py` | yfinance calls in threads with 2s delay + 15s timeout |
-| `app/services/signal_explainer.py` | Groq LLM client + template fallback |
-| `app/services/telegram_bot.py` | Polling loop, all command handlers |
-| `app/services/telegram_notifier.py` | Send messages |
-| `app/services/accuracy_tracker.py` | SQLite DB — signal history + cache/sent persistence |
-| `app/services/market_edge_service.py` | Edge scanner, FII/DII, breadth (full 119 stocks) |
-| `app/services/ema_bounce_scanner.py` | EMA 200 bounce scanner on 1min chart (SCALP signals) |
-| `app/services/dhanhq_service.py` | DhanHQ broker integration: market data, orders, funds, token mgmt |
-| `app/services/options_chain_service.py` | F&O bhavcopy → option chain (PCR, max pain, key levels) |
-| `app/services/insider_service.py` | NSE bulk/block deals with summary aggregation |
-| `app/services/sector_service.py` | Sectoral index performance + industry→sector mapping |
-| `app/services/ai_agent_service.py` | Groq-based multi-modal stock analysis |
-| `app/services/strategy_marketplace.py` | 6 curated strategies + in-memory backtest simulator |
-| `app/services/politician_service.py` | 11 business group bulk/block deals + FII/DII |
-| `app/services/ohlc_builder.py` | 1-min OHLC bar builder from Dhan WebSocket tick stream |
-| `app/services/strategy_builder.py` | DIY Strategy Builder: 36 leading indicators, 23 confirmation filters, signal engine, backtest |
-| `app/routes/market_realtime.py` | API endpoints (signals + realtime) |
-| `app/main.py` | FastAPI entry, lifespan tasks, 6 new routers |
-| `render.yaml` | Render service config (Docker + persistent disk) |
+| `send_backtest_report.py` | Send backtest CSV + summary to Telegram | |
 
 ### Telegram Commands
 | Command | Description |
