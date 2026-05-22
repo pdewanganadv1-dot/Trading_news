@@ -1405,6 +1405,34 @@ def confirm_divergence(o, h, l, c, v, period=14):
     return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
 
 
+def confirm_market_trend(o, h, l, c, v):
+    """Check broader market direction using all symbols in OHLC builder.
+    If most stocks are going up → LONG, most going down → SHORT.
+    Acts as a hard override in update() to block signals against the trend."""
+    from app.services.ohlc_builder import ohlc_builder
+    symbols = ohlc_builder.get_all_symbols_with_bars(min_bars=5)
+    up = down = 0
+    for sym in symbols:
+        bars = ohlc_builder.get_bars(sym, 2)
+        if len(bars) >= 2:
+            if bars[-1]["close"] > bars[-2]["close"]:
+                up += 1
+            elif bars[-1]["close"] < bars[-2]["close"]:
+                down += 1
+    total = up + down
+    if total < 10:
+        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+    bull_pct = up / total
+    bear_pct = down / total
+    if bull_pct > 0.55:
+        direction = "LONG"
+    elif bear_pct > 0.55:
+        direction = "SHORT"
+    else:
+        direction = "NEUTRAL"
+    return {"confirmed": direction != "NEUTRAL", "direction": direction, "value": bull_pct - bear_pct}
+
+
 CONFIRMATION_FILTERS: Dict[str, Callable] = {
     "EMA 20": confirm_ema_20,
     "EMA 50": confirm_ema_50,
@@ -1429,6 +1457,7 @@ CONFIRMATION_FILTERS: Dict[str, Callable] = {
     "VWAP": confirm_vwap,
     "Pivot": confirm_pivot,
     "Divergence": confirm_divergence,
+    "Market Trend": confirm_market_trend,
 }
 
 CONFIRMATION_NAMES = list(CONFIRMATION_FILTERS.keys())
@@ -1500,7 +1529,7 @@ class StrategyBuilder:
         self.alt_signal_mode = False
         self.alt_counter: Dict[str, int] = {}
         self.selected_leading = "Speedy+ALMA"  # default leading indicator
-        self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action"]
+        self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend"]
         self.signal_threshold = 3  # min confirmations needed
         self.min_bars = 20  # minimum 1-min bars required
 
@@ -1582,13 +1611,27 @@ class StrategyBuilder:
         else:
             final_signal = "HOLD"
 
-        # 4. Alternate signal mode
+        # 4. Market trend hard override — block signals against the broader market
+        if "Market Trend" in self.selected_confirmations:
+            mt_func = CONFIRMATION_FILTERS.get("Market Trend")
+            if mt_func:
+                try:
+                    mt_result = mt_func(opens, highs, lows, closes, volumes)
+                    mt_dir = mt_result.get("direction", "NEUTRAL")
+                    if final_signal == "BUY" and mt_dir == "SHORT":
+                        final_signal = "HOLD"
+                    elif final_signal == "SELL" and mt_dir == "LONG":
+                        final_signal = "HOLD"
+                except Exception:
+                    pass
+
+        # 5. Alternate signal mode
         if self.alt_signal_mode and final_signal != "HOLD":
             self.alt_counter[sym] = self.alt_counter.get(sym, 0) + 1
             if self.alt_counter[sym] % 3 != 0:
                 return None
 
-        # 5. Build result
+        # 6. Build result
         result = {
             "symbol": sym,
             "price": current_price,
