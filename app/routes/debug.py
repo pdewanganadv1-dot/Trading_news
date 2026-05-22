@@ -377,40 +377,64 @@ async def debug_strategy_signals():
 async def debug_signal_history(symbol: str):
     """Show signal history for a specific symbol from the strategy_signals DB."""
     from app.services.strategy_builder import strategy_builder
+    import sqlite3, json as j
     sym = symbol.upper()
-    signals = strategy_builder.get_active_signals()
-    sym_signals = [s for s in signals if s["symbol"] == sym]
-    # Also try full DB query via strategy_builder's internal _get_db
+    # Active signals only
+    active = strategy_builder.get_active_signals()
+    sym_active = [s for s in active if s["symbol"] == sym]
+    # Check if DB exists and has any data at all
     try:
-        import sqlite3
-        import json as j
-        from app.services.strategy_builder import DB_PATH, _get_db
-        conn = _get_db()
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT * FROM strategy_signals WHERE symbol = ? ORDER BY timestamp DESC LIMIT 100",
-            (sym,),
-        ).fetchall()
-        conn.close()
-        all_signals = []
-        for r in rows:
-            d = dict(r)
-            for f in ("confirmations", "metadata"):
-                try:
-                    v = d.get(f)
-                    d[f] = j.loads(v) if v else None
-                except Exception:
-                    pass
-            all_signals.append(d)
-    except Exception:
-        all_signals = []
-    return {
-        "symbol": sym,
-        "active_count": len(sym_signals),
-        "active": sym_signals,
-        "total_history": len(all_signals) if all_signals else 0,
-        "history": all_signals if all_signals else sym_signals,
-    }
+        import os as _os
+        from app.config import settings as _s
+        dbp = _os.path.join(_s.persistent_dir, 'strategy_signals.db')
+        db_exists = _os.path.exists(dbp)
+        tables = []
+        all_rows_count = 0
+        if db_exists:
+            c = sqlite3.connect(dbp)
+            c.row_factory = sqlite3.Row
+            tbls = c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            tables = [dict(t) for t in tbls]
+            for t in tables:
+                cnt = c.execute(f"SELECT COUNT(*) as cnt FROM \"{t['name']}\"").fetchone()
+                t['count'] = cnt['cnt'] if cnt else 0
+                all_rows_count += t['count']
+            # Get this symbol's records
+            rows = c.execute(
+                "SELECT * FROM strategy_signals WHERE symbol=? ORDER BY timestamp DESC LIMIT 50",
+                (sym,)
+            ).fetchall() if any(t['name'] == 'strategy_signals' for t in tables) else []
+            c.close()
+            hist = []
+            for r in rows:
+                d = dict(r)
+                for f in ("confirmations", "metadata"):
+                    try:
+                        v = d.get(f)
+                        d[f] = j.loads(v) if v else None
+                    except Exception:
+                        pass
+                hist.append(d)
+        else:
+            hist = []
+        return {
+            "symbol": sym,
+            "active_signals": sym_active,
+            "active_count": len(sym_active),
+            "db_path": dbp,
+            "db_exists": db_exists,
+            "tables": tables,
+            "total_rows": all_rows_count,
+            "history": hist,
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "symbol": sym,
+            "active_signals": sym_active,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+        }
 
 
 @router.get("/dashboard/unified")
