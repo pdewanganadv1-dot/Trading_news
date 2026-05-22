@@ -1433,6 +1433,44 @@ def confirm_market_trend(o, h, l, c, v):
     return {"confirmed": direction != "NEUTRAL", "direction": direction, "value": bull_pct - bear_pct}
 
 
+def confirm_liquidity_sweep(o, h, l, c, v, lookback=15):
+    """Detect liquidity sweeps — price takes out a recent swing high/low
+    then reverses back inside. Indicates stop hunts / liquidity grabs."""
+    if len(c) < lookback + 3:
+        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+    recent_high = max(h[-lookback:-1])
+    recent_low = min(l[-lookback:-1])
+    bearish_sweep = h[-1] > recent_high and c[-1] < recent_high
+    bullish_sweep = l[-1] < recent_low and c[-1] > recent_low
+    if bullish_sweep:
+        return {"confirmed": True, "direction": "LONG", "value": 1, "pattern": "liquidity_sweep_bullish"}
+    elif bearish_sweep:
+        return {"confirmed": True, "direction": "SHORT", "value": -1, "pattern": "liquidity_sweep_bearish"}
+    return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+
+
+def confirm_market_structure(o, h, l, c, v, lookback=12):
+    """Detect market structure trend via sequence of highs/lows.
+    Uptrend = higher highs + higher lows, Downtrend = lower highs + lower lows."""
+    if len(c) < lookback * 2:
+        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+    highs = h[-lookback:]
+    lows = l[-lookback:]
+    up_score = sum(1 for i in range(1, len(highs)) if highs[i] >= highs[i-1]) + \
+               sum(1 for i in range(1, len(lows)) if lows[i] >= lows[i-1])
+    down_score = sum(1 for i in range(1, len(highs)) if highs[i] <= highs[i-1]) + \
+                 sum(1 for i in range(1, len(lows)) if lows[i] <= lows[i-1])
+    total = up_score + down_score
+    if total == 0:
+        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+    up_pct = up_score / total
+    if up_pct > 0.65:
+        return {"confirmed": True, "direction": "LONG", "value": up_pct, "pattern": "uptrend"}
+    elif up_pct < 0.35:
+        return {"confirmed": True, "direction": "SHORT", "value": 1 - up_pct, "pattern": "downtrend"}
+    return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+
+
 CONFIRMATION_FILTERS: Dict[str, Callable] = {
     "EMA 20": confirm_ema_20,
     "EMA 50": confirm_ema_50,
@@ -1458,6 +1496,8 @@ CONFIRMATION_FILTERS: Dict[str, Callable] = {
     "Pivot": confirm_pivot,
     "Divergence": confirm_divergence,
     "Market Trend": confirm_market_trend,
+    "Liquidity Sweep": confirm_liquidity_sweep,
+    "Market Structure": confirm_market_structure,
 }
 
 CONFIRMATION_NAMES = list(CONFIRMATION_FILTERS.keys())
@@ -1529,7 +1569,7 @@ class StrategyBuilder:
         self.alt_signal_mode = False
         self.alt_counter: Dict[str, int] = {}
         self.selected_leading = "Speedy+ALMA"  # default leading indicator
-        self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend"]
+        self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure"]
         self.signal_threshold = 3  # min confirmations needed
         self.min_bars = 20  # minimum 1-min bars required
 
