@@ -375,66 +375,50 @@ async def debug_strategy_signals():
 
 @router.get("/debug/signal-history/{symbol}")
 async def debug_signal_history(symbol: str):
-    """Show signal history for a specific symbol from the strategy_signals DB."""
+    """Show signal history across all sources."""
     from app.services.strategy_builder import strategy_builder
+    from app.services.signal_monitor import get_cached_signals, get_cached_realtime
     import sqlite3, json as j
+    from app.config import settings
     sym = symbol.upper()
-    # Active signals only
+    # 1) Active strategy signals
     active = strategy_builder.get_active_signals()
     sym_active = [s for s in active if s["symbol"] == sym]
-    # Check if DB exists and has any data at all
+    # 2) 5-min cached signal
+    cache = get_cached_signals()
+    cached_signal = cache.get(sym.lower())
+    # 3) Strategy DB full history
+    dbp = os.path.join(settings.persistent_dir, 'strategy_signals.db')
+    hist = []
     try:
-        import os as _os
-        from app.config import settings as _s
-        dbp = _os.path.join(_s.persistent_dir, 'strategy_signals.db')
-        db_exists = _os.path.exists(dbp)
-        tables = []
-        all_rows_count = 0
-        if db_exists:
-            c = sqlite3.connect(dbp)
-            c.row_factory = sqlite3.Row
-            tbls = c.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-            tables = [dict(t) for t in tbls]
-            for t in tables:
-                cnt = c.execute(f"SELECT COUNT(*) as cnt FROM \"{t['name']}\"").fetchone()
-                t['count'] = cnt['cnt'] if cnt else 0
-                all_rows_count += t['count']
-            # Get this symbol's records
-            rows = c.execute(
-                "SELECT * FROM strategy_signals WHERE symbol=? ORDER BY timestamp DESC LIMIT 50",
-                (sym,)
-            ).fetchall() if any(t['name'] == 'strategy_signals' for t in tables) else []
-            c.close()
-            hist = []
-            for r in rows:
-                d = dict(r)
-                for f in ("confirmations", "metadata"):
-                    try:
-                        v = d.get(f)
-                        d[f] = j.loads(v) if v else None
-                    except Exception:
-                        pass
-                hist.append(d)
-        else:
-            hist = []
-        return {
-            "symbol": sym,
-            "active_signals": sym_active,
-            "active_count": len(sym_active),
-            "db_path": dbp,
-            "db_exists": db_exists,
-            "tables": tables,
-            "total_rows": all_rows_count,
-            "history": hist,
-        }
-    except Exception as e:
-        import traceback
-        return {
-            "symbol": sym,
-            "active_signals": sym_active,
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-        }
+        c = sqlite3.connect(dbp)
+        c.row_factory = sqlite3.Row
+        rows = c.execute(
+            "SELECT * FROM strategy_signals WHERE symbol=? ORDER BY timestamp DESC LIMIT 50",
+            (sym,)
+        ).fetchall()
+        c.close()
+        for r in rows:
+            d = dict(r)
+            for f in ("confirmations", "metadata"):
+                try:
+                    v = d.get(f)
+                    d[f] = j.loads(v) if v else None
+                except Exception:
+                    pass
+            hist.append(d)
+    except Exception:
+        pass
+    # 4) Realtime cache
+    realtime = get_cached_realtime()
+    rt = realtime.get(sym.lower())
+    return {
+        "symbol": sym,
+        "active_strategy_signals": sym_active,
+        "cached_5min_signal": cached_signal,
+        "cached_realtime": rt,
+        "strategy_db_history": hist,
+    }
 
 
 @router.get("/dashboard/unified")
