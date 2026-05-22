@@ -376,25 +376,30 @@ async def debug_strategy_signals():
 @router.get("/debug/signal-history/{symbol}")
 async def debug_signal_history(symbol: str):
     """Show signal history for a specific symbol from the strategy_signals DB."""
-    from app.services.strategy_builder import strategy_builder
+    import sqlite3
+    import json
+    from app.services.strategy_builder import DB_PATH
     sym = symbol.upper()
-    signals = strategy_builder.get_active_signals()
-    sym_signals = [s for s in signals if s["symbol"] == sym]
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM strategy_signals WHERE symbol = ? ORDER BY timestamp DESC LIMIT 100",
+        (sym,),
+    ).fetchall()
+    conn.close()
+    signals = []
+    for r in rows:
+        d = dict(r)
+        for field in ("confirmations", "metadata"):
+            try:
+                d[field] = json.loads(d[field]) if d.get(field) else None
+            except (json.JSONDecodeError, TypeError):
+                pass
+        signals.append(d)
     return {
         "symbol": sym,
-        "total_active": len(sym_signals),
-        "signals": [
-            {
-                "symbol": s["symbol"],
-                "signal": s["final_signal"],
-                "price": s.get("price"),
-                "leading": s.get("leading_name"),
-                "confirmations": s.get("confirmation_count"),
-                "threshold": s.get("signal_threshold"),
-                "timestamp": s.get("timestamp"),
-            }
-            for s in sym_signals
-        ],
+        "total_signals": len(signals),
+        "signals": signals,
     }
 
 
