@@ -1568,7 +1568,7 @@ class StrategyBuilder:
         self.signal_expiry = 5  # 1-min bars before signal expires
         self.alt_signal_mode = False
         self.alt_counter: Dict[str, int] = {}
-        self.selected_leading = "Speedy+ALMA"  # default leading indicator
+        self.selected_leading = "PSAR"  # default leading indicator — optimized (See PB: 2026-05-22)
         self.selected_confirmations: List[str] = ["EMA 20", "EMA 50", "MACD", "RSI", "Volume", "Price Action", "Market Trend", "Liquidity Sweep", "Market Structure"]
         self.signal_threshold = 3  # min confirmations needed
         self.buy_only = True  # only generate BUY signals, block SELL
