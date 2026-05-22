@@ -4,8 +4,6 @@ import json
 from datetime import datetime
 import os
 
-from app.config import settings
-
 router = APIRouter(tags=["debug"])
 
 
@@ -378,37 +376,41 @@ async def debug_strategy_signals():
 @router.get("/debug/signal-history/{symbol}")
 async def debug_signal_history(symbol: str):
     """Show signal history for a specific symbol from the strategy_signals DB."""
-    import sqlite3
-    import json
-    import traceback
+    from app.services.strategy_builder import strategy_builder
+    sym = symbol.upper()
+    signals = strategy_builder.get_active_signals()
+    sym_signals = [s for s in signals if s["symbol"] == sym]
+    # Also try full DB query via strategy_builder's internal _get_db
     try:
-        from app.config import settings as s
-        db_path = os.path.join(s.persistent_dir, 'strategy_signals.db')
-        sym = symbol.upper()
-        conn = sqlite3.connect(db_path)
+        import sqlite3
+        import json as j
+        from app.services.strategy_builder import DB_PATH, _get_db
+        conn = _get_db()
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM strategy_signals WHERE symbol = ? ORDER BY timestamp DESC LIMIT 100",
             (sym,),
         ).fetchall()
         conn.close()
-        signals = []
+        all_signals = []
         for r in rows:
             d = dict(r)
-            for field in ("confirmations", "metadata"):
+            for f in ("confirmations", "metadata"):
                 try:
-                    d[field] = json.loads(d[field]) if d.get(field) else None
-                except (json.JSONDecodeError, TypeError):
+                    v = d.get(f)
+                    d[f] = j.loads(v) if v else None
+                except Exception:
                     pass
-            signals.append(d)
-        return {
-            "symbol": sym,
-            "total_signals": len(signals),
-            "db_path": db_path,
-            "signals": signals,
-        }
-    except Exception as e:
-        return {"error": str(e), "traceback": traceback.format_exc()}
+            all_signals.append(d)
+    except Exception:
+        all_signals = []
+    return {
+        "symbol": sym,
+        "active_count": len(sym_signals),
+        "active": sym_signals,
+        "total_history": len(all_signals) if all_signals else 0,
+        "history": all_signals if all_signals else sym_signals,
+    }
 
 
 @router.get("/dashboard/unified")
