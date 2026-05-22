@@ -313,26 +313,26 @@ async def dashboard_v2():
 
 @router.get("/debug/test-amo")
 async def debug_test_amo():
-    """Test After Market Order (AMO) — buys 1 share YESBANK via AMO with CNC."""
+    """Test After Market Order (AMO) — tries INTRADAY + AMO, CNC + AMO, and checks security ID."""
     from app.services.dhanhq_service import (
-        ensure_security_map, dhan_enabled, place_order,
+        ensure_security_map, dhan_enabled, place_order, get_security_id,
     )
 
     await ensure_security_map()
 
     sym = "YESBANK"
+    sid = get_security_id(sym)
     qty = 1
 
-    result = await place_order(sym, qty, "BUY", product_type="CNC", after_market=True)
+    r1 = await place_order(sym, qty, "BUY", product_type="INTRADAY", after_market=True)
+    r2 = await place_order(sym, qty, "BUY", product_type="CNC", after_market=True)
 
     return {
         "dhan_enabled": dhan_enabled,
         "symbol": sym,
-        "quantity": qty,
-        "type": "BUY",
-        "product_type": "CNC",
-        "after_market": True,
-        "result": result,
+        "security_id": sid,
+        "test_INTRA_AMO": r1,
+        "test_CNC_AMO": r2,
     }
 
 
