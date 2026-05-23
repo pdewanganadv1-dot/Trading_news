@@ -20,6 +20,7 @@ from app.services.market_structure import (
 
 REPORT_DIR = os.path.join(os.path.dirname(__file__), "data", "backtest_reports")
 CACHE_1M = os.path.join(os.path.dirname(__file__), "data", "ohlc_cache_1m")
+DAILY_CACHE = os.path.join(os.path.dirname(__file__), "data", "ohlc_cache")
 os.makedirs(REPORT_DIR, exist_ok=True)
 
 MIN_BARS = 30
@@ -538,6 +539,9 @@ def backtest_stock_fast(sym, df):
             elite_configs.append(("Elite:Str+Mom", -1, 0))
 
         # Dedup: only the first (most specific) elite combo per bar+dir
+        elite_conf_long = conf_long
+        elite_conf_short = conf_short
+        elite_thresholds = [0, 1, 2, 3]
         seen_elite = set()
         for e_name, e_dir, _ in elite_configs:
             if e_dir == 0 or (i, e_dir) in seen_elite:
@@ -545,30 +549,37 @@ def backtest_stock_fast(sym, df):
             seen_elite.add((i, e_dir))
             signal = "BUY" if e_dir == 1 else "SELL"
 
-            # EMA 200 trend filter
-            if trend != 0:
-                if signal == "BUY" and trend == -1:
+            # Confirmation threshold sweep for elite combos
+            for eth in elite_thresholds:
+                if signal == "BUY" and elite_conf_long < eth:
                     continue
-                if signal == "SELL" and trend == 1:
+                if signal == "SELL" and elite_conf_short < eth:
                     continue
 
-            entry_price = c[i]
-            dt = dates[i]
-            ts = dt.strftime("%Y-%m-%d %H:%M") if hasattr(dt, 'strftime') else str(dt)[:16]
+                # EMA 200 trend filter
+                if trend != 0:
+                    if signal == "BUY" and trend == -1:
+                        continue
+                    if signal == "SELL" and trend == 1:
+                        continue
 
-            for strategy in EXIT_STRATEGIES:
-                ext, exp, bars, pnl = simulate_exit(c, i, entry_price, signal, strategy)
-                results.append({
-                    "symbol": sym, "indicator": e_name,
-                    "confirmations": "elite",
-                    "threshold": 0,
-                    "signal": signal,
-                    "entry_price": round(entry_price, 2),
-                    "exit_strategy": strategy["name"],
-                    "exit_type": ext, "exit_price": round(exp, 2),
-                    "bars_held": bars, "pnl_pct": round(pnl, 2),
-                    "is_win": 1 if pnl > 0 else 0, "timestamp": ts,
-                })
+                entry_price = c[i]
+                dt = dates[i]
+                ts = dt.strftime("%Y-%m-%d %H:%M") if hasattr(dt, 'strftime') else str(dt)[:16]
+
+                for strategy in EXIT_STRATEGIES:
+                    ext, exp, bars, pnl = simulate_exit(c, i, entry_price, signal, strategy)
+                    results.append({
+                        "symbol": sym, "indicator": e_name,
+                        "confirmations": "elite",
+                        "threshold": eth,
+                        "signal": signal,
+                        "entry_price": round(entry_price, 2),
+                        "exit_strategy": strategy["name"],
+                        "exit_type": ext, "exit_price": round(exp, 2),
+                        "bars_held": bars, "pnl_pct": round(pnl, 2),
+                        "is_win": 1 if pnl > 0 else 0, "timestamp": ts,
+                    })
 
     return results
 
@@ -690,9 +701,26 @@ def main():
     print("  JIT ready.", flush=True)
     print()
 
+    # ── Load daily cache (much longer history than resampling 1-min) ──
+    daily_data = {}
+    for f in sorted(os.listdir(DAILY_CACHE)):
+        if not f.endswith(".pkl"):
+            continue
+        sym = f.replace(".pkl", "").upper()
+        if sym not in stock_data:
+            continue
+        try:
+            df = pickle.load(open(os.path.join(DAILY_CACHE, f), "rb"))
+            if len(df) >= MIN_BARS:
+                daily_data[sym] = df
+        except Exception:
+            pass
+    print(f"  Daily cache: {len(daily_data)} stocks", flush=True)
+
     # ── Run on multiple timeframes ──
     timeframes = {
         "1MIN": stock_data,
+        "1D": daily_data,
     }
 
     # Resample to 5-min and 15-min
