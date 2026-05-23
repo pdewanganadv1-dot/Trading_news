@@ -126,6 +126,8 @@ def _build_help() -> str:
         "• `/whitelist_toggle` — Enforce whitelist ON/OFF\n"
         "• `/blocklist_add <sym>` — Block stock from trading\n"
         "• `/blocklist_remove <sym>` — Unblock stock\n"
+        "• `/strategy_gap <N>` — Min bars between signals (default 60 = ~1hr). 3-4 trades/day ≈ 60-90\n"
+        "• `/strategy_flip` — Toggle direction-change-only mode (ON=only signal on flip, default ON)\n"
         "• `/strategy_bt <sym> [days] [1d|1m]` — Backtest on historical data (default 365d daily)\n"
         "   e.g. `/strategy_bt RELIANCE 365 1d` or `/strategy_bt RELIANCE 7 1m`\n"
         "• `/strategy_signals <sym> [days] [1d|1m]` — Full BUY/SELL signal history\n"
@@ -787,6 +789,8 @@ async def _handle_message(text: str, chat_id: int):
         lines.append("")
         lines.append(f"*Threshold:* `{strategy_builder.signal_threshold}` / `{len(strategy_builder.selected_confirmations)}` — `/strategy_threshold <N>`")
         lines.append(f"*Expiry:* `{strategy_builder.signal_expiry}` bars — `/strategy_expiry <N>`")
+        lines.append(f"*Min Gap:* `{strategy_builder.min_gap_bars}` bars — `/strategy_gap <N>` (~1hr=60)")
+        lines.append(f"*Flip Mode:* `{'ON' if strategy_builder.signal_on_change else 'OFF'}` — `/strategy_flip`")
         lines.append(f"*Alt Mode:* `{'ON' if strategy_builder.alt_signal_mode else 'OFF'}` — `/strategy_alt` to toggle")
         lines.append(f"*Buy Only:* `{'ON' if strategy_builder.buy_only else 'OFF'}` — `/strategy_buyonly` to toggle")
         lines.append(f"*Stop-Loss:* `{strategy_builder.sl_pct}%` {'trailing' if strategy_builder.trailing_sl else 'fixed'} — `/strategy_sl <pct>`")
@@ -895,6 +899,21 @@ async def _handle_message(text: str, chat_id: int):
         strategy_builder.trailing_sl = not strategy_builder.trailing_sl
         return await telegram_notifier.send_message(
             f"✅ Trailing stop-loss `{'ON' if strategy_builder.trailing_sl else 'OFF'}`"
+        )
+
+    m = re.match(r'^/strategy_gap\s+(\d+)$', text)
+    if m:
+        from app.services.strategy_builder import strategy_builder
+        strategy_builder.set_min_gap(int(m.group(1)))
+        return await telegram_notifier.send_message(
+            f"✅ Min gap set to `{strategy_builder.min_gap_bars}` bars (~{strategy_builder.min_gap_bars} min)"
+        )
+
+    if text in ('/strategy_flip', 'strategy_flip'):
+        from app.services.strategy_builder import strategy_builder
+        strategy_builder.signal_on_change = not strategy_builder.signal_on_change
+        return await telegram_notifier.send_message(
+            f"✅ Direction-flip mode `{'ON' if strategy_builder.signal_on_change else 'OFF'}`"
         )
 
     if text in ('/whitelist_toggle', 'whitelist_toggle'):

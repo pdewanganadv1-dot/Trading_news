@@ -1719,6 +1719,70 @@ def calc_supply_demand(opens, highs, lows, closes) -> Dict[str, List]:
     return {k: v[-3:] for k, v in zones.items()}  # last 3 zones each
 
 
+# ─── Candle Pattern Detection ──────────────────────────────────────
+
+def detect_engulfing(o, h, l, c):
+    """Bullish engulfing: current green candle fully engulfs previous red candle.
+    Bearish engulfing: current red candle fully engulfs previous green candle.
+    Returns: ('LONG'/'SHORT'/None, strength)"""
+    if len(c) < 3:
+        return None, 0
+    pc, po = c[-2], o[-2]
+    cc, co = c[-1], o[-1]
+    prev_bear = pc < po  # previous was red
+    prev_bull = pc > po
+    curr_bull = cc > co  # current is green
+    curr_bear = cc < co
+    if curr_bull and prev_bear and o[-1] < c[-2] and c[-1] > o[-2]:
+        return "LONG", 2
+    if curr_bear and prev_bull and o[-1] > c[-2] and c[-1] < o[-2]:
+        return "SHORT", 2
+    return None, 0
+
+def detect_pin_bar(o, h, l, c):
+    """Pin bar / hammer / shooting star detection.
+    Returns: ('LONG'/'SHORT'/None, strength)"""
+    if len(c) < 2:
+        return None, 0
+    body = abs(c[-1] - o[-1])
+    if body == 0:
+        return None, 0
+    upper_wick = h[-1] - max(o[-1], c[-1])
+    lower_wick = min(o[-1], c[-1]) - l[-1]
+    total_range = h[-1] - l[-1]
+    if total_range == 0:
+        return None, 0
+    # Bullish pin: long lower wick, small body at top
+    if lower_wick > body * 2 and lower_wick > upper_wick * 2 and lower_wick > total_range * 0.5:
+        return "LONG", 1
+    # Bearish pin: long upper wick, small body at bottom
+    if upper_wick > body * 2 and upper_wick > lower_wick * 2 and upper_wick > total_range * 0.5:
+        return "SHORT", 1
+    return None, 0
+
+def detect_inside_bar(o, h, l, c):
+    """Inside bar: current range within previous range.
+    Returns: direction from previous trend continuation."""
+    if len(c) < 3:
+        return None, 0
+    if h[-1] <= h[-2] and l[-1] >= l[-2]:
+        # Inside bar — look at previous trend
+        if c[-2] > o[-2]:
+            return "LONG", 1
+        elif c[-2] < o[-2]:
+            return "SHORT", 1
+    return None, 0
+
+def detect_volume_confirmation(v):
+    """Check if current volume > average of last 5 bars."""
+    if len(v) < 6:
+        return False, 0
+    avg_vol = sum(v[-6:-1]) / 5
+    if avg_vol == 0:
+        return False, 0
+    return v[-1] > avg_vol * 1.5, v[-1] / avg_vol
+
+
 # ─── Strategy Builder Engine ────────────────────────────────────────
 
 class StrategyBuilder:
@@ -1790,6 +1854,12 @@ class StrategyBuilder:
         self.stock_whitelist: List[str] = []  # empty = allow all
         self.whitelist_only: bool = False  # enforce whitelist when True
         self.stock_blocklist: List[str] = []  # explicitly blocked stocks
+        # ─── Direction-change signal mode ───
+        self.signal_on_change = True  # only signal when direction flips
+        self.prev_leading_dir: Dict[str, str] = {}  # last direction per symbol
+        self.min_gap_bars = 60  # minimum 1-min bars between signals per symbol (default 60min)
+        self.last_signal_bar: Dict[str, int] = {}  # bar count when last signal fired
+        self._bar_counter: Dict[str, int] = {}  # running bar count per symbol
 
     def get_presets(self) -> dict:
         return {k: {**v, "is_active": k == self.selected_preset} for k, v in self.STRATEGY_PRESETS.items()}
@@ -1830,6 +1900,14 @@ class StrategyBuilder:
     def set_trailing_sl(self, enabled: bool):
         self.trailing_sl = enabled
 
+    def set_min_gap(self, bars: int):
+        """Set minimum gap in 1-min bars between signals (default 60 = ~1 hour)."""
+        self.min_gap_bars = max(5, min(bars, 390))  # 5min to full market day
+
+    def set_signal_on_change(self, enabled: bool):
+        """Toggle direction-change-only signal mode (default: True)."""
+        self.signal_on_change = enabled
+
     def whitelist_add(self, symbol: str):
         sym = symbol.upper()
         if sym not in self.stock_whitelist:
@@ -1858,7 +1936,11 @@ class StrategyBuilder:
         return True
 
     def update(self, symbol: str) -> Optional[Dict]:
-        """Compute signals from 1-min OHLC bars. Returns signal dict or None."""
+        """Compute signals from 1-min OHLC bars. Returns signal dict or None.
+        
+        Only generates signals on DIRECTION CHANGE (flip) with cooldown.
+        Uses candle patterns for additional confirmation.
+        """
         sym = symbol.upper()
 
         # Whitelist/blocklist filter
@@ -1871,10 +1953,13 @@ class StrategyBuilder:
             return None
         opens, highs, lows, closes, volumes = ohlc
 
+        # Increment bar counter for cooldown tracking
+        self._bar_counter[sym] = self._bar_counter.get(sym, 0) + 1
+
         # Use latest close as current price
         current_price = closes[-1]
 
-        # 1. Leading indicator
+        # ── 1. Leading indicator ──
         leading_func = LEADING_INDICATORS.get(self.selected_leading)
         if not leading_func:
             leading_func = leading_superTrend
@@ -1888,7 +1973,7 @@ class StrategyBuilder:
         if leading_dir == "NEUTRAL":
             return None
 
-        # 1b. Composite mode — secondary leading indicator must agree
+        # ── 1b. Composite mode — secondary leading indicator must agree ──
         if self.composite_mode and self.composite_secondary:
             secondary_func = LEADING_INDICATORS.get(self.composite_secondary)
             if secondary_func:
@@ -1899,7 +1984,37 @@ class StrategyBuilder:
                 if sd.get("direction") != leading_dir:
                     return None
 
-        # 2. Confirmation filters
+        # ── 2. Direction-change check ──
+        # Only signal when leading indicator FLIPS direction
+        prev_dir = self.prev_leading_dir.get(sym, None)
+        is_flip = False
+        if prev_dir is not None and prev_dir != leading_dir:
+            # Direction changed: SHORT→LONG or LONG→SHORT
+            is_flip = True
+        # Store current direction for next time
+        self.prev_leading_dir[sym] = leading_dir
+
+        if self.signal_on_change and not is_flip:
+            return None  # No direction change → no signal
+
+        # ── 3. Cooldown check ──
+        last_bar = self.last_signal_bar.get(sym, 0)
+        current_bar = self._bar_counter[sym]
+        bars_since_last = current_bar - last_bar
+        if self.min_gap_bars > 0 and bars_since_last < self.min_gap_bars:
+            return None  # Too soon since last signal
+
+        # ── 4. Candle pattern confirmation ──
+        pattern_dir, pattern_strength = detect_engulfing(opens, highs, lows, closes)
+        if pattern_dir is None:
+            pattern_dir, pattern_strength = detect_pin_bar(opens, highs, lows, closes)
+        if pattern_dir is None:
+            pattern_dir, pattern_strength = detect_inside_bar(opens, highs, lows, closes)
+
+        # Volume confirmation
+        vol_surge, vol_ratio = detect_volume_confirmation(volumes)
+
+        # ── 5. Confirmation filters ──
         confirmations = []
         conf_long = 0
         conf_short = 0
@@ -1923,19 +2038,41 @@ class StrategyBuilder:
             elif result["direction"] == "SHORT":
                 conf_short += 1
 
-        # 3. Determine final signal
+        # ── 6. Determine final signal ──
         long_votes = 1 + conf_long
         short_votes = 1 + conf_short
         total_possible = 1 + len(self.selected_confirmations)
 
+        # Direction flip dictates candidate signal
         if leading_dir == "LONG":
-            final_signal = "BUY" if long_votes >= self.signal_threshold else "HOLD"
+            candidate = "BUY"
         elif leading_dir == "SHORT":
-            final_signal = "SELL" if short_votes >= self.signal_threshold else "HOLD"
+            candidate = "SELL"
+        else:
+            candidate = "HOLD"
+
+        # Apply threshold vote
+        if candidate == "BUY":
+            final_signal = candidate if long_votes >= self.signal_threshold else "HOLD"
+        elif candidate == "SELL":
+            final_signal = candidate if short_votes >= self.signal_threshold else "HOLD"
         else:
             final_signal = "HOLD"
 
-        # 4. Market trend hard override — block signals against the broader market
+        # Candle pattern must agree with signal direction (unless strong volume)
+        if final_signal in ("BUY", "SELL"):
+            if pattern_dir is not None:
+                pattern_agrees = (
+                    (final_signal == "BUY" and pattern_dir == "LONG") or
+                    (final_signal == "SELL" and pattern_dir == "SHORT")
+                )
+                if not pattern_agrees:
+                    final_signal = "HOLD"  # Pattern disagrees → skip
+            # Even without pattern, require volume confirmation
+            elif not vol_surge:
+                final_signal = "HOLD"  # No pattern + no volume surge → skip
+
+        # ── 7. Market trend hard override ──
         if "Market Trend" in self.selected_confirmations:
             mt_func = CONFIRMATION_FILTERS.get("Market Trend")
             if mt_func:
@@ -1949,17 +2086,21 @@ class StrategyBuilder:
                 except Exception:
                     pass
 
-        # 5. Buy-only mode — block all SELL signals
+        # ── 8. Buy-only mode ──
         if self.buy_only and final_signal == "SELL":
             final_signal = "HOLD"
 
-        # 6. Alternate signal mode
+        # ── 9. Alternate signal mode ──
         if self.alt_signal_mode and final_signal != "HOLD":
             self.alt_counter[sym] = self.alt_counter.get(sym, 0) + 1
             if self.alt_counter[sym] % 3 != 0:
                 return None
 
-        # 6. Build result
+        # Record bar of this signal for cooldown
+        if final_signal in ("BUY", "SELL"):
+            self.last_signal_bar[sym] = current_bar
+
+        # ── 10. Build result ──
         result = {
             "symbol": sym,
             "price": current_price,
@@ -1978,9 +2119,16 @@ class StrategyBuilder:
             "signal_threshold": self.signal_threshold,
             "final_signal": final_signal,
             "expiry_bars": self.signal_expiry,
+            "signal_on_change": self.signal_on_change,
+            "min_gap_bars": self.min_gap_bars,
+            "pattern_dir": pattern_dir,
+            "pattern_strength": pattern_strength,
+            "vol_surge": vol_surge,
+            "vol_ratio": round(vol_ratio, 2) if isinstance(vol_ratio, float) else vol_ratio,
+            "bars_since_last": bars_since_last,
         }
 
-        # 6. Persist
+        # ── 11. Persist ──
         _save_signal(
             symbol=sym,
             leading_name=self.selected_leading,
@@ -1991,7 +2139,9 @@ class StrategyBuilder:
             final_signal=final_signal,
             price=current_price,
             expiry_bars=self.signal_expiry,
-            meta={"long_votes": long_votes, "short_votes": short_votes, "timeframe": "1m"},
+            meta={"long_votes": long_votes, "short_votes": short_votes, "timeframe": "1m",
+                  "signal_on_change": True, "min_gap_bars": self.min_gap_bars,
+                  "pattern_dir": pattern_dir, "vol_surge": vol_surge},
         )
 
         if final_signal in ("BUY", "SELL"):
@@ -2108,6 +2258,8 @@ class StrategyBuilder:
         entry_time = ""
         entry_signal = ""
         signals_log = []
+        prev_leading_dir_bt = None
+        last_signal_idx = 0
 
         for i in range(self.min_bars, len(closes)):
             o = opens[:i + 1]
@@ -2126,6 +2278,19 @@ class StrategyBuilder:
                 continue
             leading_dir = ld.get("direction", "NEUTRAL")
             if leading_dir == "NEUTRAL":
+                continue
+
+            # Direction-change check (backtest)
+            is_flip = False
+            if prev_leading_dir_bt is not None and prev_leading_dir_bt != leading_dir:
+                is_flip = True
+            prev_leading_dir_bt = leading_dir
+
+            if self.signal_on_change and not is_flip:
+                continue
+
+            # Cooldown check
+            if self.min_gap_bars > 0 and (i - last_signal_idx) < self.min_gap_bars:
                 continue
 
             # Confirmation filters
@@ -2156,9 +2321,30 @@ class StrategyBuilder:
             else:
                 signal = "HOLD"
 
+            # Candle pattern confirmation
+            if signal in ("BUY", "SELL"):
+                pat_dir, pat_str = detect_engulfing(o, h, l, c)
+                if pat_dir is None:
+                    pat_dir, pat_str = detect_pin_bar(o, h, l, c)
+                if pat_dir is None:
+                    pat_dir, pat_str = detect_inside_bar(o, h, l, c)
+                vol_surge, _ = detect_volume_confirmation(v)
+                if pat_dir is not None:
+                    pattern_agrees = (
+                        (signal == "BUY" and pat_dir == "LONG") or
+                        (signal == "SELL" and pat_dir == "SHORT")
+                    )
+                    if not pattern_agrees:
+                        signal = "HOLD"
+                elif not vol_surge:
+                    signal = "HOLD"
+
             # Buy-only override
             if self.buy_only and signal == "SELL":
                 signal = "HOLD"
+
+            if signal in ("BUY", "SELL"):
+                last_signal_idx = i
 
             price = c[-1]
 

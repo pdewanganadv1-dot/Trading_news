@@ -428,6 +428,13 @@ def backtest_stock_fast(sym, df):
     # Composite thresholds (sum of weighted directions across 18 indicators)
     composite_thresholds = [3.0, 5.0, 7.0]
 
+    # Direction-change tracking per indicator
+    prev_dir_per_ind = {}
+    last_signal_bar_per_ind = {}
+    MIN_GAP_BARS = 60  # cooldown: ~1 hour between signals per indicator
+    prev_elite_dir = 0
+    last_elite_bar = 0
+
     # Scan bars
     for i in range(MIN_BARS, n):
         # Check trend filter
@@ -439,6 +446,20 @@ def backtest_stock_fast(sym, df):
         for ind_name, dir_series in ind_series.items():
             ld_dir = dir_series[i]
             if ld_dir == 0:
+                continue
+
+            # ── Direction-change check ──
+            prev_dir = prev_dir_per_ind.get(ind_name, 0)
+            is_flip = False
+            if prev_dir != 0 and prev_dir != ld_dir:
+                is_flip = True
+            prev_dir_per_ind[ind_name] = ld_dir
+            if not is_flip:
+                continue
+
+            # ── Cooldown check ──
+            last_bar = last_signal_bar_per_ind.get(ind_name, 0)
+            if i - last_bar < MIN_GAP_BARS:
                 continue
 
             # Trend filter
@@ -469,6 +490,35 @@ def backtest_stock_fast(sym, df):
                 if not signal:
                     continue
 
+                # ── Candle pattern confirmation ──
+                # Quick candle check using numpy
+                if i >= 2:
+                    prev_close = c[i-1]
+                    prev_open = o[i-1]
+                    curr_close = c[i]
+                    curr_open = o[i]
+                    # Bullish engulfing check
+                    if signal == "BUY" and prev_close < prev_open and curr_close > curr_open and curr_open < prev_close and curr_close > prev_open:
+                        pass  # pattern confirmed
+                    elif signal == "SELL" and prev_close > prev_open and curr_close < curr_open and curr_open > prev_close and curr_close < prev_open:
+                        pass  # pattern confirmed
+                    else:
+                        # Pin bar check
+                        body = abs(curr_close - curr_open)
+                        if body > 0:
+                            upper = h[i] - max(curr_open, curr_close)
+                            lower = min(curr_open, curr_close) - l[i]
+                            total = h[i] - l[i]
+                            bullish_pin = lower > body * 2 and lower > upper * 2 and lower > total * 0.5
+                            bearish_pin = upper > body * 2 and upper > lower * 2 and upper > total * 0.5
+                            if signal == "BUY" and not bullish_pin:
+                                continue  # no pattern confirmation
+                            if signal == "SELL" and not bearish_pin:
+                                continue  # no pattern confirmation
+                        else:
+                            continue  # doji — skip
+
+                last_signal_bar_per_ind[ind_name] = i
                 entry_price = c[i]
                 dt = dates[i]
                 ts = dt.strftime("%Y-%m-%d %H:%M") if hasattr(dt, 'strftime') else str(dt)[:16]
@@ -490,6 +540,20 @@ def backtest_stock_fast(sym, df):
         c_score = composite[i]
         st_score = struct_composite[i]
         dirs = {name: ind_series[name][i] for name in ind_series}
+
+        # Determine elite composite direction for flip detection
+        elite_dir = 0
+        if st_score >= 2:
+            elite_dir = 1
+        elif st_score <= -2:
+            elite_dir = -1
+
+        # Elite direction-flip + cooldown (only signal when structure changes)
+        elite_flip = False
+        if prev_elite_dir != 0 and prev_elite_dir != elite_dir and elite_dir != 0 and (i - last_elite_bar) >= MIN_GAP_BARS:
+            elite_flip = True
+        if elite_dir != 0:
+            prev_elite_dir = elite_dir
 
         ms_dir = st_score  # market structure composite
         ls_dir = dirs.get("Liq Sweep", 0)
@@ -543,11 +607,15 @@ def backtest_stock_fast(sym, df):
         elite_conf_short = conf_short
         elite_thresholds = [0, 1, 2, 3]
         seen_elite = set()
+        # Only emit elite signals on direction flip with cooldown
         for e_name, e_dir, _ in elite_configs:
             if e_dir == 0 or (i, e_dir) in seen_elite:
                 continue
             seen_elite.add((i, e_dir))
+            if not elite_flip:
+                continue
             signal = "BUY" if e_dir == 1 else "SELL"
+            last_elite_bar = i
 
             # Confirmation threshold sweep for elite combos
             for eth in elite_thresholds:
