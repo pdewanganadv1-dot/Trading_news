@@ -491,7 +491,6 @@ def backtest_stock_fast(sym, df):
         dirs = {name: ind_series[name][i] for name in ind_series}
 
         ms_dir = st_score  # market structure composite
-        tr_dir = dirs.get("SuperTrend", 0) or dirs.get("HMA", 0) or dirs.get("RSI V2", 0)
         ls_dir = dirs.get("Liq Sweep", 0)
         bs_dir = dirs.get("BOS/CHoCH", 0)
         st_dir = dirs.get("SuperTrend", 0)
@@ -502,42 +501,48 @@ def backtest_stock_fast(sym, df):
 
         elite_configs = []
 
-        # Elite Pair: Liq Sweep + BOS/CHoCH both agree
-        if ls_dir != 0 and ls_dir == bs_dir:
-            elite_configs.append(("Elite:Liq+BOS", ls_dir, 0))
-        # Elite Pair: Liq Sweep + SuperTrend both agree
-        if ls_dir != 0 and ls_dir == st_dir:
-            elite_configs.append(("Elite:Liq+ST",  ls_dir, 0))
+        # Elite Triple: Liq Sweep + BOS/CHoCH + SuperTrend (most specific)
+        if ls_dir != 0 and ls_dir == bs_dir == st_dir:
+            elite_configs.append(("Elite:Liq+BOS+ST", ls_dir, 0))
         # Elite Triple: Liq Sweep + RSI + Williams agree
         if ls_dir != 0 and ls_dir == rs_dir == wr_dir:
             elite_configs.append(("Elite:Liq+RSI+WR", ls_dir, 0))
-        # Elite Pair: BOS/CHoCH + SuperTrend both agree
+        # Elite Triple: all 3 structure indicators agree
+        if ls_dir != 0 and bs_dir != 0 and fvg_dir != 0 and ls_dir == bs_dir == fvg_dir:
+            elite_configs.append(("Elite:Struct3", ls_dir, 0))
+        # Elite Pair: Liq Sweep + BOS/CHoCH
+        if ls_dir != 0 and ls_dir == bs_dir:
+            elite_configs.append(("Elite:Liq+BOS", ls_dir, 0))
+        # Elite Pair: Liq Sweep + SuperTrend
+        if ls_dir != 0 and ls_dir == st_dir:
+            elite_configs.append(("Elite:Liq+ST", ls_dir, 0))
+        # Elite Pair: BOS/CHoCH + SuperTrend
         if bs_dir != 0 and bs_dir == st_dir:
-            elite_configs.append(("Elite:BOS+ST",  bs_dir, 0))
-        # Elite Pair: FVG + Order Blocks both agree (structure-only)
+            elite_configs.append(("Elite:BOS+ST", bs_dir, 0))
+        # Elite Pair: FVG + Order Blocks
         if fvg_dir != 0 and fvg_dir == ob_dir and ob_dir != 0:
-            elite_configs.append(("Elite:FVG+OB",  fvg_dir, 0))
+            elite_configs.append(("Elite:FVG+OB", fvg_dir, 0))
         # Elite Trio: any 2 of (Liq Sweep, BOS/CHoCH, FVG) agree
         struct_dirs = [d for d in [ls_dir, bs_dir, fvg_dir] if d != 0]
         if len(struct_dirs) >= 2 and all(d == struct_dirs[0] for d in struct_dirs[:2]):
             elite_configs.append(("Elite:Struct2", struct_dirs[0], 0))
-        # Elite All-Struct: all 3 structure indicators agree
-        if ls_dir != 0 and bs_dir != 0 and fvg_dir != 0 and ls_dir == bs_dir == fvg_dir:
-            elite_configs.append(("Elite:Struct3", ls_dir, 0))
-        # Elite Cross: structure + trend agree
+        # Elite Cross: structure composite + trend agree
         if ms_dir >= 2 and st_dir == 1:
             elite_configs.append(("Elite:Str+Trend", 1, 0))
         elif ms_dir <= -2 and st_dir == -1:
             elite_configs.append(("Elite:Str+Trend", -1, 0))
-        # Elite Cross: structure + momentum agree
+        # Elite Cross: structure composite + momentum agree
         if ms_dir >= 2 and rs_dir == 1:
             elite_configs.append(("Elite:Str+Mom", 1, 0))
         elif ms_dir <= -2 and rs_dir == -1:
             elite_configs.append(("Elite:Str+Mom", -1, 0))
 
+        # Dedup: only the first (most specific) elite combo per bar+dir
+        seen_elite = set()
         for e_name, e_dir, _ in elite_configs:
-            if e_dir == 0:
+            if e_dir == 0 or (i, e_dir) in seen_elite:
                 continue
+            seen_elite.add((i, e_dir))
             signal = "BUY" if e_dir == 1 else "SELL"
 
             # EMA 200 trend filter
