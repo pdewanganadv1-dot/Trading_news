@@ -1024,6 +1024,147 @@ def leading_dema(o, h, l, c, v, period=14):
     return leading_double_ema(o, h, l, c, v, period)
 
 
+# ─── Market Structure (SMC/ICT) Leading Indicators ───────────────────
+
+def _swing_highs_py(h, left=3, right=3):
+    """Swing high detection using lists (non-numba fallback)."""
+    n = len(h)
+    result = [0.0] * n
+    for i in range(left, n - right):
+        is_high = True
+        for j in range(i - left, i + right + 1):
+            if j == i:
+                continue
+            if h[j] >= h[i]:
+                is_high = False
+                break
+        if is_high:
+            result[i] = 1.0
+    return result
+
+def _swing_lows_py(l, left=3, right=3):
+    n = len(l)
+    result = [0.0] * n
+    for i in range(left, n - right):
+        is_low = True
+        for j in range(i - left, i + right + 1):
+            if j == i:
+                continue
+            if l[j] <= l[i]:
+                is_low = False
+                break
+        if is_low:
+            result[i] = 1.0
+    return result
+
+def leading_liquidity_sweep(o, h, l, c, v, lookback=10):
+    """Liquidity Sweep detection. Returns 1/-1/0 direction."""
+    n = len(c)
+    if n < lookback + 5:
+        return {"direction": "NEUTRAL", "value": 0}
+    recent_high = max(h[-lookback:-1]) if len(h) >= lookback else h[-1]
+    recent_low = min(l[-lookback:-1]) if len(l) >= lookback else l[-1]
+    # Bearish sweep: price above recent high, closes below
+    if h[-1] > recent_high and c[-1] < recent_high:
+        return {"direction": "SHORT", "value": -1}
+    # Bullish sweep: price below recent low, closes above
+    if l[-1] < recent_low and c[-1] > recent_low:
+        return {"direction": "LONG", "value": 1}
+    return {"direction": "NEUTRAL", "value": 0}
+
+def leading_market_structure(o, h, l, c, v):
+    """Market Structure BOS/CHoCH detection."""
+    n = len(c)
+    if n < 15:
+        return {"direction": "NEUTRAL", "value": 0}
+    sh = _swing_highs_py(h, 3, 3)
+    sl = _swing_lows_py(l, 3, 3)
+    swing_high_prices = [h[i] for i in range(n) if sh[i] == 1]
+    swing_low_prices = [l[i] for i in range(n) if sl[i] == 1]
+    if len(swing_high_prices) < 3 or len(swing_low_prices) < 3:
+        return {"direction": "NEUTRAL", "value": 0}
+    h1, h2 = swing_high_prices[-3], swing_high_prices[-2]
+    l1, l2 = swing_low_prices[-3], swing_low_prices[-2]
+    uptrend = h2 > h1 and l2 > l1
+    downtrend = h2 < h1 and l2 < l1
+    if uptrend and c[-1] > h2:
+        return {"direction": "LONG", "value": 1}
+    elif downtrend and c[-1] < l2:
+        return {"direction": "SHORT", "value": -1}
+    elif h2 > h1 and l2 < l1:
+        return {"direction": "SHORT", "value": -2}  # bearish CHoCH
+    elif h2 < h1 and l2 > l1:
+        return {"direction": "LONG", "value": 2}  # bullish CHoCH
+    return {"direction": "NEUTRAL", "value": 0}
+
+def leading_fvg(o, h, l, c, v):
+    """Fair Value Gap detection."""
+    n = len(c)
+    if n < 3:
+        return {"direction": "NEUTRAL", "value": 0}
+    if l[-1] > h[-3]:
+        return {"direction": "LONG", "value": 1}
+    elif h[-1] < l[-3]:
+        return {"direction": "SHORT", "value": -1}
+    return {"direction": "NEUTRAL", "value": 0}
+
+def leading_order_blocks(o, h, l, c, v):
+    """Order Block detection."""
+    n = len(c)
+    if n < 5:
+        return {"direction": "NEUTRAL", "value": 0}
+    for i in range(max(1, n - 5), n):
+        body = abs(c[i] - o[i])
+        body_pct = body / (o[i] + 1e-10) * 100
+        if body_pct < 0.3:
+            continue
+        prev_body = abs(c[i-1] - o[i-1]) if i > 0 else 0
+        # Bullish impulse
+        if c[i] > o[i] and body > prev_body * 1.5:
+            ob_high = max(o[i-1], c[i-1])
+            ob_low = min(o[i-1], c[i-1])
+            if l[-1] <= ob_high and h[-1] >= ob_low:
+                return {"direction": "LONG", "value": 1}
+        # Bearish impulse
+        elif c[i] < o[i] and body > prev_body * 1.5:
+            ob_high = max(o[i-1], c[i-1])
+            ob_low = min(o[i-1], c[i-1])
+            if l[-1] <= ob_high and h[-1] >= ob_low:
+                return {"direction": "SHORT", "value": -1}
+    return {"direction": "NEUTRAL", "value": 0}
+
+def leading_trendline(o, h, l, c, v):
+    """Trendline bounce detection."""
+    n = len(c)
+    if n < 15:
+        return {"direction": "NEUTRAL", "value": 0}
+    sl = _swing_lows_py(l, 2, 2)
+    sh = _swing_highs_py(h, 2, 2)
+    # Check uptrend line (rising lows)
+    low_indices = [i for i in range(n) if sl[i] == 1]
+    if len(low_indices) >= 2:
+        x1, x2 = low_indices[-2], low_indices[-1]
+        y1, y2 = l[x1], l[x2]
+        if x2 > x1 and y2 >= y1:
+            x, y = n - 1, l[-1]
+            if x2 != x1:
+                expected = y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+                if abs(y - expected) <= expected * 0.001 and c[-1] > expected:
+                    return {"direction": "LONG", "value": 1}
+    # Check downtrend line (falling highs)
+    high_indices = [i for i in range(n) if sh[i] == 1]
+    if len(high_indices) >= 2:
+        x1, x2 = high_indices[-2], high_indices[-1]
+        y1, y2 = h[x1], h[x2]
+        if x2 > x1 and y2 <= y1:
+            x, y = n - 1, h[-1]
+            if x2 != x1:
+                expected = y1 + (y2 - y1) * (x - x1) / (x2 - x1)
+                if abs(y - expected) <= expected * 0.001 and c[-1] < expected:
+                    return {"direction": "SHORT", "value": -1}
+    return {"direction": "NEUTRAL", "value": 0}
+
+
 # Map of leading indicator names to functions
 LEADING_INDICATORS: Dict[str, Callable] = {
     "Range Filter": leading_rangefilter,
@@ -1063,6 +1204,12 @@ LEADING_INDICATORS: Dict[str, Callable] = {
     "Speedy+ALMA": leading_speedy_alma,
     "JJMA": leading_jjma,
     "Tillson T3": leading_tillson_t3,
+    # ── Market Structure (SMC/ICT) ──
+    "Liq Sweep": leading_liquidity_sweep,
+    "BOS/CHoCH": leading_market_structure,
+    "FVG": leading_fvg,
+    "Order Blocks": leading_order_blocks,
+    "Trendline": leading_trendline,
 }
 
 LEADING_NAMES = list(LEADING_INDICATORS.keys())
@@ -1449,42 +1596,37 @@ def confirm_market_trend(o, h, l, c, v):
     return {"confirmed": direction != "NEUTRAL", "direction": direction, "value": bull_pct - bear_pct}
 
 
-def confirm_liquidity_sweep(o, h, l, c, v, lookback=15):
-    """Detect liquidity sweeps — price takes out a recent swing high/low
-    then reverses back inside. Indicates stop hunts / liquidity grabs."""
-    if len(c) < lookback + 3:
-        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
-    recent_high = max(h[-lookback:-1])
-    recent_low = min(l[-lookback:-1])
-    bearish_sweep = h[-1] > recent_high and c[-1] < recent_high
-    bullish_sweep = l[-1] < recent_low and c[-1] > recent_low
-    if bullish_sweep:
-        return {"confirmed": True, "direction": "LONG", "value": 1, "pattern": "liquidity_sweep_bullish"}
-    elif bearish_sweep:
-        return {"confirmed": True, "direction": "SHORT", "value": -1, "pattern": "liquidity_sweep_bearish"}
-    return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+# ─── Market Structure Confirmation Filters ──────────────────────────
 
+def confirm_liquidity_sweep(o, h, l, c, v):
+    """Liquidity sweep as confirmation."""
+    r = leading_liquidity_sweep(o, h, l, c, v)
+    d = r.get("direction", "NEUTRAL")
+    return {"confirmed": d != "NEUTRAL", "direction": d, "value": r.get("value", 0)}
 
-def confirm_market_structure(o, h, l, c, v, lookback=12):
-    """Detect market structure trend via sequence of highs/lows.
-    Uptrend = higher highs + higher lows, Downtrend = lower highs + lower lows."""
-    if len(c) < lookback * 2:
-        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
-    highs = h[-lookback:]
-    lows = l[-lookback:]
-    up_score = sum(1 for i in range(1, len(highs)) if highs[i] >= highs[i-1]) + \
-               sum(1 for i in range(1, len(lows)) if lows[i] >= lows[i-1])
-    down_score = sum(1 for i in range(1, len(highs)) if highs[i] <= highs[i-1]) + \
-                 sum(1 for i in range(1, len(lows)) if lows[i] <= lows[i-1])
-    total = up_score + down_score
-    if total == 0:
-        return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
-    up_pct = up_score / total
-    if up_pct > 0.65:
-        return {"confirmed": True, "direction": "LONG", "value": up_pct, "pattern": "uptrend"}
-    elif up_pct < 0.35:
-        return {"confirmed": True, "direction": "SHORT", "value": 1 - up_pct, "pattern": "downtrend"}
-    return {"confirmed": False, "direction": "NEUTRAL", "value": 0}
+def confirm_market_structure(o, h, l, c, v):
+    """BOS/CHoCH as confirmation."""
+    r = leading_market_structure(o, h, l, c, v)
+    d = r.get("direction", "NEUTRAL")
+    return {"confirmed": d != "NEUTRAL", "direction": d, "value": r.get("value", 0)}
+
+def confirm_fvg_conf(o, h, l, c, v):
+    """FVG as confirmation."""
+    r = leading_fvg(o, h, l, c, v)
+    d = r.get("direction", "NEUTRAL")
+    return {"confirmed": d != "NEUTRAL", "direction": d, "value": r.get("value", 0)}
+
+def confirm_order_blocks(o, h, l, c, v):
+    """Order Blocks as confirmation."""
+    r = leading_order_blocks(o, h, l, c, v)
+    d = r.get("direction", "NEUTRAL")
+    return {"confirmed": d != "NEUTRAL", "direction": d, "value": r.get("value", 0)}
+
+def confirm_trendline(o, h, l, c, v):
+    """Trendline bounce as confirmation."""
+    r = leading_trendline(o, h, l, c, v)
+    d = r.get("direction", "NEUTRAL")
+    return {"confirmed": d != "NEUTRAL", "direction": d, "value": r.get("value", 0)}
 
 
 CONFIRMATION_FILTERS: Dict[str, Callable] = {
@@ -1512,10 +1654,15 @@ CONFIRMATION_FILTERS: Dict[str, Callable] = {
     "Pivot": confirm_pivot,
     "Divergence": confirm_divergence,
     "Market Trend": confirm_market_trend,
-    "Liquidity Sweep": confirm_liquidity_sweep,
-    "Market Structure": confirm_market_structure,
     "PSAR": confirm_psar,
     "ZLEMA": confirm_zlema,
+    # ── Market Structure ──
+    "Liquidity Sweep": confirm_liquidity_sweep,
+    "Liq Sweep": confirm_liquidity_sweep,
+    "BOS/CHoCH": confirm_market_structure,
+    "FVG": confirm_fvg_conf,
+    "Order Blocks": confirm_order_blocks,
+    "Trendline": confirm_trendline,
 }
 
 CONFIRMATION_NAMES = list(CONFIRMATION_FILTERS.keys())
