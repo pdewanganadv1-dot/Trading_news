@@ -103,6 +103,7 @@
             <button class="tab-btn" onclick="switchTab('analysis', this)">OI Analysis</button>
             <button class="tab-btn" onclick="switchTab('greeks', this)">Greeks & IV</button>
             <button class="tab-btn" onclick="switchTab('levels', this)">S/R & GEX</button>
+            <button class="tab-btn" onclick="switchTab('signals', this);loadSignals()">Signals</button>
         </div>
 
         <div id="tab-chain" class="tab-content active">
@@ -139,6 +140,39 @@
             <div class="section-grid">
                 <div class="level-box"><h3>OI Concentration Near Spot</h3><div id="concentrationInfo"></div></div>
                 <div class="level-box"><h3>Key Levels</h3><div id="keyLevelsInfo"></div></div>
+            </div>
+        </div>
+
+        <div id="tab-signals" class="tab-content">
+            <div class="section-grid">
+                <div class="level-box" style="grid-column:1/-1">
+                    <h3>Signal Config</h3>
+                    <div style="display:flex;gap:0.8rem;flex-wrap:wrap;align-items:center;margin-bottom:0.5rem">
+                        <select id="signalStrategy" style="background:var(--bg-primary);border:1px solid var(--border-color);color:var(--text-primary);padding:0.3rem 0.6rem;border-radius:6px;font-size:0.8rem">
+                            <option value="mega" selected>MEGA</option>
+                            <option value="fii_filtered">FII Filtered</option>
+                            <option value="short_premium">Short Premium</option>
+                            <option value="ultra_selective">Ultra Selective</option>
+                        </select>
+                        <button id="runSignalsBtn" onclick="runSignals()" style="background:var(--accent-blue);border:none;color:white;padding:0.3rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem">&#9654; Run Signals</button>
+                        <button onclick="updatePositions()" style="background:var(--accent-gold);border:none;color:#000;padding:0.3rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem">&#8635; Update Positions</button>
+                        <span id="signalStatus" style="font-size:0.75rem;color:var(--text-secondary)"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="section-grid">
+                <div class="level-box">
+                    <h3>New Signals</h3>
+                    <div id="newSignalsList" style="font-size:0.8rem"><div class="buildup-item" style="justify-content:center">Run signals to see results</div></div>
+                </div>
+                <div class="level-box">
+                    <h3>Open Positions</h3>
+                    <div id="openPositionsList" style="font-size:0.8rem"><div class="buildup-item" style="justify-content:center">No open positions</div></div>
+                </div>
+            </div>
+            <div class="level-box">
+                <h3>Trade History</h3>
+                <div id="tradeHistoryList" style="font-size:0.8rem"><div class="buildup-item" style="justify-content:center">No closed trades</div></div>
             </div>
         </div>
     </div>
@@ -442,6 +476,122 @@
                 btn.style.color = '';
                 clearInterval(autoInterval);
             }
+        }
+
+        async function loadSignals() {
+            const stat = document.getElementById('signalStatus');
+            stat.textContent = 'Loading...';
+            try {
+                const r = await fetch('/api/options/positions');
+                const d = await r.json();
+                renderPositions(d);
+                stat.textContent = '';
+            } catch(e) { stat.textContent = 'Error loading positions'; }
+        }
+
+        async function runSignals() {
+            const strategy = document.getElementById('signalStrategy').value;
+            const btn = document.getElementById('runSignalsBtn');
+            const stat = document.getElementById('signalStatus');
+            btn.disabled = true;
+            stat.textContent = 'Generating signals...';
+            try {
+                const r = await fetch(`/api/options/signals?symbol=NIFTY&strategy=${strategy}`);
+                if (!r.ok) throw new Error(await r.text());
+                const d = await r.json();
+                renderSignals(d);
+                if (d.new_signals && d.new_signals.length) {
+                    const pr = await fetch('/api/options/positions');
+                    const pd = await pr.json();
+                    renderPositions(pd);
+                }
+                stat.textContent = `Done (${d.data_source}, ${d.history_days} days history)`;
+            } catch(e) {
+                stat.textContent = 'Error: ' + e.message;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function updatePositions() {
+            const stat = document.getElementById('signalStatus');
+            stat.textContent = 'Updating positions...';
+            try {
+                const r = await fetch('/api/options/positions/update?symbol=NIFTY');
+                const d = await r.json();
+                const pr = await fetch('/api/options/positions');
+                const pd = await pr.json();
+                renderPositions(pd);
+                stat.textContent = `Updated: ${d.closed_count} closed, ${d.updated_count} updated`;
+            } catch(e) {
+                stat.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        async function closePosition(posId) {
+            if (!confirm('Close this position?')) return;
+            try {
+                const r = await fetch(`/api/options/positions/close?pos_id=${posId}&reason=Manual`, {method:'POST'});
+                if (!r.ok) throw new Error(await r.text());
+                const pr = await fetch('/api/options/positions');
+                const pd = await pr.json();
+                renderPositions(pd);
+            } catch(e) { alert('Error: '+e.message); }
+        }
+
+        function renderSignals(d) {
+            const list = document.getElementById('newSignalsList');
+            const signals = d.new_signals || [];
+            if (!signals.length) {
+                list.innerHTML = '<div class="buildup-item" style="justify-content:center">No signals generated</div>';
+                return;
+            }
+            list.innerHTML = signals.map(s => `
+                <div class="buildup-item">
+                    <span><b>${s.action}</b> @${s.strike} (${s.entry_price?.toFixed(1)})</span>
+                    <span class="badge badge-b">${s.entry_reason?.substring(0,60)}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderPositions(d) {
+            const openList = document.getElementById('openPositionsList');
+            const open = d.open || [];
+            if (!open.length) {
+                openList.innerHTML = '<div class="buildup-item" style="justify-content:center">No open positions</div>';
+            } else {
+                openList.innerHTML = open.map(p => {
+                    const pnl = ((p.entry_price - (p.exit_price || p.entry_price)) * p.qty).toFixed(0);
+                    const cls = pnl > 0 ? 'positive' : (pnl < 0 ? 'negative' : '');
+                    return `<div class="buildup-item">
+                        <span><b>${p.action}</b> @${p.strike} (exp ${p.expiry})<br><small style="color:var(--text-secondary)">${p.entry_date} ₹${p.entry_price} × ${p.qty}</small></span>
+                        <span style="text-align:right">
+                            <span class="${cls}">${pnl >= 0 ? '+' : ''}${pnl}</span><br>
+                            <button onclick="closePosition('${p.id}')" style="background:var(--accent-red);border:none;color:white;padding:2px 8px;border-radius:4px;cursor:pointer;font-size:0.65rem">Close</button>
+                        </span>
+                    </div>`;
+                }).join('');
+            }
+
+            const hist = document.getElementById('tradeHistoryList');
+            const closed = d.closed || [];
+            if (!closed.length) {
+                hist.innerHTML = '<div class="buildup-item" style="justify-content:center">No closed trades</div>';
+            } else {
+                hist.innerHTML = closed.map(t => {
+                    const pnl = (t.pnl || 0).toFixed(0);
+                    const cls = pnl > 0 ? 'positive' : (pnl < 0 ? 'negative' : '');
+                    return `<div class="buildup-item">
+                        <span>${t.entry_date} → ${t.exit_date || '-'} <b>${t.option_type}@${t.strike}</b><br><small style="color:var(--text-secondary)">${t.entry_reason?.substring(0,50)}</small></span>
+                        <span style="text-align:right">
+                            <span class="${cls}">${pnl >= 0 ? '+' : ''}${pnl}</span><br>
+                            <small style="color:var(--text-secondary)">${t.exit_reason || ''}</small>
+                        </span>
+                    </div>`;
+                }).join('');
+            }
+
+            document.querySelector('#tab-signals .level-box h3').textContent = `Open Positions (₹${(d.running_pnl||0).toFixed(0)})`;
         }
 
         document.getElementById('symbolSelect').onchange = function() {

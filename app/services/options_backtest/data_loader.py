@@ -93,6 +93,8 @@ class OptionsDataLoader:
             return None
 
         underlying = day_data["UNDERLYING_VALUE"].iloc[0]
+        if pd.isna(underlying) or underlying is None or underlying == 0:
+            return None
 
         if expiry is None:
             exps = sorted(day_data["EXPIRY_DT"].unique())
