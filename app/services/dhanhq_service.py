@@ -1,16 +1,14 @@
 import asyncio
-import csv
-import io
 import os
 import time
-import httpx
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
+
 from app.config import settings
-from app.data.stocks import INDIAN_STOCKS
+
+from dhanhq import DhanContext, dhanhq
 
 DHAN_BASE = "https://api.dhan.co/v2"
-DHAN_AUTH = "https://auth.dhan.co"
 
 # Global state
 dhan_enabled = False
@@ -18,15 +16,14 @@ _client_id: Optional[str] = None
 _access_token: Optional[str] = None
 _token_expiry: Optional[datetime] = None
 
+# SDK instances (lazy-init)
+_dhan_context: Optional[DhanContext] = None
+_dhan: Optional[dhanhq] = None
+
 # Cache for security ID mapping (symbol -> security_id)
 _security_map: Dict[str, str] = {}
 _security_map_ts: float = 0
 _SECURITY_MAP_TTL = 86400
-
-# Cache for market quotes
-_quote_cache: Dict[str, Dict] = {}
-_quote_cache_ts: float = 0
-_QUOTE_CACHE_TTL = 10
 
 
 def _init():
@@ -35,8 +32,17 @@ def _init():
     _access_token = settings.dhan_access_token or os.environ.get("DHAN_ACCESS_TOKEN")
 
 
-# Auto-init on import
 _init()
+
+
+def _get_dhan():
+    global _dhan_context, _dhan, _client_id, _access_token
+    cid = _client_id or settings.dhan_client_id or os.environ.get("DHAN_CLIENT_ID", "")
+    tok = _access_token or settings.dhan_access_token or os.environ.get("DHAN_ACCESS_TOKEN", "")
+    if _dhan is None or _dhan_context is None or _dhan_context.client_id != cid:
+        _dhan_context = DhanContext(cid, tok)
+        _dhan = dhanhq(_dhan_context)
+    return _dhan
 
 
 def _headers() -> Dict[str, str]:
@@ -58,22 +64,24 @@ async def _load_security_map():
     if _security_map and (now - _security_map_ts) < _SECURITY_MAP_TTL:
         return
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get("https://images.dhan.co/api-data/api-scrip-master.csv")
-            if resp.status_code != 200:
-                return
-            content = resp.text
-            reader = csv.DictReader(io.StringIO(content))
-            for row in reader:
-                exch = row.get("SEM_EXM_EXCH_ID", "").strip().upper()
-                seg = row.get("SEM_SEGMENT", "").strip().upper()
-                if exch != "NSE" or seg != "E":
-                    continue
-                sym = row.get("SEM_TRADING_SYMBOL", "").strip().upper()
-                sem_id = row.get("SEM_SMST_SECURITY_ID", "").strip()
-                if sym and sem_id:
-                    _security_map[sym] = sem_id
-            _security_map_ts = time.time()
+        import pandas as pd
+        import requests
+
+        url = "https://images.dhan.co/api-data/api-scrip-master.csv"
+        resp = requests.get(url, timeout=30)
+        if resp.status_code != 200:
+            return
+        df = pd.read_csv(pd.io.common.StringIO(resp.text))
+        for _, row in df.iterrows():
+            exch = str(row.get("SEM_EXM_EXCH_ID", "")).strip().upper()
+            seg = str(row.get("SEM_SEGMENT", "")).strip().upper()
+            if exch != "NSE" or seg != "E":
+                continue
+            sym = str(row.get("SEM_TRADING_SYMBOL", "")).strip().upper()
+            sem_id = str(row.get("SEM_SMST_SECURITY_ID", "")).strip()
+            if sym and sem_id:
+                _security_map[sym] = sem_id
+        _security_map_ts = time.time()
     except Exception as e:
         print(f"Dhan security map load error: {e}")
 
@@ -85,8 +93,8 @@ def get_security_id(symbol: str) -> Optional[str]:
     return None
 
 
-# Lock to prevent concurrent security map downloads
 _security_map_lock = asyncio.Lock()
+
 
 async def ensure_security_map():
     async with _security_map_lock:
@@ -94,149 +102,132 @@ async def ensure_security_map():
             await _load_security_map()
 
 
-async def _get(endpoint: str) -> Optional[Dict]:
-    token = _headers()["access-token"]
-    if not token:
-        return {"error": "NO_TOKEN"}
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                f"{DHAN_BASE}{endpoint}",
-                headers={**_headers(), "client-id": _client()},
-            )
-            if resp.status_code == 401:
-                return {"error": "TOKEN_EXPIRED"}
-            if resp.status_code != 200:
-                return {"error": f"HTTP {resp.status_code}", "detail": resp.text}
-            return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-
-async def _post(endpoint: str, data: dict) -> Optional[Dict]:
-    token = _headers()["access-token"]
-    if not token:
-        return {"error": "NO_TOKEN"}
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                f"{DHAN_BASE}{endpoint}",
-                headers={**_headers(), "client-id": _client()},
-                json=data,
-            )
-            if resp.status_code == 401:
-                return {"error": "TOKEN_EXPIRED"}
-            if resp.status_code not in (200, 201, 202):
-                return {"error": f"HTTP {resp.status_code}", "detail": resp.text}
-            return resp.json()
-    except Exception as e:
-        return {"error": str(e)}
-
-
 async def renew_token() -> bool:
     global _access_token, _token_expiry
     cid = _client()
-    token = _headers()["access-token"]
+    token = _access_token or settings.dhan_access_token or ""
     if not token or not cid:
         return False
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.post(
-                f"{DHAN_BASE}/RenewToken",
-                headers={
-                    "access-token": token,
-                    "dhanClientId": cid,
-                },
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                new_token = data.get("accessToken")
-                if new_token:
-                    _access_token = new_token
-                    _token_expiry = datetime.now() + timedelta(hours=24)
-                    return True
-            return False
+        from dhanhq import DhanLogin
+        login = DhanLogin(cid)
+        result = await asyncio.to_thread(login.renew_token, token)
+        new_token = result.get("accessToken")
+        if new_token:
+            _access_token = new_token
+            _token_expiry = datetime.now() + timedelta(hours=24)
+            return True
+        return False
     except Exception:
         return False
 
 
 async def get_profile() -> Optional[Dict]:
-    return await _get("/profile")
+    try:
+        dhan = _get_dhan()
+        result = await asyncio.to_thread(
+            dhan.dhan_http.get, "/profile"
+        )
+        return result if isinstance(result, dict) else None
+    except Exception as e:
+        return {"error": str(e)}
 
 
 async def get_fund_limit() -> Optional[Dict]:
-    return await _get("/fundlimit")
+    try:
+        dhan = _get_dhan()
+        result = await asyncio.to_thread(dhan.get_fund_limits)
+        return result if isinstance(result, dict) else None
+    except Exception as e:
+        return {"error": str(e)}
 
 
 async def get_positions() -> Optional[Dict]:
-    return await _get("/positions")
+    try:
+        dhan = _get_dhan()
+        result = await asyncio.to_thread(dhan.get_positions)
+        return result if isinstance(result, dict) else None
+    except Exception as e:
+        return {"error": str(e)}
 
 
 async def get_order_book() -> Optional[Dict]:
-    return await _get("/orders")
+    try:
+        dhan = _get_dhan()
+        result = await asyncio.to_thread(dhan.get_order_list)
+        return result if isinstance(result, dict) else None
+    except Exception as e:
+        return {"error": str(e)}
 
 
 async def get_trade_book() -> Optional[Dict]:
-    return await _get("/trades")
+    try:
+        dhan = _get_dhan()
+        result = await asyncio.to_thread(dhan.get_trade_book)
+        return result if isinstance(result, dict) else None
+    except Exception as e:
+        return {"error": str(e)}
 
 
 async def get_market_ltp(symbols: List[str]) -> Dict[str, float]:
-    """Fetch LTP for multiple symbols using Market Quote API."""
     await ensure_security_map()
-    segments: Dict[str, list] = {}
-    sym_map: Dict[str, str] = {}
+    dhan = _get_dhan()
+    ids = []
+    sym_map = {}
     for sym in symbols:
         sid = get_security_id(sym)
         if sid:
-            segments.setdefault("NSE_EQ", []).append(sid)
+            ids.append(int(sid))
             sym_map[sid] = sym.upper()
-
-    if not segments:
+    if not ids:
         return {}
-
-    result = {}
-    for exchange, ids in segments.items():
-        data = {exchange: ids}
-        resp = await _post("/marketfeed/ltp", data)
-        if resp and resp.get("status") == "success":
-            feed = resp.get("data", {}).get(exchange, {})
+    try:
+        result = await asyncio.to_thread(
+            dhan.ticker_data, {"NSE_EQ": ids}
+        )
+        out = {}
+        if isinstance(result, dict) and result.get("status") == "success":
+            feed = result.get("data", {}).get("NSE_EQ", {})
             for sid, info in feed.items():
                 sym = sym_map.get(sid, sid)
-                result[sym] = info.get("last_price", 0)
-    return result
+                out[sym] = info.get("last_price", 0)
+        return out
+    except Exception:
+        return {}
 
 
 async def get_market_ohlc(symbols: List[str]) -> Dict[str, Dict]:
-    """Fetch OHLC for multiple symbols."""
     await ensure_security_map()
-    segments: Dict[str, list] = {}
-    sym_map: Dict[str, str] = {}
+    dhan = _get_dhan()
+    ids = []
+    sym_map = {}
     for sym in symbols:
         sid = get_security_id(sym)
         if sid:
-            segments.setdefault("NSE_EQ", []).append(sid)
+            ids.append(int(sid))
             sym_map[sid] = sym.upper()
-
-    if not segments:
+    if not ids:
         return {}
-
-    result = {}
-    for exchange, ids in segments.items():
-        data = {exchange: ids}
-        resp = await _post("/marketfeed/ohlc", data)
-        if resp and resp.get("status") == "success":
-            feed = resp.get("data", {}).get(exchange, {})
+    try:
+        result = await asyncio.to_thread(
+            dhan.ohlc_data, {"NSE_EQ": ids}
+        )
+        out = {}
+        if isinstance(result, dict) and result.get("status") == "success":
+            feed = result.get("data", {}).get("NSE_EQ", {})
             for sid, info in feed.items():
                 sym = sym_map.get(sid, sid)
                 ohlc = info.get("ohlc", {})
-                result[sym] = {
+                out[sym] = {
                     "ltp": info.get("last_price", 0),
                     "open": ohlc.get("open", 0),
                     "high": ohlc.get("high", 0),
                     "low": ohlc.get("low", 0),
                     "close": ohlc.get("close", 0),
                 }
-    return result
+        return out
+    except Exception:
+        return {}
 
 
 async def place_order(
@@ -249,51 +240,40 @@ async def place_order(
     after_market: bool = False,
     amo_time: str = "",
 ) -> Optional[Dict]:
-    """Place an order via DhanHQ."""
     await ensure_security_map()
     sid = get_security_id(symbol)
     if not sid:
         return {"error": f"Security ID not found for {symbol}"}
 
-    payload: dict = {
-        "dhanClientId": _client(),
-        "transactionType": transaction_type.upper(),
-        "exchangeSegment": "NSE_EQ",
-        "productType": product_type.upper(),
-        "orderType": order_type.upper(),
-        "validity": "DAY",
-        "securityId": sid,
-        "quantity": qty,
-        "disclosedQuantity": 0,
-        "price": 0.0,
-        "triggerPrice": 0.0,
-        "afterMarketOrder": after_market,
-        "amoTime": amo_time,
-        "boProfitValue": None,
-        "boStopLossValue": None,
-    }
-    if order_type.upper() == "LIMIT" and price > 0:
-        payload["price"] = price
-
-    return await _post("/orders", payload)
+    try:
+        dhan = _get_dhan()
+        result = await asyncio.to_thread(
+            dhan.place_order,
+            security_id=sid,
+            exchange_segment="NSE_EQ",
+            transaction_type=transaction_type.upper(),
+            quantity=qty,
+            order_type=order_type.upper(),
+            product_type=product_type.upper(),
+            price=price if order_type.upper() == "LIMIT" and price > 0 else 0,
+            after_market_order=after_market,
+            amo_time=amo_time or "OPEN",
+        )
+        return result if isinstance(result, dict) else {"error": "unexpected_response"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 async def cancel_order(order_id: str) -> Optional[Dict]:
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.delete(
-                f"{DHAN_BASE}/orders/{order_id}",
-                headers={**_headers(), "client-id": _client()},
-            )
-            if resp.status_code in (200, 202):
-                return resp.json()
-            return {"error": f"HTTP {resp.status_code}"}
+        dhan = _get_dhan()
+        result = await asyncio.to_thread(dhan.cancel_order, order_id)
+        return result if isinstance(result, dict) else {"error": "unexpected_response"}
     except Exception as e:
         return {"error": str(e)}
 
 
 async def get_dashboard() -> Dict:
-    """Full DhanHQ dashboard: funds, positions, orders, profile."""
     profile, funds, positions, orders = await asyncio.gather(
         get_profile(), get_fund_limit(), get_positions(), get_order_book(),
         return_exceptions=True,
@@ -307,7 +287,6 @@ async def get_dashboard() -> Dict:
 
 
 async def auto_renew_loop():
-    """Background loop: renew Dhan access token every 23 hours (retry 5min on failure)."""
     while True:
         try:
             token = _headers()["access-token"]
@@ -323,11 +302,10 @@ async def auto_renew_loop():
             print(f"Dhan token renew error: {e}, retrying in 5min")
             await asyncio.sleep(300)
             continue
-        await asyncio.sleep(82800)  # 23 hours
+        await asyncio.sleep(82800)
 
 
 def get_debug_status() -> Dict:
-    """Return current DhanHQ state for debugging."""
     cid = _client()
     token = _headers()["access-token"]
     return {

@@ -24,6 +24,8 @@ from app.routes.sector_rotation import router as sector_rotation_router
 from app.routes.ai_agent import router as ai_agent_router
 from app.routes.strategy_marketplace import router as strategy_marketplace_router
 from app.routes.politician_trades import router as politician_trades_router
+from app.routes.options_trading import router as options_trading_router
+from app.routes.options_backtest import router as options_backtest_router
 from app.services.signal_monitor import get_cache_stats
 import asyncio
 
@@ -130,3 +132,5 @@ app.include_router(sector_rotation_router)
 app.include_router(ai_agent_router)
 app.include_router(strategy_marketplace_router)
 app.include_router(politician_trades_router)
+app.include_router(options_trading_router)
+app.include_router(options_backtest_router)

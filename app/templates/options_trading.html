@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Trading</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0f0f14;
+            --bg-secondary: #18181f;
+            --bg-card: #1e1e28;
+            --border-color: #2a2a3a;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8888a0;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-blue: #4f8cff;
+            --accent-purple: #a78bfa;
+            --accent-gold: #fbbf24;
+            --accent-cyan: #38bdf8;
+        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-primary); color: var(--text-primary); padding: 1.5rem; min-height: 100vh; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header-actions { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
+        .header-actions select, .header-actions button { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
+        .header-actions button { background: var(--accent-blue); border: none; font-weight: 500; }
+        .header-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .last-update { font-size: 0.75rem; color: var(--text-secondary); }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.8rem; margin-bottom: 1.25rem; }
+        .summary-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; text-align: center; }
+        .summary-card .label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+        .summary-card .value { font-size: 1.2rem; font-weight: 700; margin-top: 0.3rem; }
+        .summary-card .sub { font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.2rem; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .neutral { color: var(--accent-gold); }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+        .chart-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; }
+        .chart-card h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.8rem; color: var(--text-secondary); }
+        .chart-card canvas { max-height: 200px; }
+        .section-title { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.75rem; }
+        .tab-bar { display: flex; gap: 0; margin-bottom: 1rem; background: var(--bg-secondary); border-radius: 10px; overflow: hidden; border: 1px solid var(--border-color); }
+        .tab-btn { flex: 1; padding: 0.6rem 1rem; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.2s; }
+        .tab-btn.active { background: var(--accent-blue); color: white; }
+        .tab-btn:hover:not(.active) { background: var(--bg-card); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .chain-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); }
+        .chain-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .chain-table th { background: var(--bg-secondary); padding: 0.5rem 0.6rem; text-align: right; font-weight: 600; color: var(--text-secondary); position: sticky; top: 0; white-space: nowrap; }
+        .chain-table th:first-child, .chain-table td:first-child { text-align: center; }
+        .chain-table td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border-color); text-align: right; white-space: nowrap; }
+        .chain-table tr:hover { background: rgba(79, 140, 255, 0.05); }
+        .chain-table .strike-col { color: var(--accent-gold); font-weight: 700; }
+        .ce-header { color: var(--accent-green) !important; }
+        .pe-header { color: var(--accent-red) !important; }
+        .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+        .level-box { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; }
+        .level-box h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.6rem; color: var(--text-secondary); }
+        .level-row { display: flex; justify-content: space-between; padding: 0.3rem 0; font-size: 0.8rem; border-bottom: 1px solid var(--border-color); }
+        .level-row:last-child { border-bottom: none; }
+        .buildup-list { display: flex; flex-direction: column; gap: 0.3rem; }
+        .buildup-item { display: flex; justify-content: space-between; padding: 0.25rem 0.5rem; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.75rem; }
+        .loading { display: flex; align-items: center; justify-content: center; padding: 3rem; color: var(--text-secondary); }
+        .loading::after { content: ''; width: 24px; height: 24px; border: 2px solid var(--border-color); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 0.8rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-banner { background: rgba(248, 113, 113, 0.15); border: 1px solid var(--accent-red); color: var(--accent-red); padding: 1rem; border-radius: 10px; margin-bottom: 1rem; font-size: 0.85rem; }
+        .badge { display: inline-block; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; }
+        .badge-g { background: rgba(52, 211, 153, 0.15); color: var(--accent-green); }
+        .badge-r { background: rgba(248, 113, 113, 0.15); color: var(--accent-red); }
+        .badge-b { background: rgba(79, 140, 255, 0.15); color: var(--accent-blue); }
+        .badge-y { background: rgba(251, 191, 36, 0.15); color: var(--accent-gold); }
+        @media (max-width: 768px) {
+            .charts-grid, .section-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
+            .summary-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>&#9776; Options Chain + Analysis</h1>
+        <div class="header-actions">
+            <select id="symbolSelect"></select>
+            <select id="expirySelect"><option value="">Loading...</option></select>
+            <button id="refreshBtn" onclick="loadData()">&#8635; Refresh</button>
+            <button id="autoBtn" onclick="toggleAuto()" style="background:var(--bg-card)!important;border:1px solid var(--border-color)!important;font-weight:400!important;">Auto: OFF</button>
+            <span class="last-update" id="lastUpdate">-</span>
+        </div>
+    </div>
+
+    <div id="errorMsg" class="error-banner" style="display:none"></div>
+    <div id="loading" class="loading">Loading data</div>
+
+    <div id="content" style="display:none">
+        <div class="summary-grid" id="summaryCards"></div>
+
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('chain', this)">Option Chain</button>
+            <button class="tab-btn" onclick="switchTab('analysis', this)">OI Analysis</button>
+            <button class="tab-btn" onclick="switchTab('greeks', this)">Greeks & IV</button>
+            <button class="tab-btn" onclick="switchTab('levels', this)">S/R & GEX</button>
+        </div>
+
+        <div id="tab-chain" class="tab-content active">
+            <div class="chain-table-wrap" id="chainTable"></div>
+        </div>
+
+        <div id="tab-analysis" class="tab-content">
+            <div class="charts-grid">
+                <div class="chart-card"><h3>OI Concentration (CE/PE by Strike)</h3><canvas id="oiChart"></canvas></div>
+                <div class="chart-card"><h3>OI Change (Buildup / Decline)</h3><canvas id="oiChangeChart"></canvas></div>
+            </div>
+            <div class="section-grid">
+                <div class="level-box" id="buildupBox"><h3>CE Buildup &#9650;</h3><div id="ceBuildupList">-</div></div>
+                <div class="level-box" id="buildupBoxPe"><h3>PE Buildup &#9650;</h3><div id="peBuildupList">-</div></div>
+            </div>
+        </div>
+
+        <div id="tab-greeks" class="tab-content">
+            <div class="charts-grid">
+                <div class="chart-card"><h3>IV Skew (OTM Put / Call IV)</h3><canvas id="ivChart"></canvas></div>
+                <div class="chart-card"><h3>Gamma Exposure by Strike</h3><canvas id="gexChart"></canvas></div>
+            </div>
+            <div class="section-grid">
+                <div class="level-box"><h3>IV Skew Analysis</h3><div id="ivSkewInfo"></div></div>
+                <div class="level-box"><h3>Gamma Exposure</h3><div id="gexInfo"></div></div>
+            </div>
+        </div>
+
+        <div id="tab-levels" class="tab-content">
+            <div class="section-grid">
+                <div class="level-box"><h3>&#9650; Resistance (Max CE OI)</h3><div id="resistanceList"></div></div>
+                <div class="level-box"><h3>&#9660; Support (Max PE OI)</h3><div id="supportList"></div></div>
+            </div>
+            <div class="section-grid">
+                <div class="level-box"><h3>OI Concentration Near Spot</h3><div id="concentrationInfo"></div></div>
+                <div class="level-box"><h3>Key Levels</h3><div id="keyLevelsInfo"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SYMBOLS = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'ITC', 'TATAMOTORS', 'TATASTEEL', 'HINDUNILVR', 'BAJFINANCE', 'KOTAKBANK', 'LT', 'MARUTI', 'SUNPHARMA', 'ASIANPAINT', 'NTPC', 'POWERGRID', 'WIPRO', 'TITAN', 'ADANIENT', 'ADANIPORTS', 'JSWSTEEL', 'TRENT', 'ZOMATO'];
+        let chartInstances = {};
+
+        document.getElementById('symbolSelect').innerHTML = SYMBOLS.map(s => `<option value="${s}" ${s==='NIFTY'?'selected':''}>${s}</option>`).join('');
+        async function loadExpiries() {
+            const sym = document.getElementById('symbolSelect').value;
+            try {
+                const r = await fetch(`/api/options-trading/expiries?symbol=${sym}`);
+                const d = await r.json();
+                if (d.expiry_dates) {
+                    const sel = document.getElementById('expirySelect');
+                    sel.innerHTML = d.expiry_dates.map(e => `<option value="${e}" ${e===d.current_expiry?'selected':''}>${e}</option>`).join('');
+                }
+            } catch(e) {}
+        }
+
+        async function loadData() {
+            const sym = document.getElementById('symbolSelect').value;
+            const exp = document.getElementById('expirySelect').value;
+            const btn = document.getElementById('refreshBtn');
+            btn.disabled = true;
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('content').style.display = 'none';
+            document.getElementById('errorMsg').style.display = 'none';
+
+            try {
+                const r = await fetch(`/api/options-trading/chain?symbol=${sym}${exp ? '&expiry='+exp : ''}`);
+                if (!r.ok) throw new Error(await r.text());
+                const data = await r.json();
+                if (data.error) throw new Error(data.error);
+                render(data);
+            } catch(e) {
+                document.getElementById('loading').style.display = 'none';
+                const errDiv = document.getElementById('errorMsg');
+                errDiv.textContent = 'Error: ' + e.message;
+                errDiv.style.display = 'block';
+            }
+            btn.disabled = false;
+        }
+
+        function render(d) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+            document.getElementById('lastUpdate').textContent = d.timestamp ? 'As of: ' + d.timestamp : new Date().toLocaleTimeString();
+
+            renderSummary(d);
+            renderChain(d);
+            renderOIChart(d);
+            renderIVChart(d);
+            renderGEXChart(d);
+            renderBuildup(d);
+            renderLevels(d);
+            renderSkewInfo(d);
+            renderGexInfo(d);
+            renderSR(d);
+            renderConcentration(d);
+            renderKeyLevels(d);
+        }
+
+        function renderSummary(d) {
+            document.getElementById('summaryCards').innerHTML = `
+                <div class="summary-card"><div class="label">Underlying</div><div class="value">${fmt(d.underlying)}</div><div class="sub">${d.symbol}</div></div>
+                <div class="summary-card"><div class="label">PCR (OI)</div><div class="value ${d.pcr_oi > 1 ? 'positive' : 'negative'}">${d.pcr_oi}</div><div class="sub">${d.total_pe_oi.toLocaleString()} / ${d.total_ce_oi.toLocaleString()}</div></div>
+                <div class="summary-card"><div class="label">PCR (Vol)</div><div class="value">${d.pcr_vol}</div><div class="sub">Put/Call Volume</div></div>
+                <div class="summary-card"><div class="label">Max Pain</div><div class="value ${d.max_pain > d.underlying ? 'negative' : 'positive'}">${fmt(d.max_pain)}</div><div class="sub">vs Spot ${fmt(d.underlying)}</div></div>
+                <div class="summary-card"><div class="label">Total OI</div><div class="value">${(d.total_ce_oi + d.total_pe_oi).toLocaleString()}</div><div class="sub">${d.chain_length} strikes</div></div>
+                <div class="summary-card"><div class="label">IV Skew</div><div class="value ${(d.iv_skew?.skew_type||'') === 'put_skew' ? 'positive' : 'negative'}">${d.iv_skew?.skew_type||'-'}</div><div class="sub">3-strike: ${d.iv_skew?.skew_3 != null ? d.iv_skew.skew_3.toFixed(2) : '-'}</div></div>
+                <div class="summary-card"><div class="label">GEX (Cr)</div><div class="value ${(d.gamma_exposure?.total_gex||0) > 0 ? 'positive' : 'negative'}">${(d.gamma_exposure?.total_gex/1e7||0).toFixed(2)}</div><div class="sub">${d.gamma_exposure?.per_point ? '₹'+fmt(d.gamma_exposure.per_point)+'/pt' : '-'}</div></div>
+                <div class="summary-card"><div class="label">Expiry</div><div class="value" style="font-size:0.9rem">${d.expiry||'-'}</div><div class="sub">${d.expiry_dates?.length||0} dates</div></div>
+            `;
+        }
+
+        function renderChain(d) {
+            if (!d.chain || !d.chain.length) { document.getElementById('chainTable').innerHTML = '<div style="padding:2rem;text-align:center">No chain data</div>'; return; }
+            const cols = ['strike', 'ce_oi', 'ce_chng_oi', 'ce_volume', 'ce_ltp', 'ce_iv', 'ce_delta', 'ce_gamma', 'ce_theta', 'strike2', 'pe_oi', 'pe_chng_oi', 'pe_volume', 'pe_ltp', 'pe_iv', 'pe_delta', 'pe_gamma', 'pe_theta'];
+            const headers = ['Strike', 'CE OI', 'CE Chng', 'CE Vol', 'CE LTP', 'CE IV', 'Delta', 'Gamma', 'Theta', 'Strike', 'PE OI', 'PE Chng', 'PE Vol', 'PE LTP', 'PE IV', 'Delta', 'Gamma', 'Theta'];
+            const classes = ['strike-col','','','','','','','','','strike-col','','','','','','','',''];
+
+            let html = '<table class="chain-table"><thead><tr>';
+            headers.forEach((h,i) => html += `<th class="${classes[i]} ${h.startsWith('CE')?'ce-header':h.startsWith('PE')?'pe-header':''}">${h}</th>`);
+            html += '</tr></thead><tbody>';
+
+            d.chain.forEach(r => {
+                html += `<tr>
+                    <td class="strike-col">${r.strike}</td>
+                    <td>${r.ce_oi.toLocaleString()}</td>
+                    <td class="${r.ce_chng_oi > 0 ? 'positive' : r.ce_chng_oi < 0 ? 'negative' : ''}">${r.ce_chng_oi > 0 ? '+':''}${r.ce_chng_oi.toLocaleString()}</td>
+                    <td>${r.ce_volume.toLocaleString()}</td>
+                    <td>${fmt(r.ce_ltp)}</td>
+                    <td>${r.ce_iv ? (r.ce_iv*100).toFixed(1)+'%' : '-'}</td>
+                    <td>${r.ce_delta != null ? r.ce_delta.toFixed(3) : '-'}</td>
+                    <td>${r.ce_gamma != null ? r.ce_gamma.toFixed(4) : '-'}</td>
+                    <td>${r.ce_theta != null ? r.ce_theta.toFixed(4) : '-'}</td>
+                    <td class="strike-col">${r.strike}</td>
+                    <td>${r.pe_oi.toLocaleString()}</td>
+                    <td class="${r.pe_chng_oi > 0 ? 'positive' : r.pe_chng_oi < 0 ? 'negative' : ''}">${r.pe_chng_oi > 0 ? '+':''}${r.pe_chng_oi.toLocaleString()}</td>
+                    <td>${r.pe_volume.toLocaleString()}</td>
+                    <td>${fmt(r.pe_ltp)}</td>
+                    <td>${r.pe_iv ? (r.pe_iv*100).toFixed(1)+'%' : '-'}</td>
+                    <td>${r.pe_delta != null ? r.pe_delta.toFixed(3) : '-'}</td>
+                    <td>${r.pe_gamma != null ? r.pe_gamma.toFixed(4) : '-'}</td>
+                    <td>${r.pe_theta != null ? r.pe_theta.toFixed(4) : '-'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('chainTable').innerHTML = html;
+        }
+
+        function renderOIChart(d) {
+            const chain = d.chain || [];
+            const near = chain.filter(r => Math.abs(r.strike - d.underlying) <= d.underlying * 0.05);
+            const labels = near.map(r => r.strike);
+            const ceOIs = near.map(r => r.ce_oi);
+            const peOIs = near.map(r => r.pe_oi);
+
+            destroyChart('oiChart');
+            chartInstances.oiChart = new Chart(document.getElementById('oiChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'CE OI', data: ceOIs, backgroundColor: 'rgba(52,211,153,0.5)', borderColor: '#34d399', borderWidth: 1 },
+                        { label: 'PE OI', data: peOIs, backgroundColor: 'rgba(248,113,113,0.5)', borderColor: '#f87171', borderWidth: 1 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888a0' } } },
+                    scales: { x: { ticks: { color: '#8888a0' } }, y: { ticks: { color: '#8888a0' } } } }
+            });
+
+            // OI Change chart
+            destroyChart('oiChangeChart');
+            const ceChng = near.map(r => r.ce_chng_oi);
+            const peChng = near.map(r => r.pe_chng_oi);
+            chartInstances.oiChangeChart = new Chart(document.getElementById('oiChangeChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'CE OI Chng', data: ceChng, backgroundColor: ceChng.map(v => v >= 0 ? 'rgba(52,211,153,0.5)' : 'rgba(248,113,113,0.5)'), borderColor: ceChng.map(v => v >= 0 ? '#34d399' : '#f87171'), borderWidth: 1 },
+                        { label: 'PE OI Chng', data: peChng, backgroundColor: peChng.map(v => v >= 0 ? 'rgba(79,140,255,0.5)' : 'rgba(251,191,36,0.5)'), borderColor: peChng.map(v => v >= 0 ? '#4f8cff' : '#fbbf24'), borderWidth: 1 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888a0' } } },
+                    scales: { x: { ticks: { color: '#8888a0' } }, y: { ticks: { color: '#8888a0' } } } }
+            });
+        }
+
+        function renderIVChart(d) {
+            const skew = d.iv_skew || {};
+            const puts = skew.otm_puts || [];
+            const calls = skew.otm_calls || [];
+            const putLabels = puts.map(p => p.strike).reverse();
+            const putIVs = puts.map(p => p.iv * 100).reverse();
+            const callLabels = calls.map(c => c.strike);
+            const callIVs = calls.map(c => c.iv * 100);
+            const labels = [...putLabels, skew.atm_strike||'', ...callLabels];
+            const allIV = [...putIVs, skew.atm_ce_iv ? skew.atm_ce_iv*100 : null, ...callIVs];
+
+            destroyChart('ivChart');
+            chartInstances.ivChart = new Chart(document.getElementById('ivChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'IV %', data: allIV, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)',
+                        fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#38bdf8'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888a0' } } },
+                    scales: { x: { ticks: { color: '#8888a0' } }, y: { ticks: { color: '#8888a0', callback: v => v+'%' } } } }
+            });
+        }
+
+        function renderGEXChart(d) {
+            const gex = d.gamma_exposure || {};
+            const strikes = (gex.strike_gex || []).slice(0, 15);
+            const labels = strikes.map(s => s.strike);
+            const netGex = strikes.map(s => s.net_gex);
+
+            destroyChart('gexChart');
+            chartInstances.gexChart = new Chart(document.getElementById('gexChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Net GEX', data: netGex,
+                        backgroundColor: netGex.map(v => v >= 0 ? 'rgba(52,211,153,0.5)' : 'rgba(248,113,113,0.5)'),
+                        borderColor: netGex.map(v => v >= 0 ? '#34d399' : '#f87171'), borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8888a0' } } },
+                    scales: { x: { ticks: { color: '#8888a0' } }, y: { ticks: { color: '#8888a0' } } } }
+            });
+        }
+
+        function renderBuildup(d) {
+            const b = d.oi_buildup || {};
+            document.getElementById('ceBuildupList').innerHTML = (b.ce_buildup||[]).length
+                ? (b.ce_buildup||[]).map(r => `<div class="buildup-item"><span>${r.strike}</span><span class="positive">+${r.oi_change.toLocaleString()} (${r.change_pct}%)</span></div>`).join('')
+                : '<div class="buildup-item">No significant buildup</div>';
+            document.getElementById('peBuildupList').innerHTML = (b.pe_buildup||[]).length
+                ? (b.pe_buildup||[]).map(r => `<div class="buildup-item"><span>${r.strike}</span><span class="positive">+${r.oi_change.toLocaleString()} (${r.change_pct}%)</span></div>`).join('')
+                : '<div class="buildup-item">No significant buildup</div>';
+        }
+
+        function renderLevels(d) {
+            const dec = d.oi_decline || {};
+            const h = (list) => list.length ? list.map(r => `<div class="buildup-item"><span>${r.strike}</span><span class="negative">${r.oi_change.toLocaleString()} (${r.change_pct}%)</span></div>`).join('') : '<div class="buildup-item">None</div>';
+            document.getElementById('ceBuildupList').parentNode.querySelector('h3').textContent = 'CE Buildup';
+            document.getElementById('peBuildupList').parentNode.querySelector('h3').textContent = 'PE Buildup';
+        }
+
+        function renderSkewInfo(d) {
+            const s = d.iv_skew || {};
+            document.getElementById('ivSkewInfo').innerHTML = `
+                <div class="level-row"><span>Skew Type</span><span class="badge ${s.skew_type === 'put_skew' ? 'badge-g' : 'badge-r'}">${s.skew_type||'N/A'}</span></div>
+                <div class="level-row"><span>ATM Strike</span><span>${s.atm_strike||'-'}</span></div>
+                <div class="level-row"><span>ATM CE IV</span><span>${s.atm_ce_iv != null ? (s.atm_ce_iv*100).toFixed(1)+'%' : '-'}</span></div>
+                <div class="level-row"><span>ATM PE IV</span><span>${s.atm_pe_iv != null ? (s.atm_pe_iv*100).toFixed(1)+'%' : '-'}</span></div>
+                <div class="level-row"><span>3-Strike Skew</span><span class="${(s.skew_3||0) > 0 ? 'positive' : 'negative'}">${s.skew_3 != null ? s.skew_3.toFixed(4) : '-'}</span></div>
+            `;
+        }
+
+        function renderGexInfo(d) {
+            const g = d.gamma_exposure || {};
+            document.getElementById('gexInfo').innerHTML = `
+                <div class="level-row"><span>Total GEX</span><span class="${(g.total_gex||0) > 0 ? 'positive' : 'negative'}">${fmt(g.total_gex||0)}</span></div>
+                <div class="level-row"><span>Per Point</span><span>${g.per_point != null ? '₹'+fmt(g.per_point) : '-'}</span></div>
+                <div class="level-row"><span>Top GEX Strike</span><span>${g.strike_gex?.[0]?.strike||'-'} (${g.strike_gex?.[0]?.net_gex ? fmt(g.strike_gex[0].net_gex) : '-'})</span></div>
+            `;
+        }
+
+        function renderSR(d) {
+            const sr = d.support_resistance || {};
+            document.getElementById('resistanceList').innerHTML = (sr.resistances||[]).length
+                ? (sr.resistances||[]).map(r => `<div class="level-row"><span>${r.strike}</span><span>CE OI: ${r.oi.toLocaleString()}</span></div>`).join('')
+                : '<div class="level-row">No resistance levels</div>';
+            document.getElementById('supportList').innerHTML = (sr.supports||[]).length
+                ? (sr.supports||[]).map(r => `<div class="level-row"><span>${r.strike}</span><span>PE OI: ${r.oi.toLocaleString()}</span></div>`).join('')
+                : '<div class="level-row">No support levels</div>';
+        }
+
+        function renderConcentration(d) {
+            const c = d.oi_concentration || {};
+            document.getElementById('concentrationInfo').innerHTML = `
+                <div class="level-row"><span>CE near spot</span><span>${c.ce_concentration||0}% (${(c.ce_oi_near||0).toLocaleString()})</span></div>
+                <div class="level-row"><span>PE near spot</span><span>${c.pe_concentration||0}% (${(c.pe_oi_near||0).toLocaleString()})</span></div>
+                <div class="level-row"><span>Range</span><span>${fmt(c.range_lower||0)} - ${fmt(c.range_upper||0)}</span></div>
+            `;
+        }
+
+        function renderKeyLevels(d) {
+            const k = d.key_levels || {};
+            document.getElementById('keyLevelsInfo').innerHTML = `
+                <div class="level-row"><span>Max CE OI</span><span>${k.max_ce_oi?.strike||'-'} (${(k.max_ce_oi?.oi||0).toLocaleString()})</span></div>
+                <div class="level-row"><span>Max PE OI</span><span>${k.max_pe_oi?.strike||'-'} (${(k.max_pe_oi?.oi||0).toLocaleString()})</span></div>
+                <div class="level-row"><span>Max CE Chng</span><span>${k.max_ce_chng?.strike||'-'} (${(k.max_ce_chng?.chng||0).toLocaleString()})</span></div>
+                <div class="level-row"><span>Max PE Chng</span><span>${k.max_pe_chng?.strike||'-'} (${(k.max_pe_chng?.chng||0).toLocaleString()})</span></div>
+                <div class="level-row"><span>Max CE Vol</span><span>${k.max_ce_vol?.strike||'-'} (${(k.max_ce_vol?.volume||0).toLocaleString()})</span></div>
+                <div class="level-row"><span>Max PE Vol</span><span>${k.max_pe_vol?.strike||'-'} (${(k.max_pe_vol?.volume||0).toLocaleString()})</span></div>
+            `;
+        }
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-'+tabId).classList.add('active');
+            setTimeout(() => {
+                Object.values(chartInstances).forEach(c => { try { c.resize(); } catch(e) {} });
+            }, 100);
+        }
+
+        function destroyChart(id) {
+            if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+        }
+
+        function fmt(v) { return v != null ? Number(v).toLocaleString(undefined, {maximumFractionDigits:2}) : '-'; }
+
+        let autoInterval;
+        let autoOn = false;
+
+        function toggleAuto() {
+            autoOn = !autoOn;
+            const btn = document.getElementById('autoBtn');
+            if (autoOn) {
+                btn.textContent = 'Auto: ON (30s)';
+                btn.style.background = 'var(--accent-green)!important';
+                btn.style.borderColor = 'var(--accent-green)!important';
+                btn.style.color = '#000!important';
+                autoInterval = setInterval(loadData, 30000);
+            } else {
+                btn.textContent = 'Auto: OFF';
+                btn.style.background = '';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+                clearInterval(autoInterval);
+            }
+        }
+
+        document.getElementById('symbolSelect').onchange = function() {
+            if (autoOn) { clearInterval(autoInterval); autoInterval = setInterval(loadData, 30000); }
+            loadExpiries();
+            loadData();
+        };
+
+        loadExpiries();
+        loadData();
+    </script>
+</body>
+</html>

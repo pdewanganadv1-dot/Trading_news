@@ -1,0 +1,78 @@
+import httpx
+import asyncio
+import time
+from typing import Optional
+from datetime import datetime, timedelta
+import pytz
+
+IST = pytz.timezone("Asia/Kolkata")
+
+NSE_BASE = "https://www.nseindia.com"
+NSE_OPTION_CHAIN_INDICES = "https://www.nseindia.com/api/option-chain-indices"
+NSE_OPTION_CHAIN_EQUITIES = "https://www.nseindia.com/api/option-chain-equities"
+NSE_QUOTE_DERIVATIVE = "https://www.nseindia.com/api/quote-derivative"
+
+FNO_INDICES = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]
+
+
+class NSEScraper:
+    def __init__(self):
+        self._client: Optional[httpx.AsyncClient] = None
+        self._last_init = 0.0
+        self._init_cooldown = 60
+
+    async def _ensure_client(self):
+        now = time.time()
+        if self._client is None or now - self._last_init > self._init_cooldown:
+            if self._client is not None:
+                await self._client.aclose()
+            self._client = httpx.AsyncClient(
+                base_url=NSE_BASE,
+                timeout=15.0,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/125.0.0.0 Safari/537.36"
+                    ),
+                    "Accept": "application/json, text/plain, */*",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Referer": "https://www.nseindia.com/",
+                },
+            )
+            await self._client.get("/")
+            self._last_init = now
+
+    async def _get_json(self, url: str, params: dict = None) -> dict:
+        await self._ensure_client()
+        for attempt in range(3):
+            try:
+                resp = await self._client.get(url, params=params)
+                if resp.status_code == 200:
+                    return resp.json()
+                if resp.status_code == 403 and attempt < 2:
+                    self._client = None
+                    await self._ensure_client()
+                    await asyncio.sleep(1)
+                    continue
+                return {"error": f"HTTP {resp.status_code}"}
+            except Exception as e:
+                if attempt < 2:
+                    await asyncio.sleep(1)
+                    continue
+                return {"error": str(e)}
+        return {"error": "Max retries exceeded"}
+
+    async def fetch_option_chain(self, symbol: str) -> dict:
+        symbol = symbol.upper()
+        if symbol in FNO_INDICES:
+            return await self._get_json(NSE_OPTION_CHAIN_INDICES, {"symbol": symbol})
+        return await self._get_json(NSE_OPTION_CHAIN_EQUITIES, {"symbol": symbol})
+
+    async def fetch_underlying_quote(self, symbol: str) -> dict:
+        symbol = symbol.upper()
+        return await self._get_json(NSE_QUOTE_DERIVATIVE, {"symbol": symbol})
+
+
+nse_scraper = NSEScraper()

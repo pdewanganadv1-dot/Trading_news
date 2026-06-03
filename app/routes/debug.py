@@ -207,73 +207,56 @@ async def debug_dhan():
 
 @router.get("/debug/place-test")
 async def debug_place_test():
-    """Test Dhan endpoint access patterns."""
-    from app.services import dhanhq_service as dhan
-    import httpx
+    """Test Dhan SDK — profiles, orders, IP."""
+    from app.services.dhanhq_service import (
+        ensure_security_map, get_fund_limit, place_order,
+        get_security_id, _get_dhan,
+    )
 
-    await dhan.ensure_security_map()
-    headers = {**dhan._headers(), "client-id": dhan._client()}
+    await ensure_security_map()
 
-    async with httpx.AsyncClient(timeout=15) as c:
-        r1 = await c.get(f"{dhan.DHAN_BASE}/fundlimit", headers=headers)
+    # 1. Get fund limit via SDK
+    r1 = await get_fund_limit()
 
-    sid = dhan.get_security_id("RELIANCE")
-    payload = {
-        "dhanClientId": dhan._client(),
-        "transactionType": "BUY",
-        "exchangeSegment": "NSE_EQ",
-        "productType": "INTRADAY",
-        "orderType": "MARKET",
-        "validity": "DAY",
-        "securityId": sid,
-        "quantity": 1,
-        "price": 0.0,
-        "disclosedQuantity": 0,
-        "triggerPrice": 0.0,
-        "afterMarketOrder": False,
-        "boProfitValue": None,
-        "boStopLossValue": None,
-    }
-    async with httpx.AsyncClient(timeout=15) as c:
-        r2 = await c.post(
-            f"{dhan.DHAN_BASE}/orders",
-            headers=headers,
-            json=payload,
+    # 2. Test order placement via SDK (won't place — no security ID for test)
+    sid = get_security_id("RELIANCE")
+    r2 = await place_order("RELIANCE", 1, "BUY") if sid else {"error": "no security id"}
+
+    # 3. Test fund limit via SDK
+    r3 = r1
+
+    # 4. Get IP via SDK internal HTTP
+    dhan = _get_dhan()
+    try:
+        r4 = await asyncio.to_thread(dhan.dhan_http.get, "/ip/getIP")
+    except Exception as e:
+        r4 = {"error": str(e)}
+
+    # 5. Set primary IP
+    try:
+        r5 = await asyncio.to_thread(
+            dhan.dhan_http.post, "/ip/setIP",
+            {"dhanClientId": dhan.dhan_http.client_id, "ip": "74.220.52.251", "ipFlag": "PRIMARY"},
         )
+    except Exception as e:
+        r5 = {"error": str(e)}
 
-    async with httpx.AsyncClient(timeout=15) as c:
-        r3 = await c.post(
-            f"{dhan.DHAN_BASE}/fundlimit",
-            headers=headers,
-            json={},
+    # 6. Set secondary IP
+    try:
+        r6 = await asyncio.to_thread(
+            dhan.dhan_http.post, "/ip/setIP",
+            {"dhanClientId": dhan.dhan_http.client_id, "ip": "74.220.52.251", "ipFlag": "SECONDARY"},
         )
-
-    async with httpx.AsyncClient(timeout=15) as c:
-        r4 = await c.get(f"{dhan.DHAN_BASE}/ip/getIP", headers=headers)
-
-    # Try re-setting IP via API — same IP, forces backend sync
-    async with httpx.AsyncClient(timeout=15) as c:
-        r5 = await c.post(
-            f"{dhan.DHAN_BASE}/ip/setIP",
-            headers=headers,
-            json={"dhanClientId": dhan._client(), "ip": "74.220.52.251", "ipFlag": "PRIMARY"},
-        )
-
-    # Try setting secondary IP (was NA/never set)
-    async with httpx.AsyncClient(timeout=15) as c:
-        r6 = await c.post(
-            f"{dhan.DHAN_BASE}/ip/setIP",
-            headers=headers,
-            json={"dhanClientId": dhan._client(), "ip": "74.220.52.251", "ipFlag": "SECONDARY"},
-        )
+    except Exception as e:
+        r6 = {"error": str(e)}
 
     return {
-        "test1_GET_fundlimit": {"status": r1.status_code, "body": r1.text[:300]},
-        "test2_POST_orders": {"status": r2.status_code, "body": r2.text[:300]},
-        "test3_POST_fundlimit": {"status": r3.status_code, "body": r3.text[:300]},
-        "test4_GET_getIP": {"status": r4.status_code, "body": r4.text[:300]},
-        "test5_SET_primary_via_api": {"status": r5.status_code, "body": r5.text[:300]},
-        "test6_SET_secondary_via_api": {"status": r6.status_code, "body": r6.text[:300]},
+        "test1_get_fund_limit": r1,
+        "test2_place_order_via_sdk": r2,
+        "test3_funds_again": r3,
+        "test4_GET_getIP": str(r4)[:300],
+        "test5_SET_primary_via_api": str(r5)[:300],
+        "test6_SET_secondary_via_api": str(r6)[:300],
     }
 
 

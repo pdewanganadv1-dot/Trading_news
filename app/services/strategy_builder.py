@@ -1824,6 +1824,11 @@ class StrategyBuilder:
             "threshold": 3,
             "composite": True,
         },
+        "ALMA-Optimized": {
+            "leading": "ALMA",
+            "confirmations": ["EMA 20", "MACD", "RSI", "Volume", "Price Action"],
+            "threshold": 2,
+        },
     }
 
     """
@@ -1840,17 +1845,17 @@ class StrategyBuilder:
         self.buy_only = True
         self.composite_mode = False
         self.composite_secondary = None
-        self.selected_preset = "ZLEMA+PSAR-Conf"
-        p = self.STRATEGY_PRESETS["ZLEMA+PSAR-Conf"]
+        self.selected_preset = "ALMA-Optimized"
+        p = self.STRATEGY_PRESETS["ALMA-Optimized"]
         self.selected_leading = p["leading"]
         self.selected_confirmations: List[str] = list(p["confirmations"])
         self.signal_threshold = p["threshold"]
         self.composite_mode = p.get("composite", False)
-        self.composite_secondary = "ZLEMA" if self.composite_mode else None
+        self.composite_secondary = "ALMA" if self.composite_mode else None
         self.min_bars = 20  # minimum 1-min bars required
-        self.sl_pct = 1.5  # stop-loss % (fixed, not trailing — best from sweep)
+        self.sl_pct = 5.0  # stop-loss % (fixed, not trailing)
         self.tp_pct = 0.0  # take-profit % (0 = disabled)
-        self.trailing_sl = False  # fixed SL — performed best in 1-min backtest
+        self.trailing_sl = False  # fixed stop-loss (outperforms trailing on daily)
         self.stock_whitelist: List[str] = []  # empty = allow all
         self.whitelist_only: bool = False  # enforce whitelist when True
         self.stock_blocklist: List[str] = []  # explicitly blocked stocks

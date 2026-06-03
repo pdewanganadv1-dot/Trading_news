@@ -246,6 +246,14 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 8. **Default preset changed to PSAR-Default**: Live engine now uses PSAR on 1m intraday (60.3% WR beats ZLEMA's 56.9% on 1m)
 9. **Full comparison report**: `data/tf_compare_20260523_032215.md`
 
+### May 23, 2026 (Evening) — Switched Live Default to ALMA-Optimized
+- **Live default changed**: `PSAR-Default` (60.3% WR 1m) → **`ALMA-Optimized`** (ALMA + light + thr=2, SL=5% fixed, no trailing)
+- **SL changed**: trailing=5% → fixed=5% (non-trailing dramatically outperforms on daily data)
+- **Timeframe**: Proven on 180d daily data across 133 stocks — new signals at 3:30 PM IST, execute next day
+- **Performance**: 42.8% WR, +586.7% total return, 8.50% avg win per trade, 1.93 RR
+- **Reports**: `data/alma_optimize_20260523_182954.md`, `data/kama_optimize_20260523_182751.md`
+- **Telegram**: Switch via `/strategy_preset ALMA-Optimized`
+
 ### May 22, 2026 (Late Night) — SL/TP, Whitelist/Blocklist, Batch Backtest Tuning
 
 **Done**:
@@ -261,6 +269,52 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 7. **Deployed**: Commit `27f7e31` → Render deploy triggered
 
 **Key insight**: Strategy has clear sector bias — financials and manufacturing outperform, IT large-caps and RELIANCE underperform. Whitelist filters out the losers automatically. SL effect minimal on daily data (gap between bars) but critical for 1-min live trading.
+
+### May 31, 2026 — DhanHQ Python SDK Migration (Official `dhanhq` package)
+
+**Done**:
+1. **Switched from raw httpx to official `dhanhq` SDK** (`dhanhq==2.2.0`):
+   - `app/services/dhanhq_service.py` completely rewritten to use `DhanContext` + `dhanhq` instead of raw `_get()`/`_post()` HTTP calls
+   - Lazy-init `_get_dhan()` creates `DhanContext(client_id, access_token)` + `dhanhq(context)` once, reused for all calls
+   - SDK handles auth headers, connection pooling, error codes internally
+2. **All endpoints preserved** with same async signatures:
+   - `get_profile()`, `get_fund_limit()`, `get_positions()`, `get_order_book()`, `get_trade_book()`
+   - `get_market_ltp()`, `get_market_ohlc()` — still uses batch `{"NSE_EQ": [ids]}` format
+   - `place_order()`, `cancel_order()` — via SDK's `dhan.place_order()` / `dhan.cancel_order()`
+   - `renew_token()` — via SDK's `DhanLogin.renew_token()` wrapped in `asyncio.to_thread()`
+   - `get_dashboard()`, `auto_renew_loop()`, `get_debug_status()`, `ensure_security_map()`
+3. **Backward compatible**: All existing imports (`_headers`, `_client`, `_security_map`, `get_security_id`, `dhan_enabled`, etc.) kept as-is
+4. **Updated `debug.py`**: `/debug/place-test` now uses SDK instead of raw httpx calls
+5. **Added `dhanhq>=2.2.0`** to `requirements.txt`
+6. **Removed** dead `_quote_cache` (handled by SDK), `csv`/`io`/`httpx` imports no longer needed in dhanhq_service
+7. **Synchronous SDK calls wrapped** in `asyncio.to_thread()` for async compatibility with FastAPI
+
+**Benefits**:
+- Official SDK handles auth, retries, rate limiting (5 req/s data, 10 req/s orders)
+- Connection pooling via `requests` session (vs creating new httpx clients per call)
+- SDK automatically uses correct endpoints, error codes, and response parsing
+- Smaller, cleaner codebase — 340→220 lines
+- Custom Dhan MCP server built alongside the Python SDK
+
+### May 31, 2026 — Dhan MCP Server + Token Refresh
+
+**Done**:
+1. **Built custom Node.js Dhan MCP server** at `dhan-mcp-server/`:
+   - 15 MCP tools: `dhan_get_profile`, `dhan_get_fund_limits`, `dhan_get_positions`, `dhan_get_order_book`, `dhan_get_trade_book`, `dhan_get_holdings`, `dhan_get_market_ltp`, `dhan_get_market_ohlc`, `dhan_get_market_quote`, `dhan_place_order`, `dhan_cancel_order`, `dhan_renew_token`, `dhan_get_dashboard`, `dhan_get_security_id`
+   - Uses `@modelcontextprotocol/sdk` (same as tradingview-mcp)
+   - Reads `DHAN_CLIENT_ID` and `DHAN_ACCESS_TOKEN` from env
+   - Batch LTP/OHLC/Quote for multiple symbols in one call
+   - Security map loaded from Dhan's CSV (cached 24h)
+   - Same pattern as tradingview-mcp (StdioServerTransport, Zod schemas)
+2. **Registered in opencode.json** (`~/.config/opencode/opencode.jsonc`): both `tradingview` + `dhanhq` MCP servers active
+3. **New Dhan token**: Client ID `1100686335`, updated in `.env` and on Render via API (deploy `dep-d8e38apo3t8c73f2ukug` building)
+4. **Dhan's native MCP** is still "Upcoming" — our custom server fills the gap
+5. **Render deploy triggered** to apply the new token
+
+**Connection**:
+- `tradingview` MCP → controls TV Desktop chart (BTCUSD currently)
+- `dhanhq` MCP → broker operations (orders, funds, market data)
+- Python `trading_news` app → automated signal generation + Dhan execution via `dhanhq` SDK
 
 ### Key Files
 | File | Purpose |
@@ -343,3 +397,26 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 - SQLite + Render persistent disk (1GB at /data)
 - pandas for backtest calculations
 - Chart.js for all standalone dashboards
+
+### May 23, 2026 — KAMA + ALMA SL/TP Grid Optimization (Evening)
+
+**Done**:
+1. **Created** `kama_alma_optimize.py` — custom script for SL/TP grid search with trailing support
+2. **KAMA + Light + thr=2** — 48 SL/TP combos tested on 133 stocks, 180d daily
+   - **Best WR**: SL=7% TP=4% Fixed → **54.7% WR** (+243% return)
+   - **Best Return**: SL=2% TP=∞ Fixed → **38.4% WR** (+540% return)
+   - **Sweet spot**: SL=5% TP=∞ Fixed → **42.9% WR** (+523% return, 1.92 RR)
+   - Report: `data/kama_optimize_20260523_182751.md`
+3. **ALMA + Light + thr=2** — 48 SL/TP combos tested on 133 stocks, 180d daily
+   - **Best WR**: SL=7% TP=4% Fixed → **56.3% WR** (+482% return)
+   - **Best Return**: SL=2% TP=∞ Fixed → **37.1% WR** (+623% return)
+   - **Sweet spot**: SL=5% TP=∞ Fixed → **42.8% WR** (+586% return, 1.93 RR)
+   - Report: `data/alma_optimize_20260523_182954.md`
+4. **Key finding**: Both KAMA & ALMA outperform ZLEMA on total return. ALMA slightly edges KAMA. Non-trailing (fixed) SL significantly outperforms trailing SL in WR. SL=5% no TP is the best balance.
+
+**Comparison vs ZLEMA-Optimized (previous)**:
+| Indicator | WR | Return | PF | RR |
+|-----------|----|--------|----|----|
+| ZLEMA+light (thr=2) | 40.5% | +283.7% | 9.32 | 6.94 |
+| **KAMA+light (thr=2, SL=5 fixed)** | **42.9%** | **+523.3%** | **1.31** | **1.92** |
+| **ALMA+light (thr=2, SL=5 fixed)** | **42.8%** | **+586.7%** | **1.26** | **1.93** |
