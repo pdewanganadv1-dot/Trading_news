@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from app.services.options_trading import options_trading_service, dhan_source
 from app.services.options_signal_service import options_signal_service
 from app.services.position_tracker import position_tracker
+from app.services.options_backtest.backtest_engine import OptionsBacktestEngine, BacktestConfig
 import os
 
 router = APIRouter(tags=["options-trading"])
@@ -25,6 +26,16 @@ async def get_option_chain(
     if "error" in data:
         data["chain"] = []
         data["dhan_available"] = False
+        data["total_pe_oi"] = 0
+        data["total_ce_oi"] = 0
+        data["total_pe_vol"] = 0
+        data["total_ce_vol"] = 0
+        data["pcr_oi"] = 0
+        data["pcr_vol"] = 0
+        data["max_pain"] = 0
+        data["underlying"] = 0
+        data["chain_length"] = 0
+        data["expiry"] = "-"
     return data
 
 
@@ -134,3 +145,61 @@ async def position_history(limit: int = Query(50)):
 @router.post("/api/options/positions/update")
 async def update_positions(symbol: str = Query("NIFTY")):
     return await options_signal_service.update_positions(symbol)
+
+
+@router.get("/api/options/backtest")
+async def run_backtest(
+    symbol: str = Query("NIFTY"),
+    strategy: str = Query("mega"),
+    from_date: str = Query("04-03-2026"),
+    to_date: str = Query("03-06-2026"),
+    trailing_stop: float = Query(20.0),
+    fixed_target: float = Query(40.0),
+    max_hold: int = Query(5),
+    lot_size: int = Query(50),
+):
+    try:
+        engine = OptionsBacktestEngine()
+        config = BacktestConfig(
+            symbol=symbol.upper(),
+            strategy_name=strategy,
+            from_date=from_date,
+            to_date=to_date,
+            trailing_stop_pct=trailing_stop,
+            fixed_target_pct=fixed_target,
+            max_hold_days=max_hold,
+            lot_size=lot_size,
+        )
+        result = engine.run(config)
+        trades = []
+        for t in result.trades:
+            trades.append({
+                "entry_date": t["entry_date"],
+                "exit_date": t["exit_date"],
+                "action": t.get("option_type", ""),
+                "strike": t["strike"],
+                "entry_price": round(t["entry_price"], 1),
+                "exit_price": round(t["exit_price"], 1) if t.get("exit_price") else None,
+                "pnl": round(t["pnl"], 0),
+                "pnl_pct": round(t.get("pnl_pct", 0), 1),
+                "exit_reason": t.get("exit_reason", ""),
+                "days_held": t.get("days_held", 0),
+            })
+        return {
+            "strategy": strategy,
+            "symbol": symbol,
+            "from_date": from_date,
+            "to_date": to_date,
+            "trades": trades,
+            "summary": {
+                "total_trades": result.total_trades,
+                "win_rate": round(result.win_rate * 100, 1),
+                "total_pnl": round(result.total_pnl, 0),
+                "profit_factor": round(result.profit_factor, 2),
+                "max_drawdown_pct": round(result.max_drawdown_pct * 100, 1),
+                "sharpe_ratio": round(result.sharpe_ratio, 2),
+                "avg_days_held": round(result.avg_days_held, 1),
+            },
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Backtest failed: {e}")

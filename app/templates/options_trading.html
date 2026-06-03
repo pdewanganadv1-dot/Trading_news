@@ -156,6 +156,7 @@
                         </select>
                         <button id="runSignalsBtn" onclick="runSignals()" style="background:var(--accent-blue);border:none;color:white;padding:0.3rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem">&#9654; Run Signals</button>
                         <button onclick="updatePositions()" style="background:var(--accent-gold);border:none;color:#000;padding:0.3rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem">&#8635; Update Positions</button>
+                        <button onclick="loadBacktest()" style="background:var(--accent-green);border:none;color:#000;padding:0.3rem 1rem;border-radius:6px;cursor:pointer;font-size:0.8rem">&#128202; Backtest</button>
                         <span id="signalStatus" style="font-size:0.75rem;color:var(--text-secondary)"></span>
                     </div>
                 </div>
@@ -540,6 +541,39 @@
                 const pd = await pr.json();
                 renderPositions(pd);
             } catch(e) { alert('Error: '+e.message); }
+        }
+
+        async function loadBacktest() {
+            const strategy = document.getElementById('signalStrategy').value;
+            const stat = document.getElementById('signalStatus');
+            const hist = document.getElementById('tradeHistoryList');
+            stat.textContent = 'Running backtest...';
+            hist.innerHTML = '<div class="buildup-item" style="justify-content:center">Loading...</div>';
+            try {
+                const r = await fetch(`/api/options/backtest?symbol=NIFTY&strategy=${strategy}`);
+                if (!r.ok) throw new Error(await r.text());
+                const d = await r.json();
+                const s = d.summary;
+                let html = `<div class="buildup-item" style="background:var(--bg-secondary);font-weight:600">
+                    <span>${s.total_trades} trades, ${s.win_rate}% win</span>
+                    <span>₹${s.total_pnl >= 0 ? '+' : ''}${s.total_pnl}  PF ${s.profit_factor}  DD ${s.max_drawdown_pct}%  SR ${s.sharpe_ratio}</span>
+                </div>`;
+                html += d.trades.map(t => {
+                    const cls = t.pnl > 0 ? 'positive' : 'negative';
+                    return `<div class="buildup-item">
+                        <span>${t.entry_date}→${t.exit_date||'-'} <b>${t.action}</b> @${t.strike}<br><small style="color:var(--text-secondary)">${t.days_held}d  ₹${t.entry_price}→${t.exit_price}</small></span>
+                        <span style="text-align:right">
+                            <span class="${cls}">${t.pnl >= 0 ? '+' : ''}${t.pnl}</span><br>
+                            <small style="color:var(--text-secondary)">${t.exit_reason||''}</small>
+                        </span>
+                    </div>`;
+                }).join('');
+                hist.innerHTML = html;
+                stat.textContent = `Backtest ${d.from_date} → ${d.to_date}`;
+            } catch(e) {
+                hist.innerHTML = '<div class="buildup-item" style="justify-content:center;color:var(--accent-red)">Error: '+e.message+'</div>';
+                stat.textContent = 'Backtest failed';
+            }
         }
 
         function renderSignals(d) {
