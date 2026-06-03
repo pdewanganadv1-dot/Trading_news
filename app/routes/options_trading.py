@@ -155,7 +155,8 @@ async def run_backtest(
     to_date: str = Query("03-06-2026"),
     trailing_stop: float = Query(20.0),
     fixed_target: float = Query(40.0),
-    max_hold: int = Query(5),
+    max_hold: int = Query(3),
+    decay_stop: float = Query(70.0),
     lot_size: int = Query(50),
 ):
     try:
@@ -168,6 +169,7 @@ async def run_backtest(
             trailing_stop_pct=trailing_stop,
             fixed_target_pct=fixed_target,
             max_hold_days=max_hold,
+            decay_stop_pct=decay_stop,
             lot_size=lot_size,
         )
         result = engine.run(config)
@@ -199,10 +201,12 @@ async def run_backtest(
                 "win_rate": round(result.win_rate * 100, 1),
                 "total_pnl": round(result.total_pnl, 0),
                 "profit_factor": round(result.profit_factor, 2),
-                "max_drawdown_pct": round(result.max_drawdown_pct * 100, 1),
+                "max_drawdown_pct": round(result.max_drawdown_pct, 1),
                 "sharpe_ratio": round(result.sharpe_ratio, 2),
                 "avg_days_held": round(result.avg_days_held, 1),
             },
+            "equity_curve": [round(e, 0) for e in result.equity_curve],
+            "daily_pnl": result.daily_pnl,
         }
     except Exception as e:
         raise HTTPException(500, f"Backtest failed: {e}")

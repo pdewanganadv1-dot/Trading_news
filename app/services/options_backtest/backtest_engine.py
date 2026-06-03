@@ -22,7 +22,8 @@ class BacktestConfig:
     trailing_stop_pct: float = 0.0
     fixed_target_pct: float = 0.0
     stop_loss_pct: float = 0.0
-    max_hold_days: int = 5
+    max_hold_days: int = 3
+    decay_stop_pct: float = 70.0
     lot_size: int = 50
 
 
@@ -204,6 +205,12 @@ class OptionsBacktestEngine:
                 if config.max_hold_days > 0 and days_held >= config.max_hold_days:
                     should_exit = True
                     exit_reason = f"Max hold {config.max_hold_days}d"
+
+                if not is_short and not should_exit and config.decay_stop_pct > 0:
+                    decay_level = entry_p * (1 - config.decay_stop_pct / 100)
+                    if price_now <= decay_level:
+                        should_exit = True
+                        exit_reason = f"Decay stop ({config.decay_stop_pct}%)"
 
                 if date_str >= expiry_str:
                     should_exit = True

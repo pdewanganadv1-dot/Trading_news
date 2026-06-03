@@ -174,6 +174,7 @@
             <div class="level-box">
                 <h3>Trade History</h3>
                 <div id="tradeHistoryList" style="font-size:0.8rem"><div class="buildup-item" style="justify-content:center">No closed trades</div></div>
+                <div style="margin-top:0.8rem;height:200px"><canvas id="pnlChart"></canvas></div>
             </div>
         </div>
     </div>
@@ -550,12 +551,12 @@
             stat.textContent = 'Running backtest...';
             hist.innerHTML = '<div class="buildup-item" style="justify-content:center">Loading...</div>';
             try {
-                const r = await fetch(`/api/options/backtest?symbol=NIFTY&strategy=${strategy}`);
+                const r = await fetch(`/api/options/backtest?symbol=NIFTY&strategy=${strategy}&max_hold=3&decay_stop=70`);
                 if (!r.ok) throw new Error(await r.text());
                 const d = await r.json();
                 const s = d.summary;
                 let html = `<div class="buildup-item" style="background:var(--bg-secondary);font-weight:600">
-                    <span>${s.total_trades} trades, ${s.win_rate}% win</span>
+                    <span>${s.total_trades} trades, ${s.win_rate}% win, ${s.avg_days_held}d avg</span>
                     <span>₹${s.total_pnl >= 0 ? '+' : ''}${s.total_pnl}  PF ${s.profit_factor}  DD ${s.max_drawdown_pct}%  SR ${s.sharpe_ratio}</span>
                 </div>`;
                 html += d.trades.map(t => {
@@ -570,6 +571,32 @@
                 }).join('');
                 hist.innerHTML = html;
                 stat.textContent = `Backtest ${d.from_date} → ${d.to_date}`;
+
+                // PnL equity curve chart
+                destroyChart('pnlChart');
+                if (d.equity_curve && d.equity_curve.length > 1) {
+                    chartInstances.pnlChart = new Chart(document.getElementById('pnlChart'), {
+                        type: 'line',
+                        data: {
+                            labels: d.daily_pnl.map(p => p.date?.slice(5) || ''),
+                            datasets: [{
+                                label: 'Equity',
+                                data: d.equity_curve,
+                                borderColor: '#34d399',
+                                backgroundColor: 'rgba(52,211,153,0.1)',
+                                fill: true, tension: 0.2, pointRadius: 0,
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { ticks: { color: '#8888a0', maxTicksLimit: 12, font: {size:9} } },
+                                y: { ticks: { color: '#8888a0', font: {size:9} } }
+                            }
+                        }
+                    });
+                }
             } catch(e) {
                 hist.innerHTML = '<div class="buildup-item" style="justify-content:center;color:var(--accent-red)">Error: '+e.message+'</div>';
                 stat.textContent = 'Backtest failed';
