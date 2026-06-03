@@ -561,7 +561,7 @@
                 html += d.trades.map(t => {
                     const cls = t.pnl > 0 ? 'positive' : 'negative';
                     return `<div class="buildup-item">
-                        <span>${t.entry_date}→${t.exit_date||'-'} <b>${t.action}</b> @${t.strike}<br><small style="color:var(--text-secondary)">${t.days_held}d  ₹${t.entry_price}→${t.exit_price}</small></span>
+                        <span>${t.entry_date}→${t.exit_date||'-'} <b class="${t.action === 'SELL' ? 'negative' : 'positive'}">${t.action}</b> ${t.option_type}@${t.strike}<br><small style="color:var(--text-secondary)">${t.qty} qty × ₹${t.entry_price} → ₹${t.exit_price}  (${t.days_held}d)</small></span>
                         <span style="text-align:right">
                             <span class="${cls}">${t.pnl >= 0 ? '+' : ''}${t.pnl}</span><br>
                             <small style="color:var(--text-secondary)">${t.exit_reason||''}</small>

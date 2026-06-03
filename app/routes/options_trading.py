@@ -173,11 +173,14 @@ async def run_backtest(
         result = engine.run(config)
         trades = []
         for t in result.trades:
+            is_short = t.get("is_short", False)
             trades.append({
                 "entry_date": t["entry_date"],
                 "exit_date": t["exit_date"],
-                "action": t.get("option_type", ""),
+                "action": "SELL" if is_short else "BUY",
+                "option_type": t.get("option_type", ""),
                 "strike": t["strike"],
+                "qty": t.get("qty", lot_size),
                 "entry_price": round(t["entry_price"], 1),
                 "exit_price": round(t["exit_price"], 1) if t.get("exit_price") else None,
                 "pnl": round(t["pnl"], 0),

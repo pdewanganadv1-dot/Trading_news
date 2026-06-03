@@ -29,6 +29,7 @@ class TradeResult:
     days_held: int
     underlying_entry: float
     underlying_exit: float
+    is_short: bool = False
 
 
 class OptionStrategy:

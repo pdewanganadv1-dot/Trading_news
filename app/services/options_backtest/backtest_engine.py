@@ -223,6 +223,7 @@ class OptionsBacktestEngine:
                         days_held=days_held,
                         underlying_entry=t["underlying_entry"],
                         underlying_exit=snap["underlying"],
+                        is_short=is_short,
                     ))
                 else:
                     still_open.append(t)
@@ -253,6 +254,7 @@ class OptionsBacktestEngine:
                 days_held=days_held,
                 underlying_entry=t["underlying_entry"],
                 underlying_exit=last_snap["underlying"] if last_snap else 0,
+                is_short=is_short,
             ))
 
         return self._compute_results(config, closed_trades, equity_curve, daily_pnl_records)
