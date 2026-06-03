@@ -1,28 +1,19 @@
 import asyncio
-import math
-import statistics
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import pandas as pd
 import pytz
 
 from app.services.options_backtest.strategies import (
-    STRATEGIES, Signal, _find_price, _get_atm_strike, _fii_bias,
+    STRATEGIES, Signal, _find_price, _get_atm_strike,
 )
 from app.services.options_backtest.data_loader import options_data_loader
 from app.services.options_trading.service import options_trading_service
-from app.services.options_trading.dhan_source import FNO_INDICES
+from app.services.options_trading.dhan_source import dhan_source
 from .position_tracker import position_tracker
 
 IST = pytz.timezone("Asia/Kolkata")
-
-
-def _ohlc_to_snap(row: pd.Series, atm_row: Optional[dict] = None) -> dict:
-    return {
-        "date": str(row.get("TIMESTAMP", row.get("date", ""))),
-        "underlying": row.get("UNDERLYING_VALUE", 0),
-    }
 
 
 def _dhan_to_snapshot(symbol: str, dhan_data: dict, expiry: str) -> Optional[dict]:
@@ -124,6 +115,10 @@ class OptionsSignalService:
             await self.refresh(symbol)
 
         dhan_data = await options_trading_service.get_option_chain(symbol)
+        if "error" in dhan_data or not dhan_data.get("chain"):
+            dhan_source.renew_token()
+            dhan_data = await options_trading_service.get_option_chain(symbol)
+
         expiries = dhan_data.get("expiry_dates", []) if "error" not in dhan_data else []
 
         today = datetime.now(IST).strftime("%Y-%m-%d")
@@ -200,6 +195,9 @@ class OptionsSignalService:
         closed = []
 
         dhan_data = await options_trading_service.get_option_chain(symbol)
+        if "error" in dhan_data or not dhan_data.get("chain"):
+            dhan_source.renew_token()
+            dhan_data = await options_trading_service.get_option_chain(symbol)
         if "error" in dhan_data or not dhan_data.get("chain"):
             return {"updated": 0, "closed": 0, "error": "Live data unavailable"}
 

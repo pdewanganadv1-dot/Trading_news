@@ -26,11 +26,18 @@ class DhanSource:
 
     def _get_dhan(self) -> dhanhq:
         if self._dhan is None:
-            cid = settings.dhan_client_id or os.environ.get("DHAN_CLIENT_ID", "")
-            tok = settings.dhan_access_token or os.environ.get("DHAN_ACCESS_TOKEN", "")
-            ctx = DhanContext(cid, tok)
-            self._dhan = dhanhq(ctx)
+            self._init_client()
         return self._dhan
+
+    def _init_client(self):
+        cid = settings.dhan_client_id or os.environ.get("DHAN_CLIENT_ID", "")
+        tok = settings.dhan_access_token or os.environ.get("DHAN_ACCESS_TOKEN", "")
+        ctx = DhanContext(cid, tok)
+        self._dhan = dhanhq(ctx)
+
+    def renew_token(self):
+        self._dhan = None
+        self._init_client()
 
     def _ensure_security_map(self):
         now = time.time()

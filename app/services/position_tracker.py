@@ -60,6 +60,9 @@ class PositionTracker:
              underlying_entry: float, trailing_stop_pct: float = 0,
              fixed_target_pct: float = 0, stop_loss_pct: float = 0,
              max_hold_days: int = 5) -> dict:
+        for p in self._positions:
+            if p["status"] == "open" and p["symbol"] == symbol and p["strike"] == strike and p["option_type"] == option_type:
+                return None
         entry_date = datetime.now().strftime("%Y-%m-%d")
         is_short = "SELL" in action
         pos = {

@@ -78,6 +78,20 @@ async def get_live_signals(
         raise HTTPException(500, f"Signal generation failed: {e}")
 
 
+@router.get("/api/options/signals/refresh")
+async def refresh_signal_data(symbol: str = Query("NIFTY")):
+    try:
+        await options_signal_service.refresh(symbol)
+        return {
+            "status": "ok",
+            "symbol": symbol,
+            "history_days": len(options_signal_service._snapshots),
+            "fiidii_days": len(options_signal_service._fiidii_cache),
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Refresh failed: {e}")
+
+
 @router.get("/api/options/positions")
 async def get_positions():
     return {
