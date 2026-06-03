@@ -23,7 +23,8 @@ async def get_option_chain(
 ):
     data = await options_trading_service.get_option_chain(symbol, expiry)
     if "error" in data:
-        raise HTTPException(400, data["error"])
+        data["chain"] = []
+        data["dhan_available"] = False
     return data
 
 

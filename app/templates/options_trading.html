@@ -207,7 +207,10 @@
                 const r = await fetch(`/api/options-trading/chain?symbol=${sym}${exp ? '&expiry='+exp : ''}`);
                 if (!r.ok) throw new Error(await r.text());
                 const data = await r.json();
-                if (data.error) throw new Error(data.error);
+                if (!data.dhan_available && data.chain && data.chain.length === 0) {
+                    document.getElementById('errorMsg').textContent = 'Dhan data unavailable — switching to nselib fallback';
+                    document.getElementById('errorMsg').style.display = 'block';
+                }
                 render(data);
             } catch(e) {
                 document.getElementById('loading').style.display = 'none';
