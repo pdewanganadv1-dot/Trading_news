@@ -1,5 +1,6 @@
 import os
 import time
+import requests
 import pandas as pd
 from typing import Dict, List, Optional, Tuple
 from functools import lru_cache
@@ -16,6 +17,19 @@ FNO_INDICES = {
     "FINNIFTY": {"security_id": 27, "segment": "IDX_I"},
     "MIDCPNIFTY": {"security_id": 442, "segment": "IDX_I"},
 }
+
+# Common F&O stocks for option buying
+FNO_STOCKS = [
+    "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN",
+    "BAJFINANCE", "BHARTIARTL", "KOTAKBANK", "LT", "WIPRO", "HCLTECH",
+    "AXISBANK", "MARUTI", "SUNPHARMA", "TITAN", "ASIANPAINT", "NTPC",
+    "ONGC", "POWERGRID", "M&M", "TATAMOTORS", "TATASTEEL", "JSWSTEEL",
+    "ADANIENT", "ADANIPORTS", "HINDUNILVR", "ITC", "ULTRACEMCO", "BAJAJFINSV",
+    "HDFCLIFE", "SBILIFE", "HEROMOTOCO", "EICHERMOT", "COALINDIA",
+    "BRITANNIA", "DIVISLAB", "DRREDDY", "CIPLA", "APOLLOHOSP",
+    "NESTLEIND", "GRASIM", "HINDALCO", "INDUSINDBK", "TECHM",
+    "BPCL", "IOC", "HAL", "VEDL", "BEL",
+]
 
 
 class DhanSource:
@@ -36,8 +50,25 @@ class DhanSource:
         self._dhan = dhanhq(ctx)
 
     def renew_token(self):
-        self._dhan = None
-        self._init_client()
+        cid = settings.dhan_client_id or os.environ.get("DHAN_CLIENT_ID", "")
+        tok = settings.dhan_access_token or os.environ.get("DHAN_ACCESS_TOKEN", "")
+        if not cid or not tok:
+            return {"success": False, "error": "Missing credentials"}
+        try:
+            resp = requests.post("https://api.dhan.co/v2/RenewToken", headers={
+                "access-token": tok, "dhanClientId": cid,
+            }, timeout=10)
+            if resp.ok:
+                data = resp.json()
+                new_token = data.get("accessToken")
+                if new_token:
+                    os.environ["DHAN_ACCESS_TOKEN"] = new_token
+                    settings.dhan_access_token = new_token
+                    self._dhan = None
+                    return {"success": True, "access_token": new_token}
+            return {"success": False, "status": resp.status_code}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def _ensure_security_map(self):
         now = time.time()
@@ -72,7 +103,19 @@ class DhanSource:
             return sid, seg
         raise ValueError(f"Unknown symbol: {symbol}")
 
+    def resolve_fno_symbol(self, symbol: str) -> Tuple[int, str]:
+        symbol = symbol.upper().strip()
+        if symbol in FNO_INDICES:
+            info = FNO_INDICES[symbol]
+            return info["security_id"], info["segment"]
+        self._ensure_security_map()
+        if symbol in self._security_map:
+            sid, _ = self._security_map[symbol]
+            return sid, "NSE_FNO"
+        raise ValueError(f"Unknown symbol: {symbol}")
+
     def get_option_chain(self, symbol: str, expiry: str) -> Optional[dict]:
+        sid, seg = self.resolve_fno_symbol(symbol)
         sid, seg = self.resolve_symbol(symbol)
         dhan = self._get_dhan()
         result = dhan.option_chain(sid, seg, expiry)
@@ -86,7 +129,7 @@ class DhanSource:
         return inner
 
     def get_expiry_list(self, symbol: str) -> List[str]:
-        sid, seg = self.resolve_symbol(symbol)
+        sid, seg = self.resolve_fno_symbol(symbol)
         dhan = self._get_dhan()
         result = dhan.expiry_list(sid, seg)
         if result.get("status") != "success":

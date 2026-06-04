@@ -89,6 +89,10 @@ def fii_filtered_strategy(date: str, snap: dict, history: List[dict], fiidii: Op
     pcr = snap.get("pcr_oi", 1.0)
     bias = _fii_bias(fiidii)
 
+    # Use PCR as sentiment proxy when FII data is unavailable
+    if bias == "neutral" and fiidii is None:
+        bias = "bullish" if pcr > 1.0 else "bearish"
+
     prev = history[-1]
     spot_chg = (spot - prev.get("underlying", spot)) / prev.get("underlying", spot) if prev.get("underlying", 0) else 0
     pcr_trend = pcr - history[-1].get("pcr_oi", 1.0)
@@ -184,6 +188,9 @@ def ultra_selective_strategy(date: str, snap: dict, history: List[dict], fiidii:
     atm = _get_atm_strike(spot)
     pcr = snap.get("pcr_oi", 1.0)
     bias = _fii_bias(fiidii)
+
+    if bias == "neutral" and fiidii is None:
+        bias = "bullish" if pcr > 1.0 else "bearish"
 
     prev1 = history[-1]
     prev2 = history[-2]

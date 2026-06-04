@@ -24,7 +24,10 @@ class BacktestConfig:
     stop_loss_pct: float = 0.0
     max_hold_days: int = 3
     decay_stop_pct: float = 70.0
+    entry_type: str = "close"
     lot_size: int = 50
+    trade_qty: int = 0
+    max_loss_per_trade: float = 20000.0
 
 
 @dataclass
@@ -107,6 +110,7 @@ class OptionsBacktestEngine:
         open_trades: List[dict] = []
         closed_trades: List[TradeResult] = []
         daily_pnl_records = []
+        pending_signals: List[Signal] = []
 
         for date in dates:
             date_str = date.strftime("%Y-%m-%d")
@@ -117,31 +121,68 @@ class OptionsBacktestEngine:
                 continue
 
             snapshots.append(snap)
+
             fiidii = fiidii_cache.get(date_str)
             new_signals = strategy(date_str, snap, snapshots[:-1], fiidii)
-            selected = new_signals[:config.max_positions_per_day]
 
-            for sig in selected:
-                price = sig.price or _find_price(snap, sig.strike, sig.action)
-                if price is None or price <= 0:
-                    continue
-                trade_expiry = self._find_nearest_expiry(date_str, expiry_strs)
-                if not trade_expiry:
-                    continue
-                is_short = "SELL" in sig.action
-                open_trades.append({
-                    "entry_date": date_str,
-                    "strike": sig.strike,
-                    "option_type": "CE" if "CE" in sig.action else "PE",
-                    "expiry": trade_expiry,
-                    "entry_price": price,
-                    "qty": sig.qty * config.lot_size,
-                    "entry_reason": sig.reason,
-                    "underlying_entry": snap["underlying"],
-                    "is_short": is_short,
-                    "highest_price": price,
-                    "lowest_price": price,
-                })
+            if config.entry_type == "next_open":
+                if pending_signals:
+                    selected = pending_signals[:config.max_positions_per_day]
+                    pending_signals = []
+                    for sig in selected:
+                        trade_expiry = self._find_nearest_expiry(date_str, expiry_strs)
+                        if not trade_expiry:
+                            continue
+                        optype = "CE" if "CE" in sig.action else "PE"
+                        sig_key = (sig.strike, optype, trade_expiry)
+                        if any(sig_key == (t.get("strike"), t.get("option_type"), t.get("expiry")) for t in open_trades):
+                            continue
+                        price = sig.price or _find_price(snap, sig.strike, sig.action)
+                        if price is None or price <= 0:
+                            continue
+                        is_short = "SELL" in sig.action
+                        open_trades.append({
+                            "symbol": config.symbol,
+                            "entry_date": date_str,
+                            "strike": sig.strike,
+                            "option_type": optype,
+                            "expiry": trade_expiry,
+                            "entry_price": price,
+                            "qty": config.trade_qty or (sig.qty * config.lot_size),
+                            "entry_reason": sig.reason,
+                            "underlying_entry": snap["underlying"],
+                            "is_short": is_short,
+                            "highest_price": price,
+                            "lowest_price": price,
+                        })
+                pending_signals.extend(new_signals)
+            else:
+                for sig in new_signals[:config.max_positions_per_day]:
+                    trade_expiry = self._find_nearest_expiry(date_str, expiry_strs)
+                    if not trade_expiry:
+                        continue
+                    optype = "CE" if "CE" in sig.action else "PE"
+                    sig_key = (sig.strike, optype, trade_expiry)
+                    if any(sig_key == (t.get("strike"), t.get("option_type"), t.get("expiry")) for t in open_trades):
+                        continue
+                    price = sig.price or _find_price(snap, sig.strike, sig.action)
+                    if price is None or price <= 0:
+                        continue
+                    is_short = "SELL" in sig.action
+                    open_trades.append({
+                        "symbol": config.symbol,
+                        "entry_date": date_str,
+                        "strike": sig.strike,
+                        "option_type": "CE" if "CE" in sig.action else "PE",
+                        "expiry": trade_expiry,
+                        "entry_price": price,
+                        "qty": config.trade_qty or (sig.qty * config.lot_size),
+                        "entry_reason": sig.reason,
+                        "underlying_entry": snap["underlying"],
+                        "is_short": is_short,
+                        "highest_price": price,
+                        "lowest_price": price,
+                    })
 
             day_pnl = 0.0
             still_open = []
@@ -211,6 +252,12 @@ class OptionsBacktestEngine:
                     if price_now <= decay_level:
                         should_exit = True
                         exit_reason = f"Decay stop ({config.decay_stop_pct}%)"
+
+                if not should_exit and config.max_loss_per_trade > 0:
+                    unrealized = (price_now - entry_p) * t["qty"] if not is_short else (entry_p - price_now) * t["qty"]
+                    if unrealized <= -config.max_loss_per_trade:
+                        should_exit = True
+                        exit_reason = f"Max loss ₹{config.max_loss_per_trade:,.0f}"
 
                 if date_str >= expiry_str:
                     should_exit = True

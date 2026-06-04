@@ -142,6 +142,32 @@ async def position_history(limit: int = Query(50)):
     return {"trades": position_tracker.get_closed(limit=limit)}
 
 
+@router.post("/api/options/positions/open")
+async def open_position(
+    action: str = Query(...),
+    strike: int = Query(...),
+    option_type: str = Query(...),
+    expiry: str = Query(...),
+    entry_price: float = Query(...),
+    qty: int = Query(50),
+    entry_reason: str = Query("Manual"),
+):
+    symbol = "NIFTY"
+    dhan_data = await options_trading_service.get_option_chain(symbol)
+    underlying = dhan_data.get("underlying", 0) if "error" not in dhan_data else 0
+    pos = position_tracker.open(
+        symbol=symbol, action=action, strike=strike,
+        option_type=option_type, expiry=expiry,
+        entry_price=entry_price, qty=qty,
+        entry_reason=entry_reason, underlying_entry=underlying,
+        trailing_stop_pct=0.2, fixed_target_pct=0.4,
+        max_hold_days=3,
+    )
+    if not pos:
+        raise HTTPException(400, "Position already open or invalid")
+    return pos
+
+
 @router.post("/api/options/positions/update")
 async def update_positions(symbol: str = Query("NIFTY")):
     return await options_signal_service.update_positions(symbol)
@@ -157,6 +183,9 @@ async def run_backtest(
     fixed_target: float = Query(40.0),
     max_hold: int = Query(3),
     decay_stop: float = Query(70.0),
+    entry_type: str = Query("close"),
+    max_loss: float = Query(20000.0),
+    trade_qty: int = Query(0),
     lot_size: int = Query(50),
 ):
     try:
@@ -170,6 +199,9 @@ async def run_backtest(
             fixed_target_pct=fixed_target,
             max_hold_days=max_hold,
             decay_stop_pct=decay_stop,
+            entry_type=entry_type,
+            max_loss_per_trade=max_loss,
+            trade_qty=trade_qty,
             lot_size=lot_size,
         )
         result = engine.run(config)

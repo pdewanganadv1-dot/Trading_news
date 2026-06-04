@@ -60,49 +60,57 @@ def _dhan_to_snapshot(symbol: str, dhan_data: dict, expiry: str) -> Optional[dic
 
 class OptionsSignalService:
     def __init__(self):
-        self._df: Optional[pd.DataFrame] = None
-        self._snapshots: List[dict] = []
-        self._fiidii_cache: Dict[str, dict] = {}
-        self._last_refresh: Optional[datetime] = None
+        self._dfs: Dict[str, pd.DataFrame] = {}
+        self._snapshots_map: Dict[str, List[dict]] = {}
+        self._fiidii_map: Dict[str, Dict[str, dict]] = {}
+        self._last_refresh_map: Dict[str, datetime] = {}
+
+    def _instrument(self, symbol: str) -> str:
+        from app.services.options_trading.dhan_source import FNO_INDICES
+        return "OPTIDX" if symbol.upper() in FNO_INDICES else "OPTSTK"
 
     async def refresh(self, symbol: str = "NIFTY", lookback_days: int = 60):
+        symbol = symbol.upper()
         today = datetime.now(IST).strftime("%Y-%m-%d")
         from_date = (datetime.now(IST).replace(tzinfo=None) - pd.Timedelta(days=lookback_days)).strftime("%d-%m-%Y")
         to_date = datetime.now(IST).strftime("%d-%m-%Y")
+        instr = self._instrument(symbol)
 
         try:
             df = await asyncio.to_thread(
                 options_data_loader.fetch_option_data,
-                symbol, "OPTIDX",
+                symbol, instr,
                 from_date=from_date, to_date=to_date,
             )
         except Exception:
             df = pd.DataFrame()
 
         if df.empty:
-            self._snapshots = []
-            self._df = None
-            self._last_refresh = None
+            self._dfs[symbol] = None
+            self._snapshots_map[symbol] = []
+            self._last_refresh_map.pop(symbol, None)
             return
 
-        self._df = df
+        self._dfs[symbol] = df
         dates = sorted(df["TIMESTAMP"].unique())
-        self._snapshots = []
-        self._fiidii_cache = {}
+        snaps = []
+        fiidii = {}
 
         for d in dates:
             date_str = d.strftime("%Y-%m-%d")
             snap = options_data_loader.build_daily_snapshot(df, date_str)
             if snap:
-                self._snapshots.append(snap)
+                snaps.append(snap)
             try:
                 poi = options_data_loader.fetch_participant_oi(d.strftime("%d-%m-%Y"))
                 if poi:
-                    self._fiidii_cache[date_str] = poi
+                    fiidii[date_str] = poi
             except Exception:
                 pass
 
-        self._last_refresh = datetime.now(IST)
+        self._snapshots_map[symbol] = snaps
+        self._fiidii_map[symbol] = fiidii
+        self._last_refresh_map[symbol] = datetime.now(IST)
 
     async def get_live_signals(self, symbol: str = "NIFTY",
                                strategy_name: str = "mega",
@@ -111,8 +119,13 @@ class OptionsSignalService:
                                max_hold_days: int = 5,
                                max_positions_per_day: int = 2,
                                lot_size: int = 50) -> dict:
-        if not self._snapshots or self._last_refresh is None:
+        symbol = symbol.upper()
+        snaps = self._snapshots_map.get(symbol)
+        last_refresh = self._last_refresh_map.get(symbol)
+        if not snaps or last_refresh is None:
             await self.refresh(symbol)
+            snaps = self._snapshots_map.get(symbol, [])
+            last_refresh = self._last_refresh_map.get(symbol)
 
         dhan_data = await options_trading_service.get_option_chain(symbol)
         if "error" in dhan_data or not dhan_data.get("chain"):
@@ -129,12 +142,12 @@ class OptionsSignalService:
             nearest_expiry = dhan_data.get("expiry", "")
             live_snap = _dhan_to_snapshot(symbol, dhan_data, nearest_expiry)
 
-        history = list(self._snapshots)
+        history = list(snaps or [])
 
         if live_snap:
             history.append(live_snap)
 
-        fiidii = self._fiidii_cache.get(today)
+        fiidii = self._fiidii_map.get(symbol, {}).get(today)
 
         signal_fn = STRATEGIES.get(strategy_name, STRATEGIES["fii_filtered"])
         signals: List[Signal] = signal_fn(today, live_snap or (history[-1] if history else {}),
@@ -144,43 +157,38 @@ class OptionsSignalService:
 
         result_signals = []
         open_positions = position_tracker.get_open()
-
         existing_keys = {(p["strike"], p["option_type"]) for p in open_positions}
 
         for sig in selected:
+            if not sig.action.startswith("BUY"):
+                continue
             if (sig.strike, "CE" if "CE" in sig.action else "PE") in existing_keys:
                 continue
-
             price = sig.price or _find_price(live_snap or history[-1], sig.strike, sig.action) if (live_snap or history) else 0
             if price is None or price <= 0:
                 continue
-
             expiry = self._find_nearest_expiry(expiries)
             if not expiry:
                 continue
-
-            pos = position_tracker.open(
-                symbol=symbol,
-                action=sig.action,
-                strike=sig.strike,
-                option_type="CE" if "CE" in sig.action else "PE",
-                expiry=expiry,
-                entry_price=price,
-                qty=lot_size,
-                entry_reason=sig.reason,
-                underlying_entry=live_snap["underlying"] if live_snap else 0,
-                trailing_stop_pct=trailing_stop_pct / 100,
-                fixed_target_pct=fixed_target_pct / 100,
-                max_hold_days=max_hold_days,
-            )
-            result_signals.append(pos)
+            result_signals.append({
+                "symbol": symbol,
+                "action": sig.action,
+                "strike": sig.strike,
+                "option_type": "CE" if "CE" in sig.action else "PE",
+                "expiry": expiry,
+                "entry_price": price,
+                "qty": lot_size,
+                "entry_reason": sig.reason,
+            })
 
         return {
             "date": today,
             "strategy": strategy_name,
             "symbol": symbol,
             "data_source": "dhan" if live_snap else "nselib",
-            "history_days": len(self._snapshots),
+            "dhan_available": live_snap is not None,
+            "underlying": live_snap.get("underlying") if live_snap else (history[-1].get("underlying") if history else None),
+            "history_days": len(snaps or []),
             "fiidii_available": fiidii is not None,
             "new_signals": result_signals,
             "open_positions": position_tracker.get_open(),

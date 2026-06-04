@@ -66,6 +66,7 @@ async def lifespan(app: FastAPI):
     from app.services.live_analysis import volume_spike_loop
     from app.services.strategy_builder import strategy_builder_loop
     from app.services.dhanhq_service import auto_renew_loop
+    from app.services.options_signal_scanner import options_signal_scanner_loop
     _safe_task(signal_monitor_loop(), "signal_monitor", delay=0)
     _safe_task(telegram_poll_loop(), "telegram_poll", delay=5)
     _safe_task(daily_report_loop(), "daily_report", delay=10)
@@ -75,6 +76,7 @@ async def lifespan(app: FastAPI):
     _safe_task(volume_spike_loop(), "volume_spike", delay=30)
     _safe_task(strategy_builder_loop(), "strategy_builder", delay=35)
     _safe_task(auto_renew_loop(), "dhan_token_renew", delay=40)
+    _safe_task(options_signal_scanner_loop(), "options_signal_scanner", delay=45)
     yield
     for t in _background_tasks:
         t.cancel()
