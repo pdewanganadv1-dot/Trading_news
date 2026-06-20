@@ -156,9 +156,6 @@ _COMPANY_NAMES: Dict[str, List[str]] = {
     "abcap": ["aditya birla capital", "abcap"],
     "abfrl": ["aditya birla fashion", "abfrl"],
     "adanienergy": ["adani energy", "adani electricity"],
-    "bajaj-auto": ["bajaj auto"],
-    "siemens": ["siemens"],
-    "angelone": ["angel one"],
 }
 
 _POLITICAL_KEYWORDS = [
@@ -185,9 +182,14 @@ _POLITICAL_KEYWORDS = [
 ]
 
 _POLITICAL_SOURCES = [
-    ("PRS India", "https://prsindia.org/feed"),
-    ("PRS Blog", "https://prsindia.org/blog/feed"),
-    ("PRS Parliament", "https://prsindia.org/parliament-track/feed"),
+    ("ET Parliament", "https://economictimes.indiatimes.com/news/news-by-industry/et-commentary/rssfeeds/1715247553.cms"),
+    ("ET Politics", "https://economictimes.indiatimes.com/news/politics/nation/rssfeeds/13357242.cms"),
+    ("Mint Politics", "https://www.livemint.com/rss/politics"),
+    ("NDTV India", "https://feeds.feedburner.com/ndtvnews-india-news"),
+    ("Business Standard Politics", "https://www.business-standard.com/rss/politics-103.rss"),
+    ("The Hindu Politics", "https://www.thehindu.com/news/national/feeder/default.rss"),
+    ("Indian Express", "https://indianexpress.com/feed/"),
+    ("Times of India India", "https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms"),
 ]
 
 
@@ -255,6 +257,9 @@ class ParliamentNewsService:
             except Exception as e:
                 print(f"[ParliamentNews] Google RSS error ({query}): {e}")
 
+        prs_news = await self._scrape_prs_india()
+        all_news.extend(prs_news)
+
         seen = set()
         unique = []
         for n in all_news:
@@ -309,6 +314,33 @@ class ParliamentNewsService:
             return items
         except Exception as e:
             print(f"[ParliamentNews] RSS error ({source_name}): {e}")
+            return []
+
+    async def _scrape_prs_india(self) -> List[Dict]:
+        try:
+            resp = await self.session.get("https://prsindia.org/", timeout=15)
+            if resp.status_code != 200:
+                return []
+            import re as _re
+            items = []
+            for m in _re.finditer(
+                r'<a\s+href="(https?://prsindia\.org[^"]+)"[^>]*>([^<]+)</a>',
+                resp.text
+            ):
+                url = m.group(1)
+                title = m.group(2).strip()
+                if title and len(title) > 15:
+                    items.append({
+                        "title": title,
+                        "description": title,
+                        "url": url,
+                        "source": "PRS INDIA",
+                        "published_at": datetime.utcnow().isoformat(),
+                        "category": "parliament",
+                    })
+            return items[:15]
+        except Exception as e:
+            print(f"[ParliamentNews] PRS scrape error: {e}")
             return []
 
     async def get_stock_mentions(self, force: bool = False) -> Dict[str, List[Dict]]:
