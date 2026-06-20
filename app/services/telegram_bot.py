@@ -1265,21 +1265,26 @@ async def _handle_message(text: str, chat_id: int):
             snap = await get_parliament_snapshot()
             news = await parliament_news_service.get_parliament_news()
             lines = [
-                f"🏛 *Parliament Stock Scanner*",
+                f"🏛 *Parliament Presignals*",
                 f"📰 {len(news)} articles | {snap['total_mentions']} stocks mentioned",
-                f"🆕 {snap['active_unusual']} unusual mentions active",
+                f"🎯 {snap['active_presignals']} actionable presignals",
                 ""
             ]
-            top = snap.get("top_mentions", [])[:10]
-            if top:
-                lines.append("*Top Stock Mentions:*")
-                for u in top:
-                    flag = "🆕" if u["is_new"] else "⏳"
+            signals = snap.get("signals", [])
+            if signals:
+                lines.append("*Presignals (news × price action):*")
+                for s in signals[:10]:
+                    emoji = "🟢" if s['direction'] == 'BUY' else "🔴" if s['direction'] == 'SELL' else "⚪"
+                    score_str = f"{'█' * (s['score']//2)}{'░' * (5 - s['score']//2)}" if s['score'] > 0 else "░░░░░"
+                    flag = "🆕" if s.get("is_new") else "⏳"
+                    title = s.get('detail', '')[:50] if s.get('detail') else ''
                     lines.append(
-                        f"{flag} `{u['symbol']:<12}` {u['article_count']} articles"
+                        f"{flag}{emoji} `{s['symbol']:<12}` {score_str} {s['score']}/10"
                     )
+                    if title:
+                        lines.append(f"   └ {title}")
             else:
-                lines.append("No stock mentions in recent parliament news.")
+                lines.append("No presignals — stocks with news but no price movement.")
             lines.append("")
             lines.append("💡 `/parliament_buy <SYM> <QTY>` to buy")
             return await telegram_notifier.send_message("\n".join(lines))
