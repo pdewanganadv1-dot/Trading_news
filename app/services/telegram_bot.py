@@ -25,6 +25,10 @@ from app.services.dhanhq_service import (
     get_order_book, get_positions, dhan_enabled,
 )
 import app.services.dhanhq_service as _dhan
+from app.services.telegram_image_watch import download_photo, get_latest_images
+from app.services.telegram_image_analyzer import image_analyzer
+from app.services.parliament_news_service import parliament_news_service
+from app.services.parliament_tracker import get_parliament_snapshot, buy_from_parliament
 
 _price_alerts: list = []
 _alert_id_counter = 0
@@ -152,6 +156,9 @@ def _build_help() -> str:
         "• `postmarket` — 3:45pm: gainers, losers, wrap\n"
         "• `summary` — Dashboard overview all assets\n"
         "• `stocks` — List all 119 monitored Nifty stocks\n\n"
+        "🏛 *Parliament Stock Scanner*\n"
+        "• `/parliament` — Parliament news affecting stocks (top mentions)\n"
+        "• `/parliament_buy <sym> <qty>` — Buy a parliament-flagged stock\n\n"
         "🛠 *System*\n"
         "• `/help` — This message\n"
         "• `docker` — Container status\n"
@@ -1253,6 +1260,47 @@ async def _handle_message(text: str, chat_id: int):
             await telegram_notifier.send_message(msg)
         return
 
+    if text == '/parliament':
+        try:
+            snap = await get_parliament_snapshot()
+            news = await parliament_news_service.get_parliament_news()
+            lines = [
+                f"🏛 *Parliament Stock Scanner*",
+                f"📰 {len(news)} articles | {snap['total_mentions']} stocks mentioned",
+                f"🆕 {snap['active_unusual']} unusual mentions active",
+                ""
+            ]
+            top = snap.get("top_mentions", [])[:10]
+            if top:
+                lines.append("*Top Stock Mentions:*")
+                for u in top:
+                    flag = "🆕" if u["is_new"] else "⏳"
+                    lines.append(
+                        f"{flag} `{u['symbol']:<12}` {u['article_count']} articles"
+                    )
+            else:
+                lines.append("No stock mentions in recent parliament news.")
+            lines.append("")
+            lines.append("💡 `/parliament_buy <SYM> <QTY>` to buy")
+            return await telegram_notifier.send_message("\n".join(lines))
+        except Exception as e:
+            return await telegram_notifier.send_message(f"❌ Parliament error: {e}")
+
+    m = re.match(r'^/parliament_buy\s+(\w+)\s+(\d+)$', text)
+    if m:
+        symbol = m.group(1).upper()
+        qty = int(m.group(2))
+        status_msg = await telegram_notifier.send_message(
+            f"⏳ Checking parliament data & placing BUY {symbol} x{qty}..."
+        )
+        result = await buy_from_parliament(symbol, qty)
+        if isinstance(result, dict) and result.get("success"):
+            await telegram_notifier.send_message(result["message"])
+        else:
+            err = result.get("error", "Unknown")
+            await telegram_notifier.send_message(f"❌ Parliament buy failed: {err}")
+        return
+
     # Unrecognized command — silent ignore
     return
 
@@ -1313,10 +1361,61 @@ async def telegram_poll_loop():
                         if update_id >= offset:
                             offset = update_id + 1
                         msg = update.get("message", {})
-                        text = msg.get("text", "")
                         chat_id = msg.get("chat", {}).get("id", "")
-                        if text and str(chat_id) == CHAT_ID:
+                        if str(chat_id) != CHAT_ID:
+                            continue
+
+                        text = msg.get("text", "")
+                        if text:
                             await _handle_message(text, chat_id)
+
+                        photo = msg.get("photo")
+                        if photo:
+                            file_id = photo[-1]["file_id"]
+                            caption = msg.get("caption", "")
+                            chat_info = {
+                                "chat_id": chat_id,
+                                "chat_title": msg.get("chat", {}).get("title", ""),
+                                "from": msg.get("from", {}).get("first_name", ""),
+                                "date": msg.get("date", 0),
+                            }
+                            meta = await download_photo(file_id, caption, chat_info)
+                            if meta:
+                                print(f"\n📸 [Image #{meta['id']}] New image received: {meta['image_path']}")
+                                if caption:
+                                    print(f"   Caption: {caption[:200]}")
+                                print(f"   Source: {chat_info.get('chat_title', 'DM')} from {chat_info.get('from', '?')}")
+                                analysis = await asyncio.to_thread(
+                                    image_analyzer.analyze_image,
+                                    meta["image_path"],
+                                    caption,
+                                )
+                                if analysis:
+                                    try:
+                                        import json as _json
+                                        parsed = _json.loads(analysis.strip().removeprefix("```json").removesuffix("```").strip())
+                                        sym = parsed.get("symbol", "?").upper()
+                                        entry = parsed.get("entry", 0)
+                                        tp = parsed.get("take_profit", 0)
+                                        sl = parsed.get("stop_loss", 0)
+                                        direction = parsed.get("direction", "BUY")
+                                        emoji = "🟢" if direction.upper() == "BUY" else "🔴"
+                                        risk = abs(entry - sl)
+                                        reward = abs(tp - entry)
+                                        rr = round(reward / risk, 2) if risk else 0
+                                        analysis_msg = (
+                                            f"{emoji} *{direction} {sym}*\n"
+                                            f"Entry: `{entry}`\n"
+                                            f"TP: `{tp}` | SL: `{sl}`\n"
+                                            f"R:R = 1:{rr}\n\n"
+                                            f"_{parsed.get('assessment', '')}_"
+                                        )
+                                    except Exception:
+                                        analysis_msg = f"🤖 AI Analysis #{meta['id']}\n\n{analysis}"
+                                    if len(analysis_msg) > 4000:
+                                        analysis_msg = analysis_msg[:3900] + "\n…(truncated)"
+                                    await telegram_notifier.send_message(analysis_msg)
+                                print(f"   Analysis sent to Telegram\n")
 
             check_counter += 1
             if check_counter >= 10:

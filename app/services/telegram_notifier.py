@@ -23,10 +23,13 @@ class TelegramNotifier:
 
     async def send_message(self, text: str, parse_mode: str = "Markdown") -> bool:
         try:
+            payload = {"chat_id": self.chat_id, "text": text}
+            if parse_mode:
+                payload["parse_mode"] = parse_mode
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(
                     f"{self.base_url}/sendMessage",
-                    json={"chat_id": self.chat_id, "text": text, "parse_mode": parse_mode},
+                    json=payload,
                 )
                 return resp.status_code == 200
         except Exception as e:

@@ -2228,7 +2228,8 @@ class StrategyBuilder:
         sym = symbol.upper()
 
         # Map symbol
-        yf_sym = f"{sym}.NS" if sym not in ('BTC', 'ETH', 'GOLD', 'SILVER') else sym
+        crypto_map = {'BTC': 'BTC-USD', 'ETH': 'ETH-USD', 'GOLD': 'GC=F', 'SILVER': 'SI=F'}
+        yf_sym = crypto_map.get(sym) or (f"{sym}.NS" if sym not in crypto_map else sym)
 
         # Fetch data
         try:

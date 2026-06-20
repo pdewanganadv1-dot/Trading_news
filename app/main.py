@@ -26,6 +26,8 @@ from app.routes.strategy_marketplace import router as strategy_marketplace_route
 from app.routes.politician_trades import router as politician_trades_router
 from app.routes.options_trading import router as options_trading_router
 from app.routes.options_backtest import router as options_backtest_router
+from app.routes.crypto_trading import router as crypto_trading_router
+from app.routes.parliament_trading import router as parliament_trading_router
 from app.services.signal_monitor import get_cache_stats
 import asyncio
 
@@ -67,6 +69,10 @@ async def lifespan(app: FastAPI):
     from app.services.strategy_builder import strategy_builder_loop
     from app.services.dhanhq_service import auto_renew_loop
     from app.services.options_signal_scanner import options_signal_scanner_loop
+    from app.services.crypto_signal_scanner import crypto_signal_scanner_loop
+    from app.services.crypto_signal_tracker import crypto_tracker_loop
+    from app.services.parliament_tracker import parliament_scanner_loop
+    _safe_task(parliament_scanner_loop(), "parliament_scanner", delay=60)
     _safe_task(signal_monitor_loop(), "signal_monitor", delay=0)
     _safe_task(telegram_poll_loop(), "telegram_poll", delay=5)
     _safe_task(daily_report_loop(), "daily_report", delay=10)
@@ -77,6 +83,8 @@ async def lifespan(app: FastAPI):
     _safe_task(strategy_builder_loop(), "strategy_builder", delay=35)
     _safe_task(auto_renew_loop(), "dhan_token_renew", delay=40)
     _safe_task(options_signal_scanner_loop(), "options_signal_scanner", delay=45)
+    _safe_task(crypto_signal_scanner_loop(), "crypto_signal_scanner", delay=50)
+    _safe_task(crypto_tracker_loop(), "crypto_signal_tracker", delay=55)
     yield
     for t in _background_tasks:
         t.cancel()
@@ -136,3 +144,5 @@ app.include_router(strategy_marketplace_router)
 app.include_router(politician_trades_router)
 app.include_router(options_trading_router)
 app.include_router(options_backtest_router)
+app.include_router(crypto_trading_router)
+app.include_router(parliament_trading_router)

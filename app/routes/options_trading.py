@@ -94,11 +94,13 @@ async def get_live_signals(
 async def refresh_signal_data(symbol: str = Query("NIFTY")):
     try:
         await options_signal_service.refresh(symbol)
+        snaps = options_signal_service._snapshots_map.get(symbol.upper(), [])
+        fiidii = options_signal_service._fiidii_map.get(symbol.upper(), {})
         return {
             "status": "ok",
             "symbol": symbol,
-            "history_days": len(options_signal_service._snapshots),
-            "fiidii_days": len(options_signal_service._fiidii_cache),
+            "history_days": len(snaps),
+            "fiidii_days": len(fiidii),
         }
     except Exception as e:
         raise HTTPException(500, f"Refresh failed: {e}")
