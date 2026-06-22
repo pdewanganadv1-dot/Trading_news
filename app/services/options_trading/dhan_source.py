@@ -116,7 +116,6 @@ class DhanSource:
 
     def get_option_chain(self, symbol: str, expiry: str) -> Optional[dict]:
         sid, seg = self.resolve_fno_symbol(symbol)
-        sid, seg = self.resolve_symbol(symbol)
         dhan = self._get_dhan()
         result = dhan.option_chain(sid, seg, expiry)
         if result.get("status") != "success":

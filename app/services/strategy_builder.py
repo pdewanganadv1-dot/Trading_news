@@ -141,6 +141,22 @@ def sma(values: List[float], period: int) -> List[float]:
     return result
 
 
+def last_atr(highs: List[float], lows: List[float], closes: List[float], period: int = 14) -> float:
+    """Average True Range (last value only)."""
+    if len(highs) < period + 1:
+        return 0.0
+    tr = []
+    for i in range(1, len(highs)):
+        hl = highs[i] - lows[i]
+        hc = abs(highs[i] - closes[i - 1])
+        lc = abs(lows[i] - closes[i - 1])
+        tr.append(max(hl, hc, lc))
+    atr_val = sum(tr[:period]) / period
+    for i in range(period, len(tr)):
+        atr_val = (atr_val * (period - 1) + tr[i]) / period
+    return atr_val
+
+
 def wma(values: List[float], period: int) -> List[float]:
     """Weighted Moving Average (linear weights)."""
     if not values or period < 1:
@@ -1165,6 +1181,51 @@ def leading_trendline(o, h, l, c, v):
     return {"direction": "NEUTRAL", "value": 0}
 
 
+def leading_liqhunter(o, h, l, c, v, wick_ratio=2.0, max_bars_back=60, min_vol_ratio=0.5):
+    """
+    LiqHunter: Identifies large wick candles (wick >= 2x body) on any timeframe.
+    - Green candle + large lower wick → support level at wick low
+    - Red candle + large upper wick → resistance level at wick high
+    Signals when price sweeps past the level then closes back beyond it (liquidity grab).
+    Volume filter: current bar volume must be >= min_vol_ratio * avg volume (last 20 bars).
+    Returns {"direction": "LONG"/"SHORT"/"NEUTRAL", "value": ..., "level": ...}
+    """
+    n = len(c)
+    if n < 20:
+        return {"direction": "NEUTRAL", "value": 0}
+
+    # Volume filter: check if current volume is significant vs average
+    vol_avg = sma(v, 20)
+    if len(vol_avg) > 0 and v[-1] < min_vol_ratio * vol_avg[-1]:
+        return {"direction": "NEUTRAL", "value": 0}
+
+    last_h = h[-1]
+    last_l = l[-1]
+    last_c = c[-1]
+    start = max(0, n - max_bars_back)
+
+    for i in range(n - 2, start - 1, -1):
+        body = abs(c[i] - o[i])
+        if body < 1e-10:
+            continue
+        upper_wick = h[i] - max(c[i], o[i])
+        lower_wick = min(c[i], o[i]) - l[i]
+
+        # Bullish: green candle, lower wick >= wick_ratio * body
+        if c[i] > o[i] and lower_wick >= wick_ratio * body:
+            level = l[i]
+            if last_l <= level and last_c > level:
+                return {"direction": "LONG", "value": 1, "level": round(level, 2)}
+
+        # Bearish: red candle, upper wick >= wick_ratio * body
+        elif c[i] < o[i] and upper_wick >= wick_ratio * body:
+            level = h[i]
+            if last_h >= level and last_c < level:
+                return {"direction": "SHORT", "value": -1, "level": round(level, 2)}
+
+    return {"direction": "NEUTRAL", "value": 0}
+
+
 # Map of leading indicator names to functions
 LEADING_INDICATORS: Dict[str, Callable] = {
     "Range Filter": leading_rangefilter,
@@ -1210,6 +1271,8 @@ LEADING_INDICATORS: Dict[str, Callable] = {
     "FVG": leading_fvg,
     "Order Blocks": leading_order_blocks,
     "Trendline": leading_trendline,
+    # ── LiqHunter ──
+    "LiqHunter": leading_liqhunter,
 }
 
 LEADING_NAMES = list(LEADING_INDICATORS.keys())
@@ -1829,6 +1892,11 @@ class StrategyBuilder:
             "confirmations": ["EMA 20", "MACD", "RSI", "Volume", "Price Action"],
             "threshold": 2,
         },
+        "LiqHunter": {
+            "leading": "LiqHunter",
+            "confirmations": ["Price Action"],
+            "threshold": 1,
+        },
     }
 
     """
@@ -1856,6 +1924,7 @@ class StrategyBuilder:
         self.sl_pct = 5.0  # stop-loss % (fixed, not trailing)
         self.tp_pct = 0.0  # take-profit % (0 = disabled)
         self.trailing_sl = False  # fixed stop-loss (outperforms trailing on daily)
+        self.atr_sl_mult = 0.0  # if > 0, use ATR * mult instead of sl_pct %
         self.stock_whitelist: List[str] = []  # empty = allow all
         self.whitelist_only: bool = False  # enforce whitelist when True
         self.stock_blocklist: List[str] = []  # explicitly blocked stocks
@@ -2388,19 +2457,24 @@ class StrategyBuilder:
 
                 # Check trailing stop-loss
                 sl_hit = False
-                if self.sl_pct > 0:
+                if self.sl_pct > 0 or self.atr_sl_mult > 0:
+                    if self.atr_sl_mult > 0:
+                        atr_val = last_atr(h[:i + 1], l[:i + 1], c[:i + 1])
+                        sl_dist = max(atr_val * self.atr_sl_mult, 0.01)
+                    else:
+                        sl_dist = entry_price * self.sl_pct / 100
                     if entry_signal == "BUY":
                         if self.trailing_sl:
-                            sl_price = entry_high * (1 - self.sl_pct / 100)
+                            sl_price = entry_high - sl_dist
                         else:
-                            sl_price = entry_price * (1 - self.sl_pct / 100)
+                            sl_price = entry_price - sl_dist
                         if price <= sl_price:
                             sl_hit = True
                     else:  # SELL
                         if self.trailing_sl:
-                            sl_price = entry_low * (1 + self.sl_pct / 100)
+                            sl_price = entry_low + sl_dist
                         else:
-                            sl_price = entry_price * (1 + self.sl_pct / 100)
+                            sl_price = entry_price + sl_dist
                         if price >= sl_price:
                             sl_hit = True
 

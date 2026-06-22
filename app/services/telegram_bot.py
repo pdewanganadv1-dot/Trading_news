@@ -1350,7 +1350,7 @@ async def _auto_scalp_scan():
 async def telegram_poll_loop():
     offset = 0
     check_counter = 0
-    asyncio.create_task(_auto_scalp_scan())
+    _auto_scalp_task = asyncio.create_task(_auto_scalp_scan())
 
     while True:
         try:

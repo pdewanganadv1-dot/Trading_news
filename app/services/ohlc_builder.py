@@ -3,6 +3,7 @@
 Aggregates WebSocket ticks into 1-minute candles for strategy calculations.
 """
 import time
+import threading
 from collections import deque, defaultdict
 from typing import Dict, List, Optional
 from app.data.stocks import MONITORED_SYMBOLS_SET as _TRACKED
@@ -47,6 +48,7 @@ class OHLCBuilder:
 
     def __init__(self, max_bars: int = 100):
         self.max_bars = max_bars
+        self._lock = threading.RLock()
         # symbol -> current active minute bar
         self._current: Dict[str, MinuteBar] = {}
         # symbol -> deque of recent finalized minute bars
@@ -65,50 +67,53 @@ class OHLCBuilder:
         Process a single tick from the market feed.
         Call this for every incoming packet.
         """
-        symbol = symbol.upper()
-        if symbol not in _TRACKED:
-            return
-        ts = timestamp if timestamp else time.time()
-        minute_key = self._get_minute_key(ts)
+        with self._lock:
+            symbol = symbol.upper()
+            if symbol not in _TRACKED:
+                return
+            ts = timestamp if timestamp else time.time()
+            minute_key = self._get_minute_key(ts)
 
-        # Compute volume delta if we have cumulative volume
-        vol_delta = 0
-        if volume is not None:
-            prev_vol = self._prev_volumes.get(symbol, volume)
-            vol_delta = max(0, volume - prev_vol)
-            self._prev_volumes[symbol] = volume
+            # Compute volume delta if we have cumulative volume
+            vol_delta = 0
+            if volume is not None:
+                prev_vol = self._prev_volumes.get(symbol, volume)
+                vol_delta = max(0, volume - prev_vol)
+                self._prev_volumes[symbol] = volume
 
-        current_bar = self._current.get(symbol)
+            current_bar = self._current.get(symbol)
 
-        if current_bar is None or current_bar.minute_key != minute_key:
-            # Finalize previous bar if it exists
-            if current_bar is not None:
-                self._history[symbol].append(current_bar)
+            if current_bar is None or current_bar.minute_key != minute_key:
+                # Finalize previous bar if it exists
+                if current_bar is not None:
+                    self._history[symbol].append(current_bar)
 
-            # Start new bar
-            self._current[symbol] = MinuteBar(minute_key, price, vol_delta)
-        else:
-            # Update existing bar
-            current_bar.update(price, vol_delta)
+                # Start new bar
+                self._current[symbol] = MinuteBar(minute_key, price, vol_delta)
+            else:
+                # Update existing bar
+                current_bar.update(price, vol_delta)
 
-        self._prev_prices[symbol] = price
+            self._prev_prices[symbol] = price
 
     def get_current_bar(self, symbol: str) -> Optional[dict]:
         """Get the current (in-progress) minute bar."""
-        bar = self._current.get(symbol.upper())
-        return bar.to_dict() if bar else None
+        with self._lock:
+            bar = self._current.get(symbol.upper())
+            return bar.to_dict() if bar else None
 
     def get_bars(self, symbol: str, n: int = 50) -> List[dict]:
         """
         Get the last N finalized 1-minute bars plus the current bar.
         Returns oldest first, newest last as dicts.
         """
-        symbol = symbol.upper()
-        bars = [b.to_dict() for b in self._history.get(symbol, [])]
-        current = self._current.get(symbol)
-        if current:
-            bars = bars + [current.to_dict()]
-        return bars[-n:]
+        with self._lock:
+            symbol = symbol.upper()
+            bars = [b.to_dict() for b in self._history.get(symbol, [])]
+            current = self._current.get(symbol)
+            if current:
+                bars = bars + [current.to_dict()]
+            return bars[-n:]
 
     def get_bars_since(self, symbol: str, since_minute: int) -> List[dict]:
         """Get bars since a given minute key."""
@@ -119,26 +124,28 @@ class OHLCBuilder:
         Convert OHLC bars to lists of (opens, highs, lows, closes, volumes).
         Returns None if fewer than min_bars available.
         """
-        bars = self.get_bars(symbol, 200)
-        if len(bars) < min_bars:
-            return None
-        opens = [b["open"] for b in bars]
-        highs = [b["high"] for b in bars]
-        lows = [b["low"] for b in bars]
-        closes = [b["close"] for b in bars]
-        volumes = [b["volume"] for b in bars]
-        return opens, highs, lows, closes, volumes
+        with self._lock:
+            bars = self.get_bars(symbol, 200)
+            if len(bars) < min_bars:
+                return None
+            opens = [b["open"] for b in bars]
+            highs = [b["high"] for b in bars]
+            lows = [b["low"] for b in bars]
+            closes = [b["close"] for b in bars]
+            volumes = [b["volume"] for b in bars]
+            return opens, highs, lows, closes, volumes
 
     def get_all_symbols_with_bars(self, min_bars: int = 20) -> List[str]:
         """Get all symbols that have at least min_bars of data."""
-        result = []
-        for sym, bars in self._history.items():
-            total = len(bars)
-            if sym in self._current:
-                total += 1
-            if total >= min_bars:
-                result.append(sym)
-        return result
+        with self._lock:
+            result = []
+            for sym, bars in self._history.items():
+                total = len(bars)
+                if sym in self._current:
+                    total += 1
+                if total >= min_bars:
+                    result.append(sym)
+            return result
 
 
 # Singleton

@@ -226,7 +226,7 @@ async def debug_place_test():
     r3 = r1
 
     # 4. Get IP via SDK internal HTTP
-    dhan = _get_dhan()
+    dhan = await _get_dhan()
     try:
         r4 = await asyncio.to_thread(dhan.dhan_http.get, "/ip/getIP")
     except Exception as e:

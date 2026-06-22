@@ -29,6 +29,7 @@ def _ist_now_str() -> str:
 
 _cache_start: str = _ist_now_str()
 _initial_scan_done: bool = False
+_background_edge_tasks: list = []
 
 async def _process_symbol(symbol: str) -> None:
     """Process a single symbol: fetch data, generate signal, explain, alert."""
@@ -223,9 +224,9 @@ async def signal_monitor_loop():
             if resolve_counter >= 30:
                 resolve_counter = 0
                 await resolve_signals()
-            if edge_counter >= 15:  # Edge scan every ~150 min during market hours
+            if edge_counter >= 15:
                 edge_counter = 0
-                asyncio.ensure_future(_edge_scan())
+                _background_edge_tasks.append(asyncio.create_task(_edge_scan()))
             await asyncio.sleep(max(60, settings.signal_check_interval_seconds - elapsed))
         else:
             await asyncio.sleep(300)  # Check every 5min outside market hours

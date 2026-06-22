@@ -39,19 +39,21 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _background_tasks: list = []
 
 
-def _safe_task(coro, name: str, delay: int = 0):
-    """Create a background task that logs crashes and restarts (staggered start)."""
+def _safe_task(coro_func, name: str, delay: int = 0):
+    """Create a background task that logs crashes and restarts (staggered start).
+    Accepts a coroutine function (not a coroutine object) so it can be re-created on restart.
+    """
     async def wrapper():
         if delay:
             await asyncio.sleep(delay)
         while True:
             try:
-                await coro
+                await coro_func()
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logging.error(f"Background task '{name}' crashed: {e}", exc_info=True)
-            await asyncio.sleep(30)  # restart delay
+            await asyncio.sleep(30)
     t = asyncio.create_task(wrapper())
     _background_tasks.append(t)
     return t
@@ -72,22 +74,23 @@ async def lifespan(app: FastAPI):
     from app.services.crypto_signal_scanner import crypto_signal_scanner_loop
     from app.services.crypto_signal_tracker import crypto_tracker_loop
     from app.services.parliament_tracker import parliament_scanner_loop
-    _safe_task(parliament_scanner_loop(), "parliament_scanner", delay=60)
-    _safe_task(signal_monitor_loop(), "signal_monitor", delay=0)
-    _safe_task(telegram_poll_loop(), "telegram_poll", delay=5)
-    _safe_task(daily_report_loop(), "daily_report", delay=10)
-    _safe_task(sentiment_pipeline_loop(), "sentiment_pipeline", delay=15)
-    _safe_task(auto_update_fii_dii(), "fii_dii", delay=20)
-    _safe_task(feed_loop(), "market_feed", delay=25)
-    _safe_task(volume_spike_loop(), "volume_spike", delay=30)
-    _safe_task(strategy_builder_loop(), "strategy_builder", delay=35)
-    _safe_task(auto_renew_loop(), "dhan_token_renew", delay=40)
-    _safe_task(options_signal_scanner_loop(), "options_signal_scanner", delay=45)
-    _safe_task(crypto_signal_scanner_loop(), "crypto_signal_scanner", delay=50)
-    _safe_task(crypto_tracker_loop(), "crypto_signal_tracker", delay=55)
+    _safe_task(parliament_scanner_loop, "parliament_scanner", delay=60)
+    _safe_task(signal_monitor_loop, "signal_monitor", delay=0)
+    _safe_task(telegram_poll_loop, "telegram_poll", delay=5)
+    _safe_task(daily_report_loop, "daily_report", delay=10)
+    _safe_task(sentiment_pipeline_loop, "sentiment_pipeline", delay=15)
+    _safe_task(auto_update_fii_dii, "fii_dii", delay=20)
+    _safe_task(feed_loop, "market_feed", delay=25)
+    _safe_task(volume_spike_loop, "volume_spike", delay=30)
+    _safe_task(strategy_builder_loop, "strategy_builder", delay=35)
+    _safe_task(auto_renew_loop, "dhan_token_renew", delay=40)
+    _safe_task(options_signal_scanner_loop, "options_signal_scanner", delay=45)
+    _safe_task(crypto_signal_scanner_loop, "crypto_signal_scanner", delay=50)
+    _safe_task(crypto_tracker_loop, "crypto_signal_tracker", delay=55)
     yield
     for t in _background_tasks:
         t.cancel()
+    await asyncio.gather(*_background_tasks, return_exceptions=True)
 
 
 app = FastAPI(

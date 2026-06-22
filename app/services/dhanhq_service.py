@@ -19,6 +19,7 @@ _token_expiry: Optional[datetime] = None
 # SDK instances (lazy-init)
 _dhan_context: Optional[DhanContext] = None
 _dhan: Optional[dhanhq] = None
+_dhan_init_lock = asyncio.Lock()
 
 # Cache for security ID mapping (symbol -> security_id)
 _security_map: Dict[str, str] = {}
@@ -35,13 +36,14 @@ def _init():
 _init()
 
 
-def _get_dhan():
+async def _get_dhan():
     global _dhan_context, _dhan, _client_id, _access_token
     cid = _client_id or settings.dhan_client_id or os.environ.get("DHAN_CLIENT_ID", "")
     tok = _access_token or settings.dhan_access_token or os.environ.get("DHAN_ACCESS_TOKEN", "")
-    if _dhan is None or _dhan_context is None or _dhan_context.client_id != cid:
-        _dhan_context = DhanContext(cid, tok)
-        _dhan = dhanhq(_dhan_context)
+    async with _dhan_init_lock:
+        if _dhan is None or _dhan_context is None or _dhan_context.client_id != cid:
+            _dhan_context = DhanContext(cid, tok)
+            _dhan = dhanhq(_dhan_context)
     return _dhan
 
 
@@ -98,12 +100,13 @@ _security_map_lock = asyncio.Lock()
 
 async def ensure_security_map():
     async with _security_map_lock:
-        if not _security_map:
+        now = time.time()
+        if not _security_map or (now - _security_map_ts) > _SECURITY_MAP_TTL:
             await _load_security_map()
 
 
 async def renew_token() -> bool:
-    global _access_token, _token_expiry
+    global _access_token, _token_expiry, _dhan_context, _dhan
     cid = _client()
     token = _access_token or settings.dhan_access_token or ""
     if not token or not cid:
@@ -115,6 +118,8 @@ async def renew_token() -> bool:
         new_token = result.get("accessToken")
         if new_token:
             _access_token = new_token
+            _dhan_context = None
+            _dhan = None
             _token_expiry = datetime.now() + timedelta(hours=24)
             return True
         return False
@@ -124,7 +129,7 @@ async def renew_token() -> bool:
 
 async def get_profile() -> Optional[Dict]:
     try:
-        dhan = _get_dhan()
+        dhan = await _get_dhan()
         result = await asyncio.to_thread(
             dhan.dhan_http.get, "/profile"
         )
@@ -135,7 +140,7 @@ async def get_profile() -> Optional[Dict]:
 
 async def get_fund_limit() -> Optional[Dict]:
     try:
-        dhan = _get_dhan()
+        dhan = await _get_dhan()
         result = await asyncio.to_thread(dhan.get_fund_limits)
         return result if isinstance(result, dict) else None
     except Exception as e:
@@ -144,7 +149,7 @@ async def get_fund_limit() -> Optional[Dict]:
 
 async def get_positions() -> Optional[Dict]:
     try:
-        dhan = _get_dhan()
+        dhan = await _get_dhan()
         result = await asyncio.to_thread(dhan.get_positions)
         return result if isinstance(result, dict) else None
     except Exception as e:
@@ -153,7 +158,7 @@ async def get_positions() -> Optional[Dict]:
 
 async def get_order_book() -> Optional[Dict]:
     try:
-        dhan = _get_dhan()
+        dhan = await _get_dhan()
         result = await asyncio.to_thread(dhan.get_order_list)
         return result if isinstance(result, dict) else None
     except Exception as e:
@@ -162,7 +167,7 @@ async def get_order_book() -> Optional[Dict]:
 
 async def get_trade_book() -> Optional[Dict]:
     try:
-        dhan = _get_dhan()
+        dhan = await _get_dhan()
         result = await asyncio.to_thread(dhan.get_trade_book)
         return result if isinstance(result, dict) else None
     except Exception as e:
@@ -171,7 +176,7 @@ async def get_trade_book() -> Optional[Dict]:
 
 async def get_market_ltp(symbols: List[str]) -> Dict[str, float]:
     await ensure_security_map()
-    dhan = _get_dhan()
+    dhan = await _get_dhan()
     ids = []
     sym_map = {}
     for sym in symbols:
@@ -198,7 +203,7 @@ async def get_market_ltp(symbols: List[str]) -> Dict[str, float]:
 
 async def get_market_ohlc(symbols: List[str]) -> Dict[str, Dict]:
     await ensure_security_map()
-    dhan = _get_dhan()
+    dhan = await _get_dhan()
     ids = []
     sym_map = {}
     for sym in symbols:
@@ -246,7 +251,7 @@ async def place_order(
         return {"error": f"Security ID not found for {symbol}"}
 
     try:
-        dhan = _get_dhan()
+        dhan = await _get_dhan()
         result = await asyncio.to_thread(
             dhan.place_order,
             security_id=sid,
@@ -266,7 +271,7 @@ async def place_order(
 
 async def cancel_order(order_id: str) -> Optional[Dict]:
     try:
-        dhan = _get_dhan()
+        dhan = await _get_dhan()
         result = await asyncio.to_thread(dhan.cancel_order, order_id)
         return result if isinstance(result, dict) else {"error": "unexpected_response"}
     except Exception as e:

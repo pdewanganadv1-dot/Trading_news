@@ -166,7 +166,7 @@ async def _parse_packet(data: bytes):
         price = parsed.get("ltp", 0)
         volume = parsed.get("volume")
         ts = parsed.get("timestamp", time.time())
-        if price:
+        if price is not None:
             ohlc_builder.process_tick(symbol, price, volume=volume, timestamp=ts)
 
 

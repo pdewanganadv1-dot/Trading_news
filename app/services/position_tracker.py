@@ -5,8 +5,10 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 
+from app.config import settings
 
-POSITIONS_FILE = os.path.join(os.path.dirname(__file__), "../../data/positions.json")
+
+POSITIONS_FILE = os.path.join(settings.persistent_dir, "positions.json")
 
 
 @dataclass

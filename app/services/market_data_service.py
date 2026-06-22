@@ -252,7 +252,9 @@ class MarketDataService:
             bars = ohlc_builder.get_bars(symbol, limit * 2)
             if not bars or len(bars) < 20:
                 return None
-            step = {'5m': 5, '15m': 15, '1h': 60, '1d': 375}.get(interval, 5)
+            step = {'5m': 5, '15m': 15, '1h': 60}.get(interval)
+            if step is None:
+                return None
             grouped = []
             for i in range(0, len(bars), step):
                 chunk = bars[i:i + step]
@@ -270,8 +272,8 @@ class TechnicalIndicators:
     @staticmethod
     def _to_frame(prices: List[float]) -> pd.DataFrame:
         df = pd.DataFrame({"close": prices})
-        df["high"] = df["close"] * 1.002
-        df["low"] = df["close"] * 0.998
+        df["high"] = df["close"] * 1.008
+        df["low"] = df["close"] * 0.992
         df["open"] = df["close"].shift(1).fillna(df["close"])
         df["volume"] = 1000
         return wrap(df)

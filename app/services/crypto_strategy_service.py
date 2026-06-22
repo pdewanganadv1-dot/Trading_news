@@ -4,6 +4,7 @@ import pandas as pd
 import httpx
 from datetime import datetime
 from typing import Dict, List, Optional
+from app.config import settings
 
 SYMBOLS = ["btc", "eth"]
 BINANCE_MAP = {"btc": "BTCUSDT", "eth": "ETHUSDT"}
@@ -304,7 +305,7 @@ class CryptoStrategyService:
         return [await self.get_signal(s) for s in ALL_SYMBOLS]
 
     async def get_best_strategies(self, symbol: str = "btc") -> List[Dict]:
-        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "crypto_best_strategies.json")
+        path = os.path.join(settings.persistent_dir, "crypto_best_strategies.json")
         try:
             with open(path) as f:
                 data = json.load(f)

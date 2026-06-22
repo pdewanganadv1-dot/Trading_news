@@ -3,8 +3,9 @@ import asyncio, time, json, os, hashlib
 from datetime import datetime
 from typing import Dict, List, Optional
 from app.services.crypto_strategy_service import crypto_strategy_service
+from app.config import settings
 
-HISTORY_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "crypto_signal_history.json")
+HISTORY_FILE = os.path.join(settings.persistent_dir, "crypto_signal_history.json")
 MAX_HOLD_MINUTES = 60  # max 1 hour per signal
 MONITOR_INTERVAL = 60  # check every 60s
 

@@ -14,6 +14,7 @@ SCAN_INTERVAL = 300
 ALL_SYMBOLS = list(FNO_INDICES.keys()) + FNO_STOCKS
 
 _sent_hashes: set = set()
+_SENT_HASH_MAX = 5000
 
 
 def _signal_hash(sig: dict) -> str:
@@ -47,6 +48,8 @@ async def options_signal_scanner_loop():
                     for sig in result.get("new_signals", []):
                         h = _signal_hash(sig)
                         if h not in _sent_hashes:
+                            if len(_sent_hashes) >= _SENT_HASH_MAX:
+                                _sent_hashes.clear()
                             _sent_hashes.add(h)
                             sig["_underlying"] = result.get("underlying")
                             all_fresh.append(sig)
@@ -64,7 +67,7 @@ async def options_signal_scanner_loop():
                         f"   💰 ₹{sig['entry_price']:.1f} × {sig['qty']}\n"
                         f"   📝 {sig.get('entry_reason', '')[:80]}\n"
                     )
-                lines.append("🔗 [Dashboard](http://localhost:8000)")
+                lines.append("🔗 [Dashboard](https://trading-dashboard-e0us.onrender.com)")
                 await telegram_notifier.send_message("\n".join(lines))
 
         except Exception as e:
