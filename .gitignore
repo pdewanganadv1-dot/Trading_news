@@ -6,3 +6,8 @@ __pycache__/
 *.log
 signals.db
 data/
+node_modules/
+*.bak
+*.stale
+*.pkl
+.venv/
