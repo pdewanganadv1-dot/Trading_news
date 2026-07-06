@@ -1,0 +1,60 @@
+//@version=6
+// TP + DIY Strong — when BOTH TradersParadiseView and DIY builder give the SAME
+// signal (both buy, or both sell) on the chart's timeframe -> STRONG BUY / STRONG SELL.
+// Markers render on all history, so past signals show automatically.
+//
+// USE: add to the SAME chart as TradersParadiseView + DIY Custom Strategy Builder
+// (put chart on 5m), then Settings → "Signal Sources — BIND THESE":
+//   TP  BUY  -> TradersParadiseView: Buy Signal
+//   TP  SELL -> TradersParadiseView: Sell Signal
+//   DIY BUY  -> DIY Custom Strategy Builder: Buy Signal
+//   DIY SELL -> DIY Custom Strategy Builder: Sell Signal
+indicator('TP + DIY Strong', 'TP+DIY S', overlay=true, max_labels_count=500)
+
+grpBind = 'Signal Sources — BIND THESE'
+tpBuySrc   = input.source(close, 'TP  BUY',  group=grpBind, tooltip='Bind to TradersParadiseView → "Buy Signal"')
+tpSellSrc  = input.source(close, 'TP  SELL', group=grpBind, tooltip='Bind to TradersParadiseView → "Sell Signal"')
+diyBuySrc  = input.source(close, 'DIY BUY',  group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Buy Signal"')
+diySellSrc = input.source(close, 'DIY SELL', group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Sell Signal"')
+
+win = input.int(3, 'Both must fire within N bars', minval=0, group='Settings', tooltip='0 = exact same candle. Both TP and DIY must give the same signal within this many bars to count as STRONG.')
+
+// exact 0 -> non-zero event (never fires on a continuous series like close)
+isEvent(s) => not na(s) and s != 0 and (na(s[1]) or s[1] == 0)
+
+tpBuy   = isEvent(tpBuySrc)
+diyBuy  = isEvent(diyBuySrc)
+tpSell  = isEvent(tpSellSrc)
+diySell = isEvent(diySellSrc)
+
+bsTpBuy   = ta.barssince(tpBuy)
+bsDiyBuy  = ta.barssince(diyBuy)
+bsTpSell  = ta.barssince(tpSell)
+bsDiySell = ta.barssince(diySell)
+
+tpBuyR   = not na(bsTpBuy)   and bsTpBuy   <= win
+diyBuyR  = not na(bsDiyBuy)  and bsDiyBuy  <= win
+tpSellR  = not na(bsTpSell)  and bsTpSell  <= win
+diySellR = not na(bsDiySell) and bsDiySell <= win
+
+// STRONG = a fresh event this bar AND the other indicator also fired within the window
+strongBuy  = (tpBuy  or diyBuy)  and tpBuyR  and diyBuyR
+strongSell = (tpSell or diySell) and tpSellR and diySellR
+
+plotshape(strongBuy,  'STRONG BUY',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text='STRONG BUY',  textcolor=color.white, size=size.small)
+plotshape(strongSell, 'STRONG SELL', style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   text='STRONG SELL', textcolor=color.white, size=size.small)
+
+alertcondition(strongBuy,  'STRONG BUY',  'STRONG BUY (TP+DIY agree) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(strongSell, 'STRONG SELL', 'STRONG SELL (TP+DIY agree) {{ticker}} {{interval}} @ {{close}}')
+
+if strongBuy
+    alert('STRONG BUY (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if strongSell
+    alert('STRONG SELL (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+
+// compact status box
+if barstate.islast
+    var table t = table.new(position.middle_right, 1, 1, border_width=1)
+    txt = strongBuy ? 'STRONG BUY' : strongSell ? 'STRONG SELL' : (tpBuyR or diyBuyR) ? 'buy building...' : (tpSellR or diySellR) ? 'sell building...' : 'waiting'
+    col = strongBuy ? color.green : strongSell ? color.red : (tpBuyR or diyBuyR or tpSellR or diySellR) ? color.orange : color.gray
+    table.cell(t, 0, 0, txt, text_color=color.white, bgcolor=color.new(col, 0))
