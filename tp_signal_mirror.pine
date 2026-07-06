@@ -1,0 +1,40 @@
+//@version=6
+// TP Signal Mirror — fires on the EXACT candle TradersParadiseView prints Buy/Sell.
+// Reads TradersParadiseView's plotted Buy Signal / Sell Signal via source binding.
+//
+// USE:
+//   1. Add to the SAME chart as TradersParadiseView.
+//   2. Settings → bind:
+//        TP BUY  Signal -> TradersParadiseView: Buy Signal
+//        TP SELL Signal -> TradersParadiseView: Sell Signal
+//   3. A green BUY / red SELL prints on the exact candle TP fires. Add alerts if wanted.
+
+indicator('TP Signal Mirror', 'TP Mirror', overlay=true, max_labels_count=500)
+
+buySrc  = input.source(close, 'TP  BUY  Signal', tooltip='Bind to TradersParadiseView → "Buy Signal"')
+sellSrc = input.source(close, 'TP  SELL Signal', tooltip='Bind to TradersParadiseView → "Sell Signal"')
+
+// A real event = the exact bar the source flips from 0/na to non-zero.
+// (If left unbound on default "close" it stays silent instead of firing every bar.)
+isEvent(s) => not na(s) and s != 0 and (na(s[1]) or s[1] == 0)
+
+buy  = isEvent(buySrc)
+sell = isEvent(sellSrc)
+
+plotshape(buy,  'BUY',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text='BUY',  textcolor=color.white, size=size.small)
+plotshape(sell, 'SELL', style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   text='SELL', textcolor=color.white, size=size.small)
+
+alertcondition(buy,  'TP BUY',  'TradersParadise BUY {{ticker}} {{interval}} @ {{close}}')
+alertcondition(sell, 'TP SELL', 'TradersParadise SELL {{ticker}} {{interval}} @ {{close}}')
+
+if buy
+    alert('TP BUY ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if sell
+    alert('TP SELL ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+
+// tiny status box (bottom-right)
+if barstate.islast
+    var table t = table.new(position.bottom_right, 1, 1, border_width=1)
+    txt = buy ? 'TP: BUY' : sell ? 'TP: SELL' : 'TP: waiting'
+    col = buy ? color.green : sell ? color.red : color.gray
+    table.cell(t, 0, 0, txt, text_color=color.white, bgcolor=color.new(col, 0))
