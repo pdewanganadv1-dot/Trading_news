@@ -28,6 +28,7 @@ from app.routes.options_trading import router as options_trading_router
 from app.routes.options_backtest import router as options_backtest_router
 from app.routes.crypto_trading import router as crypto_trading_router
 from app.routes.parliament_trading import router as parliament_trading_router
+from app.routes.backtest_viz import router as backtest_viz_router
 from app.services.signal_monitor import get_cache_stats
 import asyncio
 
@@ -149,3 +150,4 @@ app.include_router(options_trading_router)
 app.include_router(options_backtest_router)
 app.include_router(crypto_trading_router)
 app.include_router(parliament_trading_router)
+app.include_router(backtest_viz_router)

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backtest Visualizer</title>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0b0b12;--bg2:#14141f;--card:#1c1c2a;--border:#2a2a3e;--text:#e8e8f0;--text2:#8888a0;--green:#34d399;--red:#f87171;--blue:#4f8cff;--gold:#fbbf24}
+body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+.sidebar{width:240px;min-width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sidebar-header{padding:.8rem 1rem;border-bottom:1px solid var(--border)}
+.sidebar-header h2{font-size:.8rem;color:var(--text2);font-weight:500;margin-bottom:.4rem}
+.sidebar-header .count{font-size:.7rem;color:var(--text2)}
+#search{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);padding:.35rem .6rem;border-radius:6px;font-size:.75rem;outline:none;margin-top:.3rem}
+#search:focus{border-color:var(--blue)}
+.stock-list{flex:1;overflow-y:auto;padding:.3rem}
+.stock-list::-webkit-scrollbar{width:4px}
+.stock-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.stock-item{padding:.35rem .6rem;border-radius:6px;cursor:pointer;font-size:.75rem;color:var(--text2);transition:.1s;display:flex;align-items:center;gap:.4rem}
+.stock-item:hover{background:var(--card);color:var(--text)}
+.stock-item.active{background:var(--blue);color:#fff}
+.stock-item .tcount{font-size:.62rem;color:var(--text2);margin-left:auto}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:.8rem;padding:.5rem 1rem;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
+.topbar h1{font-size:1rem;font-weight:600;margin-right:auto}
+select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:.3rem .5rem;border-radius:6px;font-size:.75rem;outline:none}
+button{background:var(--blue);border:none;color:#fff;padding:.35rem .8rem;border-radius:6px;cursor:pointer;font-size:.75rem;font-weight:500}
+button:disabled{opacity:.5;cursor:wait}
+.stats{display:flex;gap:.4rem;flex-wrap:wrap;font-size:.7rem}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:5px;padding:.2rem .5rem;color:var(--text2);display:flex;gap:.3rem;align-items:center}
+.stat b{color:var(--text)}
+.chart-area{flex:1;position:relative;min-height:200px}
+#chart{width:100%;height:100%}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(11,11,18,.85);z-index:10;gap:.5rem;font-size:.85rem;color:var(--text2)}
+.loading .sp{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:s .6s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+.bottom{height:260px;min-height:180px;border-top:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column}
+.tabs{display:flex;flex-shrink:0;border-bottom:1px solid var(--border)}
+.tab{padding:.4rem 1rem;cursor:pointer;font-size:.75rem;color:var(--text2);border-bottom:2px solid transparent;transition:.1s}
+.tab:hover{color:var(--text)}.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tc{flex:1;overflow:auto;padding:.6rem}
+.tc::-webkit-scrollbar{width:4px}
+.tc::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.tp{display:none}.tp.active{display:block}
+table{width:100%;border-collapse:collapse;font-size:.72rem}
+th{text-align:left;padding:.3rem .4rem;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2);z-index:1}
+td{padding:.25rem .4rem;border-bottom:1px solid var(--border);color:var(--text)}
+tr:hover td{background:var(--card)}
+.g{color:var(--green);font-weight:600}.r{color:var(--red);font-weight:600}
+.tag{display:inline-block;padding:.05rem .35rem;border-radius:3px;font-size:.62rem;font-weight:500}
+.tb{background:rgba(52,211,153,.15);color:var(--green)}
+.ts{background:rgba(248,113,113,.15);color:var(--red)}
+.th{background:rgba(79,140,255,.15);color:var(--blue)}
+.tk{background:rgba(251,191,36,.15);color:var(--gold)}
+.empty{text-align:center;padding:1.5rem;color:var(--text2);font-size:.8rem}
+.eq-chart{height:180px;margin-top:.3rem}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h2>Nifty Stocks</h2>
+    <div class="count"><span id="stockCount">0</span> cached</div>
+    <input id="search" placeholder="Search..." oninput="filter()">
+  </div>
+  <div class="stock-list" id="stockList"><div class="empty">Loading...</div></div>
+</div>
+<div class="main">
+  <div class="topbar">
+    <h1 id="title">Select a stock</h1>
+    <div class="stats" id="statsBar">
+      <span class="stat">Trades: <b id="sT">—</b></span>
+      <span class="stat">WR: <b id="sW">—</b></span>
+      <span class="stat">Return: <b id="sR">—</b></span>
+    </div>
+    <select id="strategy">
+      <option value="1">Session Sweep</option>
+      <option value="3">+ EMA50</option>
+      <option value="5">+ EMA50 + Vol</option>
+      <option value="7" selected>+ EMA50 + Vol + BOS</option>
+      <option value="9">Next Open Entry</option>
+    </select>
+    <button id="runBtn" onclick="run()">Run</button>
+  </div>
+  <div class="chart-area">
+    <div id="chart"></div>
+    <div class="loading hidden" id="loading"><div class="sp"></div> Running...</div>
+  </div>
+  <div class="bottom">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('trades',this)">Trades</div>
+      <div class="tab" onclick="switchTab('equity',this)">Equity</div>
+    </div>
+    <div class="tc">
+      <div class="tp active" id="tpTrades">
+        <table><thead><tr><th>#</th><th>Dir</th><th>Entry</th><th>Exit</th><th>Entry</th><th>Exit</th><th>PnL%</th><th>Days</th><th>Reason</th><th>BE</th></tr></thead><tbody id="tbody"></tbody></table>
+        <div class="empty" id="emptyT">Run a backtest</div>
+      </div>
+      <div class="tp" id="tpEquity">
+        <canvas id="eqChart" class="eq-chart hidden"></canvas>
+        <div class="empty" id="emptyE">Run a backtest</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let chart, cs, vs, all=[], sel=null, eqChart=null;
+
+function init() {
+  const c = document.getElementById('chart');
+  chart = LightweightCharts.createChart(c, {
+    layout:{background:{type:'solid',color:'#0b0b12'},textColor:'#8888a0',fontSize:11},
+    grid:{vertLines:{color:'#1c1c2a'},horzLines:{color:'#1c1c2a'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    timeScale:{borderColor:'#2a2a3e',fixLeftEdge:true},
+    rightPriceScale:{borderColor:'#2a2a3e',scaleMargins:{top:0.05,bottom:0.25}},
+  });
+  cs = chart.addCandlestickSeries({upColor:'#34d399',downColor:'#f87171',borderDownColor:'#f87171',borderUpColor:'#34d399',wickDownColor:'#f87171',wickUpColor:'#34d399'});
+  vs = chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'',priceLineVisible:false,lastValueVisible:false});
+  vs.priceScale().applyOptions({scaleMargins:{top:0.85,bottom:0}});
+  loadStocks();
+  document.getElementById('loading').classList.add('hidden');
+}
+
+async function loadStocks() {
+  try {
+    const r = await fetch('/api/stocks');
+    const d = await r.json();
+    all = d.stocks || [];
+    document.getElementById('stockCount').textContent = all.length;
+    render(all);
+  } catch(e) {
+    document.getElementById('stockList').innerHTML = '<div class="empty">Server unreachable</div>';
+  }
+}
+function render(list) {
+  document.getElementById('stockList').innerHTML = list.map(s =>
+    `<div class="stock-item" onclick="pick('${s}',this)">${s}<span class="tcount"></span></div>`
+  ).join('');
+}
+function filter() {
+  const q = document.getElementById('search').value.toLowerCase();
+  render(all.filter(s => s.toLowerCase().includes(q)));
+}
+
+async function pick(sym, el) {
+  document.querySelectorAll('.stock-item').forEach(e => e.classList.remove('active'));
+  if (el) el.classList.add('active');
+  sel = sym;
+  document.getElementById('title').textContent = sym;
+  await run();
+}
+
+async function run() {
+  if (!sel) return;
+  const strat = document.getElementById('strategy').value;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = '...';
+  document.getElementById('loading').classList.remove('hidden');
+
+  try {
+    const r = await fetch(`/api/backtest/${sel.toLowerCase()}?strategy=${strat}`);
+    if (!r.ok) { alert('Server error: ' + r.status); return; }
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    if (!d.ohlc || !d.ohlc.length) { alert('No data'); return; }
+
+    // Render chart
+    const ohlc = d.ohlc.map(b => ({time:b.t||b.time,open:b.o||b.open,high:b.h||b.high,low:b.l||b.low,close:b.c||b.close}));
+    cs.setData(ohlc);
+    vs.setData(d.ohlc.map(b => ({time:b.t||b.time,value:b.v||b.volume,color:(b.c||b.close)>=(b.o||b.open)?'rgba(52,211,153,0.3)':'rgba(248,113,113,0.3)'})));
+
+    // Markers
+    const markers = [];
+    (d.trades||[]).forEach(t => {
+      const dir = t.d||t.direction; const ep = t.ep||t.entry_price; const xp = t.xp||t.exit_price;
+      const pnl = t.p||t.pnl_pct; const et = t.et||t.entry_ts; const xt = t.xt||t.exit_ts;
+      markers.push({time:et,position:dir==='BUY'?'belowBar':'aboveBar',color:dir==='BUY'?'#34d399':'#f87171',shape:dir==='BUY'?'arrowUp':'arrowDown',text:dir+' @'+ep});
+      markers.push({time:xt,position:dir==='BUY'?'aboveBar':'belowBar',color:pnl>0?'#34d399':'#f87171',shape:'circle',text:(pnl>0?'+':'')+pnl+'%'});
+    });
+    cs.setMarkers(markers);
+    chart.timeScale().fitContent();
+
+    // Stats
+    const s = d.summary||{};
+    document.getElementById('sT').textContent = s.trades||s.total_trades||0;
+    document.getElementById('sW').textContent = (s.wr||s.win_rate||0)+'%';
+    const ret = s.ret||s.total_return||0;
+    document.getElementById('sR').textContent = (ret>0?'+':'')+ret+'%';
+    document.getElementById('sR').style.color = ret>=0?'var(--green)':'var(--red)';
+
+    // Trades table
+    const tb = document.getElementById('tbody');
+    const tr = d.trades||[];
+    document.getElementById('emptyT').style.display = tr.length?'none':'block';
+    tb.innerHTML = tr.length ? tr.map((t,i) => {
+      const d2 = t.d||t.direction; const ep2 = t.ep||t.entry_price; const xp2 = t.xp||t.exit_price;
+      const p2 = t.p||t.pnl_pct; const bh = t.bh||t.bars_held; const r2 = t.r||t.exit_reason;
+      const be2 = t.be||t.be_triggered; const en2 = t.s||t.entry_time; const ex2 = t.x||t.exit_time;
+      return `<tr><td>${i+1}</td><td><span class="tag ${d2==='BUY'?'tb':'ts'}">${d2}</span></td><td>${en2}</td><td>${ex2}</td><td>${ep2}</td><td>${xp2}</td><td class="${p2>0?'g':'r'}">${p2>0?'+':''}${p2}%</td><td>${bh}</td><td><span class="tag ${r2==='target'?'th':'ts'}">${r2||''}</span></td><td>${be2?'✅':'—'}</td></tr>`
+    }).join('') : '';
+
+    // Equity
+    renderEquity(d.equity||[]);
+  } catch(e) {
+    alert('Error: ' + (e.message||e));
+  } finally {
+    document.getElementById('loading').classList.add('hidden');
+    btn.disabled = false; btn.textContent = 'Run';
+  }
+}
+
+function renderEquity(eq) {
+  const canvas = document.getElementById('eqChart'); const empty = document.getElementById('emptyE');
+  if (!eq||!eq.length) { canvas.classList.add('hidden'); empty.style.display='block'; return; }
+  empty.style.display='none'; canvas.classList.remove('hidden');
+  if (eqChart) eqChart.destroy();
+  eqChart = new Chart(canvas, {
+    type:'line', data:{labels:eq.map(e => new Date((e.t||e.time||0)*1000).toLocaleDateString()),
+      datasets:[{label:'Return %',data:eq.map(e => e.v||e.value),borderColor:'#4f8cff',
+        backgroundColor:'rgba(79,140,255,0.1)',fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#8888a0',maxTicksLimit:8,font:{size:10}},grid:{color:'#1c1c2a'}},
+              y:{ticks:{color:'#8888a0',font:{size:10},callback:v=>v+'%'},grid:{color:'#1c1c2a'}}}}
+  });
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.tp').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tp'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+}
+init();
+</script>
+</body>
+</html>
