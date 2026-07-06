@@ -1,0 +1,266 @@
+//@version=6
+strategy("Liquidity Sweep Strategy [ZP]", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.04, slippage=2, process_orders_on_close=false, calc_on_every_tick=false, max_bars_back=5000)
+
+//──────────────────────────────────────────────────────────────────────────────
+// INPUTS
+//──────────────────────────────────────────────────────────────────────────────
+grp1 = "══ HTF Trend Filter ══"
+htf_tf        = input.timeframe("60", "HTF timeframe", group=grp1)
+htf_ema_len   = input.int(50,  "HTF EMA length", minval=5, group=grp1)
+use_htf_bias  = input.bool(true, "Use HTF trend bias", group=grp1)
+
+grp2 = "══ Liquidity Pools — Equal Highs/Lows ══"
+pivot_len     = input.int(5, "Pivot lookback (each side)", minval=1, maxval=50, group=grp2)
+pool_tol_pct  = input.float(0.005, "Equal-level tolerance (% of price)", minval=0.0001, step=0.0001, group=grp2)
+pool_lookback = input.int(200, "Pool memory (bars)", minval=50, group=grp2)
+use_eq_levels = input.bool(true, "Use equal highs/lows (BSL/SSL)", group=grp2)
+
+grp3 = "══ Liquidity Pools — Session Levels ══"
+use_sess_levels = input.bool(true, "Use session highs/lows", group=grp3)
+sess_lookback   = input.int(5, "Session levels lookback (days)", minval=1, maxval=30, group=grp3)
+
+grp4 = "══ Sweep Confirmation ══"
+reclaim_bars    = input.int(3, "Max bars to reclaim after sweep", minval=1, maxval=10, group=grp4)
+wick_ratio_min  = input.float(0.25, "Min wick/body ratio on sweep candle", minval=0.1, maxval=1.0, group=grp4)
+require_close_in = input.bool(true, "Require close back inside level", group=grp4)
+vol_mult        = input.float(1.2, "Volume spike multiplier", minval=0.0, step=0.1, group=grp4)
+use_vol_filter  = input.bool(false, "Require volume spike on entry", group=grp4)
+
+grp5 = "══ Risk Management ══"
+rr_tp1 = input.float(1.0, "TP1 — multiple of risk (R)", minval=0.1, step=0.1, group=grp5)
+rr_tp2 = input.float(3.0, "TP2 — multiple of risk (R)", minval=0.1, step=0.1, group=grp5)
+tp1_pct = input.float(50.0, "TP1 close %", minval=1.0, maxval=99.0, group=grp5) / 100.0
+move_sl_to_be  = input.bool(true, "Move SL to breakeven after TP1", group=grp5)
+max_stop_pct   = input.float(1.5, "Max stop distance (% from entry)", minval=0.1, step=0.1, group=grp5)
+
+grp6 = "══ Session Filter (exchange TZ) ══"
+use_session_filter = input.bool(false, "Restrict to selected sessions", group=grp6)
+sess_asia   = input.session("1900-0000", "Asia", group=grp6)
+sess_london = input.session("0700-1100", "London", group=grp6)
+sess_ny     = input.session("1200-1600", "New York", group=grp6)
+
+grp7 = "══ Visuals ══"
+show_labels = input.bool(true, "Show sweep/entry labels", group=grp7)
+show_levels = input.bool(true, "Show active liquidity levels", group=grp7)
+max_levels_shown = input.int(8, "Max levels to draw", minval=2, maxval=20, group=grp7)
+
+//──────────────────────────────────────────────────────────────────────────────
+// HTF TREND BIAS
+//──────────────────────────────────────────────────────────────────────────────
+htf_ema = request.security(syminfo.tickerid, htf_tf, ta.ema(close, htf_ema_len), lookahead=barmerge.lookahead_off)
+htf_bull = close > htf_ema
+htf_bear = close < htf_ema
+
+//──────────────────────────────────────────────────────────────────────────────
+// EQUAL HIGHS / LOWS POOLS  (BSL / SSL)
+//──────────────────────────────────────────────────────────────────────────────
+ph = ta.pivothigh(high, pivot_len, pivot_len)
+pl = ta.pivotlow(low,   pivot_len, pivot_len)
+
+var float[] bsl_pool = array.new_float(0)   // buy-side liquidity (equal highs) — SHORT trigger
+var float[] ssl_pool = array.new_float(0)   // sell-side liquidity (equal lows) — LONG trigger
+var int[]   bsl_bar  = array.new_int(0)
+var int[]   ssl_bar  = array.new_int(0)
+
+// add confirmed pivots to pools
+if not na(ph)
+    array.push(bsl_pool, ph)
+    array.push(bsl_bar, bar_index - pivot_len)
+if not na(pl)
+    array.push(ssl_pool, pl)
+    array.push(ssl_bar, bar_index - pivot_len)
+
+// trim old pools
+while array.size(bsl_pool) > 0
+    first_bar_bsl = array.get(bsl_bar, 0)
+    if bar_index - first_bar_bsl > pool_lookback
+        array.shift(bsl_pool)
+        array.shift(bsl_bar)
+    else
+        break
+while array.size(ssl_pool) > 0
+    first_bar_ssl = array.get(ssl_bar, 0)
+    if bar_index - first_bar_ssl > pool_lookback
+        array.shift(ssl_pool)
+        array.shift(ssl_bar)
+    else
+        break
+
+bsl_near = array.new_float(0)
+ssl_near = array.new_float(0)
+for i = 0 to array.size(bsl_pool) - 1
+    lvl = array.get(bsl_pool, i)
+    if math.abs(high - lvl) / lvl <= pool_tol_pct * 10   // broadly near
+        array.push(bsl_near, lvl)
+for i = 0 to array.size(ssl_pool) - 1
+    lvl = array.get(ssl_pool, i)
+    if math.abs(low - lvl) / lvl <= pool_tol_pct * 10
+        array.push(ssl_near, lvl)
+
+// sweep detection on current bar
+var int   swept_bsl = 0
+var int   swept_ssl = 0
+var float swept_bsl_level = 0.0
+var float swept_ssl_level = 0.0
+
+if use_eq_levels
+    // BSL sweep: wick above any equal-high level, then close back below
+    if array.size(bsl_near) > 0
+        nearest = array.min(bsl_near)  // lowest of the equal-high cluster
+        if high > nearest and (not require_close_in or close < nearest)
+            swept_bsl := 1
+            swept_bsl_level := nearest
+    // SSL sweep: wick below any equal-low level, then close back above
+    if array.size(ssl_near) > 0
+        nearest = array.max(ssl_near)
+        if low < nearest and (not require_close_in or close > nearest)
+            swept_ssl := 1
+            swept_ssl_level := nearest
+
+//──────────────────────────────────────────────────────────────────────────────
+// SESSION HIGHS / LOWS  (Asia/London/NY)
+//──────────────────────────────────────────────────────────────────────────────
+// Track previous N completed sessions' high/low using [1] lookback on daily-ish session boxes.
+var int   swept_sess_high = 0
+var int   swept_sess_low  = 0
+var float swept_sess_high_level = 0.0
+var float swept_sess_low_level  = 0.0
+
+if use_sess_levels
+    // Asia
+    asia_high = request.security(syminfo.tickerid, "D", ta.highest(high, sess_lookback)[1], lookahead=barmerge.lookahead_on)
+    asia_low  = request.security(syminfo.tickerid, "D", ta.lowest(low,  sess_lookback)[1], lookahead=barmerge.lookahead_on)
+    if not na(asia_high) and high > asia_high and (not require_close_in or close < asia_high)
+        swept_sess_high := 1
+        swept_sess_high_level := asia_high
+    if not na(asia_low) and low < asia_low and (not require_close_in or close > asia_low)
+        swept_sess_low := 1
+        swept_sess_low_level := asia_low
+
+// Combined sweep flags
+bear_sweep = (swept_bsl == 1 or swept_sess_high == 1) and (wick_ratio_min <= 1.0)  // wick over body
+bull_sweep = (swept_ssl == 1 or swept_sess_low  == 1) and (wick_ratio_min <= 1.0)
+
+// refine: enforce wick ratio on the sweep candle (lenient OR fallback)
+body  = math.abs(close - open)
+up_wick = high - math.max(close, open)
+dn_wick = math.min(close, open) - low
+wick_ok_long  = dn_wick > body * wick_ratio_min
+wick_ok_short = up_wick > body * wick_ratio_min
+// If body is tiny (doji-like), accept the sweep on any wick
+doji_like = body < (high - low) * 0.1
+if bear_sweep
+    bear_sweep := wick_ok_short or doji_like
+if bull_sweep
+    bull_sweep := wick_ok_long or doji_like
+
+//──────────────────────────────────────────────────────────────────────────────
+// VOLUME FILTER
+//──────────────────────────────────────────────────────────────────────────────
+vol_avg   = ta.sma(volume, 20)
+vol_spike = volume >= vol_avg * vol_mult
+vol_ok    = use_vol_filter ? vol_spike : true
+
+//──────────────────────────────────────────────────────────────────────────────
+// SESSION FILTER
+//──────────────────────────────────────────────────────────────────────────────
+in_asia   = not na(time(timeframe.period, sess_asia, syminfo.timezone))
+in_london = not na(time(timeframe.period, sess_london, syminfo.timezone))
+in_ny     = not na(time(timeframe.period, sess_ny, syminfo.timezone))
+in_session = not use_session_filter or (in_asia or in_london or in_ny)
+
+//──────────────────────────────────────────────────────────────────────────────
+// COOLDOWN  — only one entry per reclaim_bars after a sweep
+//──────────────────────────────────────────────────────────────────────────────
+var int last_entry_bar = -1000
+cooldown_ok = bar_index - last_entry_bar >= reclaim_bars
+
+//──────────────────────────────────────────────────────────────────────────────
+// ENTRIES
+//──────────────────────────────────────────────────────────────────────────────
+// LONG:  after a bull sweep (SSL swept) and HTF bias is bullish OR disabled
+// SHORT: after a bear sweep (BSL swept) and HTF bias is bearish OR disabled
+
+htf_long_ok  = (not use_htf_bias) or htf_bull
+htf_short_ok = (not use_htf_bias) or htf_bear
+
+long_trigger  = bull_sweep and htf_long_ok  and vol_ok and in_session and cooldown_ok and strategy.position_size == 0
+short_trigger = bear_sweep and htf_short_ok and vol_ok and in_session and cooldown_ok and strategy.position_size == 0
+
+// Stop placement: beyond sweep wick
+var float entry_price = na
+var float stop_price  = na
+var float tp1_price   = na
+var float tp2_price   = na
+var float risk_per_unit = na
+
+if long_trigger
+    sweep_low = math.min(swept_ssl_level, swept_sess_low_level)
+    // choose the actual sweep extreme of the bar
+    extreme = low
+    entry_price := close
+    stop_price  := math.min(sweep_low, extreme) - (close * 0.0005)  // small buffer below sweep
+    risk_per_unit := entry_price - stop_price
+    if risk_per_unit <= 0 or risk_per_unit / entry_price > max_stop_pct / 100.0
+        // invalid setup, abort
+        entry_price := na
+    else
+        tp1_price := entry_price + risk_per_unit * rr_tp1
+        tp2_price := entry_price + risk_per_unit * rr_tp2
+        strategy.entry("Long", strategy.long)
+        strategy.exit("Long TP1", "Long", qty_percent=tp1_pct, limit=tp1_price, stop=stop_price)
+        strategy.exit("Long TP2", "Long", qty_percent=100 - tp1_pct, limit=tp2_price, stop=stop_price)
+        last_entry_bar := bar_index
+        if show_labels
+            label.new(bar_index, low, "LONG sweep\nSL " + str.tostring(stop_price, format.mintick), style=label.style_label_up, color=color.new(color.green, 70), textcolor=color.white, size=size.small)
+
+if short_trigger
+    sweep_high = math.max(swept_bsl_level, swept_sess_high_level)
+    extreme = high
+    entry_price := close
+    stop_price  := math.max(sweep_high, extreme) + (close * 0.0005)
+    risk_per_unit := stop_price - entry_price
+    if risk_per_unit <= 0 or risk_per_unit / entry_price > max_stop_pct / 100.0
+        entry_price := na
+    else
+        tp1_price := entry_price - risk_per_unit * rr_tp1
+        tp2_price := entry_price - risk_per_unit * rr_tp2
+        strategy.entry("Short", strategy.short)
+        strategy.exit("Short TP1", "Short", qty_percent=tp1_pct, limit=tp1_price, stop=stop_price)
+        strategy.exit("Short TP2", "Short", qty_percent=100 - tp1_pct, limit=tp2_price, stop=stop_price)
+        last_entry_bar := bar_index
+        if show_labels
+            label.new(bar_index, high, "SHORT sweep\nSL " + str.tostring(stop_price, format.mintick), style=label.style_label_down, color=color.new(color.red, 70), textcolor=color.white, size=size.small)
+
+//──────────────────────────────────────────────────────────────────────────────
+// BREAKEVEN MOVE after TP1
+//──────────────────────────────────────────────────────────────────────────────
+if move_sl_to_be and strategy.position_size > 0 and high >= tp1_price and not na(entry_price)
+    strategy.exit("Long BE", "Long", stop=entry_price + syminfo.mintick)
+if move_sl_to_be and strategy.position_size < 0 and low <= tp1_price and not na(entry_price)
+    strategy.exit("Short BE", "Short", stop=entry_price - syminfo.mintick)
+
+//──────────────────────────────────────────────────────────────────────────────
+// VISUALS — draw near-by liquidity levels
+//──────────────────────────────────────────────────────────────────────────────
+if show_levels and barstate.islast
+    drawn = 0
+    for i = array.size(bsl_near) - 1 to 0
+        if drawn >= max_levels_shown
+            break
+        lvl = array.get(bsl_near, i)
+        line.new(bar_index - 20, lvl, bar_index + 20, lvl, color=color.new(color.red, 60), style=line.style_dashed, width=1)
+        drawn += 1
+    drawn2 = 0
+    for i = array.size(ssl_near) - 1 to 0
+        if drawn2 >= max_levels_shown
+            break
+        lvl = array.get(ssl_near, i)
+        line.new(bar_index - 20, lvl, bar_index + 20, lvl, color=color.new(color.green, 60), style=line.style_dashed, width=1)
+        drawn2 += 1
+
+// HTF EMA
+plot(use_htf_bias ? htf_ema : na, "HTF EMA", color=color.new(color.orange, 30), linewidth=2)
+
+// Background for sweeps
+bgcolor(bull_sweep ? color.new(color.green, 90) : bear_sweep ? color.new(color.red, 90) : na, title="Sweep bar")

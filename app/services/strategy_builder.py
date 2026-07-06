@@ -1897,6 +1897,11 @@ class StrategyBuilder:
             "confirmations": ["Price Action"],
             "threshold": 1,
         },
+        "Liq Sweep+Composite": {
+            "leading": "Liq Sweep",
+            "confirmations": ["Volume", "Price Action", "Market Structure", "BOS/CHoCH"],
+            "threshold": 2,
+        },
     }
 
     """
