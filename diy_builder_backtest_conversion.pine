@@ -1,0 +1,92 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  DIY Custom Strategy Builder [ZP] v1  →  BACKTESTABLE STRATEGY  (2-step patch)
+// ═══════════════════════════════════════════════════════════════════════════
+//  This does NOT retype the 1,800-line body. You apply two edits to the exact
+//  DIY builder script you already have. The signal engine is untouched — we
+//  only turn it into a strategy() and trade its longCondition / shortCondition.
+//
+//  STEP 1 ─ Replace the FIRST code line of the script:
+//
+//     indicator(title='DIY Custom Strategy Builder  [ZP] - v1', shorttitle="DIY Custom Strategy Builder  [ZP] - v1", overlay=true, max_bars_back=500)
+//
+//  ...with THIS single line (keep //@version=6 above it exactly as-is):
+//
+//     strategy(title='DIY Custom Strategy Builder [ZP] - Backtest', shorttitle='DIY Builder [S]', overlay=true, max_bars_back=500, default_qty_type=strategy.percent_of_equity, default_qty_value=100, initial_capital=100000, commission_type=strategy.commission.percent, commission_value=0.03, slippage=2, pyramiding=0, calc_on_every_tick=false, process_orders_on_close=true)
+//
+//  STEP 2 ─ Paste EVERYTHING BELOW THIS BANNER at the VERY END of the script
+//           (after the last `plot(shortCondition?-100:na, ...)` line). It reads
+//           the engine's existing longCondition / shortCondition variables.
+// ═══════════════════════════════════════════════════════════════════════════
+
+
+// ───────────────────────── Backtest / Risk engine ─────────────────────────
+grpBT = "████████ Backtest / Risk ████████"
+bt_tradeDir  = input.string('Long + Short', 'Trade Direction', options=['Long + Short','Long Only','Short Only'], group=grpBT)
+bt_slMode    = input.string('Structure + ATR cap', 'Stop mode', options=['Structure + ATR cap','ATR','Fixed %'], group=grpBT)
+bt_atrLen    = input.int(14, 'Risk ATR length', minval=1, group=grpBT)
+bt_atrMult   = input.float(1.5, 'ATR stop mult', minval=0.1, step=0.1, group=grpBT)
+bt_structBuf = input.float(0.25, 'Structure buffer (xATR)', minval=0.0, step=0.05, group=grpBT)
+bt_fixedPct  = input.float(1.5, 'Fixed stop %', minval=0.1, step=0.1, group=grpBT)
+bt_rr        = input.float(2.0, 'Reward:Risk target', minval=0.2, step=0.1, group=grpBT)
+bt_useTrail  = input.bool(true, 'ATR trailing stop', group=grpBT)
+bt_trailMult = input.float(2.0, 'Trail ATR mult', minval=0.1, step=0.1, group=grpBT)
+bt_trailAct  = input.float(1.0, 'Activate trail after +R', minval=0.0, step=0.1, group=grpBT)
+bt_flip      = input.bool(true, 'Opposite signal flips position', group=grpBT)
+
+bt_allowLong  = bt_tradeDir != 'Short Only'
+bt_allowShort = bt_tradeDir != 'Long Only'
+
+bt_atr     = ta.atr(bt_atrLen)
+bt_atrRisk = bt_atrMult * bt_atr
+bt_structRiskL = math.min(math.max((close - low)  + bt_structBuf * bt_atr, 0.5 * bt_atrRisk), 2.0 * bt_atrRisk)
+bt_structRiskS = math.min(math.max((high - close) + bt_structBuf * bt_atr, 0.5 * bt_atrRisk), 2.0 * bt_atrRisk)
+bt_riskLong  = bt_slMode == 'ATR' ? bt_atrRisk : bt_slMode == 'Fixed %' ? close * bt_fixedPct / 100.0 : bt_structRiskL
+bt_riskShort = bt_slMode == 'ATR' ? bt_atrRisk : bt_slMode == 'Fixed %' ? close * bt_fixedPct / 100.0 : bt_structRiskS
+
+// entries (opposite signal reverses when bt_flip is on)
+bt_enterLong  = longCondition  and bt_allowLong  and (strategy.position_size <= 0 and (bt_flip or strategy.position_size == 0))
+bt_enterShort = shortCondition and bt_allowShort and (strategy.position_size >= 0 and (bt_flip or strategy.position_size == 0))
+
+// close on opposite signal even if the reverse direction is disallowed
+if bt_flip and shortCondition and strategy.position_size > 0 and not bt_allowShort
+    strategy.close('Long', comment='Opp')
+if bt_flip and longCondition and strategy.position_size < 0 and not bt_allowLong
+    strategy.close('Short', comment='Opp')
+
+var float bt_stop = na
+var float bt_tp   = na
+
+if bt_enterLong
+    strategy.entry('Long', strategy.long)
+    bt_stop := close - bt_riskLong
+    bt_tp   := close + bt_rr * bt_riskLong
+
+if bt_enterShort
+    strategy.entry('Short', strategy.short)
+    bt_stop := close + bt_riskShort
+    bt_tp   := close - bt_rr * bt_riskShort
+
+// manage open position: trailing + bracket exit
+if strategy.position_size > 0
+    bt_ep = strategy.position_avg_price
+    bt_r  = bt_ep - bt_stop
+    if bt_useTrail and bt_r > 0 and (close - bt_ep) >= bt_trailAct * bt_r
+        bt_stop := math.max(bt_stop, close - bt_trailMult * bt_atr)
+    strategy.exit('X-L', from_entry='Long', stop=bt_stop, limit=bt_tp)
+
+if strategy.position_size < 0
+    bt_ep = strategy.position_avg_price
+    bt_r  = bt_stop - bt_ep
+    if bt_useTrail and bt_r > 0 and (bt_ep - close) >= bt_trailAct * bt_r
+        bt_stop := math.min(bt_stop, close + bt_trailMult * bt_atr)
+    strategy.exit('X-S', from_entry='Short', stop=bt_stop, limit=bt_tp)
+
+// reset levels only when truly flat AND not entering this bar
+if strategy.position_size == 0 and not bt_enterLong and not bt_enterShort
+    bt_stop := na
+    bt_tp   := na
+// ═══════════════════════════════════════════════════════════════════════════
+//  END. The Strategy Tester tab now backtests whatever leading indicator +
+//  confirmation combo you've selected. Tune entries in the DIY groups, tune
+//  exits in the "Backtest / Risk" group.
+// ═══════════════════════════════════════════════════════════════════════════
