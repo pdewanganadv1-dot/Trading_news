@@ -1,0 +1,89 @@
+//@version=6
+// TP+DIY MTF Signals — run on the 5m chart.
+// 5m trigger: TP or DIY buy/sell fires -> small "buy"/"sell" marker.
+// HTF confirm: same-direction signal on the 15m (current/next candle) -> "BUY/SELL STRONG CONTINUE".
+//
+// USE: add to the SAME 5m chart as TradersParadiseView + DIY Custom Strategy Builder,
+// then Settings → "Signal Sources — BIND THESE":
+//   TP  BUY  -> TradersParadiseView: Buy Signal
+//   TP  SELL -> TradersParadiseView: Sell Signal
+//   DIY BUY  -> DIY Custom Strategy Builder: Buy Signal
+//   DIY SELL -> DIY Custom Strategy Builder: Sell Signal
+//
+// CAVEAT: the 15m confirmation uses request.security on the OTHER indicators' plots.
+// TradingView may RESAMPLE their 5m output rather than recompute them natively at 15m,
+// so validate the STRONG labels against history. If they look wrong, we do the MTF
+// part via the live monitor instead (sampling 5m and 15m directly).
+indicator('TP+DIY MTF Signals', 'TP+DIY MTF', overlay=true, max_labels_count=500)
+
+grpBind = 'Signal Sources — BIND THESE'
+tpBuySrc   = input.source(close, 'TP  BUY',  group=grpBind, tooltip='TradersParadiseView → Buy Signal')
+tpSellSrc  = input.source(close, 'TP  SELL', group=grpBind, tooltip='TradersParadiseView → Sell Signal')
+diyBuySrc  = input.source(close, 'DIY BUY',  group=grpBind, tooltip='DIY Custom Strategy Builder → Buy Signal')
+diySellSrc = input.source(close, 'DIY SELL', group=grpBind, tooltip='DIY Custom Strategy Builder → Sell Signal')
+
+grpCfg = 'Settings'
+htf      = input.timeframe('15', 'Confirmation timeframe', group=grpCfg)
+confBars = input.int(6, 'Bars to keep 5m signal pending for HTF confirm', minval=1, group=grpCfg, tooltip='~ current + next 15m candle = about 6 x 5m bars.')
+
+// exact 0 -> non-zero event
+isEvent(s) => not na(s) and s != 0 and (na(s[1]) or s[1] == 0)
+isOn(s)    => not na(s) and s != 0
+
+// ── 5m (chart TF) trigger events ──
+buyBase  = isEvent(tpBuySrc)  or isEvent(diyBuySrc)
+sellBase = isEvent(tpSellSrc) or isEvent(diySellSrc)
+
+// ── HTF (15m) confirmation: is a same-direction signal active on the HTF candle? ──
+buyHtfExpr  = isOn(tpBuySrc)  or isOn(diyBuySrc)
+sellHtfExpr = isOn(tpSellSrc) or isOn(diySellSrc)
+buyHtfOn  = request.security(syminfo.tickerid, htf, buyHtfExpr,  lookahead=barmerge.lookahead_off)
+sellHtfOn = request.security(syminfo.tickerid, htf, sellHtfExpr, lookahead=barmerge.lookahead_off)
+
+// ── Pending 5m signal, waiting for HTF confirm within window ──
+var int pendBuy  = -100000
+var int pendSell = -100000
+if buyBase
+    pendBuy := bar_index
+if sellBase
+    pendSell := bar_index
+buyPending  = (bar_index - pendBuy)  <= confBars
+sellPending = (bar_index - pendSell) <= confBars
+
+bool strongBuy = false
+if buyPending and buyHtfOn
+    strongBuy := true
+    pendBuy   := -100000   // consume so it fires once
+bool strongSell = false
+if sellPending and sellHtfOn
+    strongSell := true
+    pendSell  := -100000
+
+// ── Visuals ──
+plotshape(buyBase  and not strongBuy,  'BUY 5m',  style=shape.triangleup,   location=location.belowbar, color=color.new(color.teal, 0),   size=size.tiny)
+plotshape(sellBase and not strongSell, 'SELL 5m', style=shape.triangledown, location=location.abovebar, color=color.new(color.maroon, 0), size=size.tiny)
+plotshape(strongBuy,  'BUY STRONG CONTINUE',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text='BUY STRONG',  textcolor=color.white, size=size.small)
+plotshape(strongSell, 'SELL STRONG CONTINUE', style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   text='SELL STRONG', textcolor=color.white, size=size.small)
+
+// ── Alerts ──
+alertcondition(strongBuy,  'BUY STRONG CONTINUE',  'BUY STRONG CONTINUE (5m+15m) {{ticker}} @ {{close}}')
+alertcondition(strongSell, 'SELL STRONG CONTINUE', 'SELL STRONG CONTINUE (5m+15m) {{ticker}} @ {{close}}')
+alertcondition(buyBase,    '5m Buy',  '5m Buy trigger {{ticker}} @ {{close}}')
+alertcondition(sellBase,   '5m Sell', '5m Sell trigger {{ticker}} @ {{close}}')
+
+if strongBuy
+    alert('BUY STRONG CONTINUE (5m+15m) ' + syminfo.ticker + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if strongSell
+    alert('SELL STRONG CONTINUE (5m+15m) ' + syminfo.ticker + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+
+// ── Dashboard ──
+if barstate.islast
+    var table t = table.new(position.middle_right, 2, 3, border_width=1, frame_color=color.gray, frame_width=1)
+    st = strongBuy ? 'BUY STRONG' : strongSell ? 'SELL STRONG' : buyPending ? 'buy 5m (waiting 15m)' : sellPending ? 'sell 5m (waiting 15m)' : '—'
+    sc = strongBuy ? color.green : strongSell ? color.red : (buyPending or sellPending) ? color.orange : color.gray
+    table.cell(t, 0, 0, 'MTF Signal', text_color=color.white, bgcolor=color.new(color.gray, 0))
+    table.cell(t, 1, 0, st, text_color=color.white, bgcolor=color.new(sc, 0))
+    table.cell(t, 0, 1, '15m Buy on', text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(t, 1, 1, buyHtfOn ? 'YES' : 'no', text_color=color.white, bgcolor=buyHtfOn ? color.new(color.green, 30) : color.new(color.black, 20))
+    table.cell(t, 0, 2, '15m Sell on', text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(t, 1, 2, sellHtfOn ? 'YES' : 'no', text_color=color.white, bgcolor=sellHtfOn ? color.new(color.red, 30) : color.new(color.black, 20))
