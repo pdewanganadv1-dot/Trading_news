@@ -1,0 +1,341 @@
+// Confluence STRATEGY built from three LuxAlgo concepts:
+// 1) Liquidity Sweeps (trigger/timing)
+// 2) Ultimate RSI (momentum filter)
+// 3) SuperTrend Oscillator "SuperOsc" (trend filter)
+// Backtest-ready port of the "Sweep+URSI+SuperOsc" indicator.
+// Original components (c) LuxAlgo, CC BY-NC-SA 4.0. This mashup inherits that license.
+//
+// EXIT ENGINE (logical hybrid): structural sweep-level stop, bounded by ATR, RR target,
+// optional ATR trailing after +1R, and opposite confluence signals flip the position.
+
+//@version=5
+strategy('Confluence Strategy: Sweep + Ultimate RSI + SuperOsc', 'Sweep+URSI+SuperOsc [S]',
+     overlay              = true,
+     max_lines_count      = 500,
+     max_boxes_count      = 500,
+     default_qty_type     = strategy.percent_of_equity,
+     default_qty_value    = 100,
+     initial_capital      = 100000,
+     commission_type      = strategy.commission.percent,
+     commission_value     = 0.03,
+     slippage             = 2,
+     pyramiding           = 0,
+     calc_on_every_tick   = false,
+     process_orders_on_close = true)
+
+//-----------------------------------------------------------------------------}
+//Settings
+//-----------------------------------------------------------------------------{
+grpSweep = 'Liquidity Sweeps'
+len    = input.int(5, 'Swings', minval=1, group=grpSweep)
+opt    = input.string('Only Wicks', 'Sweep Type', options=['Only Wicks', 'Only Outbreaks & Retest', 'Wicks + Outbreaks & Retest'], group=grpSweep)
+showBoxes = input.bool(true, 'Show Sweep Boxes/Lines', group=grpSweep)
+
+colBl  = input.color(#089981, 'Bull ', group=grpSweep, inline='c1')
+colBr  = input.color(#f23645, 'Bear' , group=grpSweep, inline='c2')
+colBl2 = input.color(#08998180,  ''  , group=grpSweep, inline='c1')
+colBr2 = input.color(#f2364580,  ''  , group=grpSweep, inline='c2')
+
+extend = input.bool(true, 'Extend Sweep Area', group=grpSweep)
+maxB   = input.int(300, 'Max bars', minval=1, maxval=5000, group=grpSweep)
+colBl3 = input.color(#08998141, 'Bull Area', group=grpSweep)
+colBr3 = input.color(#f2364541, 'Bear Area', group=grpSweep)
+
+grpRSI = 'Ultimate RSI'
+lenRSI    = input.int(14, 'Length', minval=2, group=grpRSI)
+smoType1  = input.string('RMA', 'Method', options=['EMA', 'SMA', 'RMA', 'TMA'], group=grpRSI)
+srcRSI    = input.source(close, 'Source', group=grpRSI)
+smooth    = input.int(14, 'Signal Smoothing', minval=1, group=grpRSI)
+smoType2  = input.string('EMA', 'Signal Method', options=['EMA', 'SMA', 'RMA', 'TMA'], group=grpRSI)
+obValue   = input.float(70, 'Overbought', group=grpRSI)
+osValue   = input.float(30, 'Oversold', group=grpRSI)
+filterExtremeRSI = input.bool(true, 'Block signal if RSI already in extreme zone', group=grpRSI)
+
+grpST = 'SuperTrend Oscillator'
+lenST    = input.int(10, 'ATR Length', minval=1, group=grpST)
+multST   = input.float(2.0, 'ATR Mult', minval=0.1, group=grpST)
+smoothST = input.int(14, 'Histogram Smoothing', minval=1, group=grpST)
+
+grpConf = 'Confluence'
+requireAll = input.bool(true, 'Require ALL 3 to agree (off = majority 2-of-3)', group=grpConf)
+showTable  = input.bool(true, 'Show Status Table', group=grpConf)
+
+// ---- Backtest / Risk engine ----
+grpBT = 'Backtest / Risk'
+tradeDir  = input.string('Long + Short', 'Trade Direction', options=['Long + Short', 'Long Only', 'Short Only'], group=grpBT)
+slMode    = input.string('Structure + ATR cap', 'Stop mode', options=['Structure + ATR cap', 'ATR', 'Fixed %'], group=grpBT)
+atrLenBT  = input.int(14, 'Risk ATR length', minval=1, group=grpBT)
+atrMultSL = input.float(1.5, 'ATR stop mult', minval=0.1, step=0.1, group=grpBT)
+structBufAtr = input.float(0.25, 'Structure buffer (xATR)', minval=0.0, step=0.05, group=grpBT)
+fixedPct  = input.float(1.5, 'Fixed stop %', minval=0.1, step=0.1, group=grpBT)
+rr        = input.float(2.0, 'Reward:Risk target', minval=0.2, step=0.1, group=grpBT)
+useTrail  = input.bool(true, 'ATR trailing stop', group=grpBT)
+trailMult = input.float(2.0, 'Trail ATR mult', minval=0.1, step=0.1, group=grpBT)
+trailActR = input.float(1.0, 'Activate trail after +R', minval=0.0, step=0.1, group=grpBT)
+flipOnOpp = input.bool(true, 'Opposite signal flips position', group=grpBT)
+
+oW = opt == 'Only Wicks'
+oO = opt == 'Only Outbreaks & Retest'
+
+n = bar_index
+
+//-----------------------------------------------------------------------------}
+//UDT's (Liquidity Sweeps engine)
+//-----------------------------------------------------------------------------{
+type piv
+    float prc
+    int   bix
+    bool  brk
+    bool  mit
+    bool  tak
+    bool  wic
+    line  lin
+
+type boxBr
+    box  bx
+    line ln
+    bool br
+    int  dr
+
+var array<piv>  aPivH  = array.new<piv>(1, piv.new())
+var array<piv>  aPivL  = array.new<piv>(1, piv.new())
+var array<boxBr> aBoxBr = array.new<boxBr>(1, boxBr.new())
+
+method n(float piv) => bool out = not na(piv)
+
+method l(piv get, color c, string s='sd') =>
+    style = switch s
+        'dt' => line.style_dotted
+        'ds' => line.style_dashed
+        =>      line.style_solid
+    showBoxes ? line.new(get.bix, get.prc, n, get.prc, color=c, style=style) : na
+
+method br(piv get, color c3, color c, int d) =>
+    y1 = d == 1 ? high : get.prc
+    y2 = d == 1 ? get.prc : low
+    boxBr.new(
+     box.new(n -1, y1, n +1, y2, border_color=color.new(na, na), bgcolor=showBoxes ? c3 : na)
+     , line.new(n , y1, n, y2, color=c, width=3)
+     , false
+     , d)
+
+lnDot(y, c) => showBoxes ? line.new(n, y, n+3, y, color=c, style=line.style_dotted) : na
+
+//-----------------------------------------------------------------------------}
+//Sweep detection (flags added for confluence)
+//-----------------------------------------------------------------------------{
+bullSweepEvent = false
+bearSweepEvent = false
+
+ph = ta.pivothigh(len, len)
+pl = ta.pivotlow (len, len)
+
+if ph.n()
+    aPivH.unshift(piv.new(ph, n -len, false, false, false, false))
+
+if pl.n()
+    aPivL.unshift(piv.new(pl, n -len, false, false, false, false))
+
+for i = aPivH.size() -1 to 0
+    get = aPivH.get(i)
+    if not get.mit
+        if not get.brk
+            if close > get.prc
+                if not oW
+                    get.brk := true
+                else
+                    get.mit := true
+            if not oO and not get.wic
+                if high > get.prc and close < get.prc
+                    aBoxBr.unshift(get.br(colBr3, colBr, 1))
+                    get.l(colBr2, 'dt'), lnDot(low, colBr)
+                    get.wic := true
+                    bearSweepEvent := true
+        else
+            if close < get.prc
+                get.mit := true
+            if not oW and low < get.prc and close > get.prc
+                aBoxBr.unshift(get.br(colBl3, colBl, -1))
+                get.l(colBl2, 'ds'), lnDot(high, colBl)
+                get.tak := true
+                bullSweepEvent := true
+
+    if n - get.bix > 2000 or get.mit or get.tak
+        aPivH.remove(i).lin.delete()
+
+for i = aPivL.size() -1 to 0
+    get = aPivL.get(i)
+    if not get.mit
+        if not get.brk
+            if close < get.prc
+                if not oW
+                    get.brk := true
+                else
+                    get.mit := true
+            if not oO and not get.wic
+                if low < get.prc and close > get.prc
+                    aBoxBr.unshift(get.br(colBl3, colBl, -1))
+                    get.l(colBl2, 'dt'), lnDot(high, colBl)
+                    get.wic := true
+                    bullSweepEvent := true
+        else
+            if close > get.prc
+                get.mit := true
+            if not oW and high > get.prc and close < get.prc
+                aBoxBr.unshift(get.br(colBr3, colBr, 1))
+                get.l(colBr2, 'ds'), lnDot(low, colBr)
+                get.tak := true
+                bearSweepEvent := true
+
+    if n - get.bix > 2000 or get.mit or get.tak
+        aPivL.remove(i).lin.delete()
+
+if extend
+    for bx in aBoxBr
+        if not bx.br and n - bx.bx.get_left() -1 <= maxB
+            bx.bx.set_right(bar_index)
+            if bx.dr == -1 and close < bx.bx.get_bottom()
+                bx.br := true
+            if bx.dr ==  1 and close > bx.bx.get_top()
+                bx.br := true
+
+//-----------------------------------------------------------------------------}
+//Ultimate RSI
+//-----------------------------------------------------------------------------{
+maRSI(x, l, maType) =>
+    switch maType
+        'EMA' => ta.ema(x, l)
+        'SMA' => ta.sma(x, l)
+        'RMA' => ta.rma(x, l)
+        'TMA' => ta.sma(ta.sma(x, l), l)
+
+upperR = ta.highest(srcRSI, lenRSI)
+lowerR = ta.lowest(srcRSI, lenRSI)
+rR = upperR - lowerR
+dR = srcRSI - srcRSI[1]
+diffR = upperR > upperR[1] ? rR : lowerR < lowerR[1] ? -rR : dR
+
+numR = maRSI(diffR, lenRSI, smoType1)
+denR = maRSI(math.abs(diffR), lenRSI, smoType1)
+arsi = numR / denR * 50 + 50
+signalRSI = maRSI(arsi, smooth, smoType2)
+
+rsiBullish = arsi > signalRSI and (not filterExtremeRSI or arsi < obValue)
+rsiBearish = arsi < signalRSI and (not filterExtremeRSI or arsi > osValue)
+
+//-----------------------------------------------------------------------------}
+//SuperTrend Oscillator (SuperOsc), ported to v5
+//-----------------------------------------------------------------------------{
+atrST = ta.atr(lenST) * multST
+upST  = hl2 + atrST
+dnST  = hl2 - atrST
+
+var float upperST = upST
+var float lowerST = dnST
+upperST := close[1] < upperST[1] ? math.min(upST, upperST[1]) : upST
+lowerST := close[1] > lowerST[1] ? math.max(dnST, lowerST[1]) : dnST
+
+var int trendST = 1
+trendST := close > upperST[1] ? 1 : close < lowerST[1] ? 0 : trendST[1]
+
+Spt = trendST == 1 ? lowerST : upperST
+osc = math.max(math.min((close - Spt) / (upperST - lowerST), 1), -1)
+
+var float amaOsc = 0.0
+alphaOsc = math.pow(osc, 2) / lenST
+amaOsc := nz(amaOsc[1] + alphaOsc * (osc - amaOsc[1]), osc)
+
+oscBullish = osc > amaOsc
+oscBearish = osc < amaOsc
+
+//-----------------------------------------------------------------------------}
+//Confluence
+//-----------------------------------------------------------------------------{
+bullVotes = (rsiBullish ? 1 : 0) + (oscBullish ? 1 : 0)
+bearVotes = (rsiBearish ? 1 : 0) + (oscBearish ? 1 : 0)
+
+buySignal  = bullSweepEvent and (requireAll ? bullVotes == 2 : bullVotes >= 1)
+sellSignal = bearSweepEvent and (requireAll ? bearVotes == 2 : bearVotes >= 1)
+
+//-----------------------------------------------------------------------------}
+//Strategy entries + hybrid exit engine
+//-----------------------------------------------------------------------------{
+allowLong  = tradeDir != 'Short Only'
+allowShort = tradeDir != 'Long Only'
+
+atrBT = ta.atr(atrLenBT)
+
+// --- risk distance at signal time ---
+atrRisk       = atrMultSL * atrBT
+structRiskL   = math.min(math.max((close - low)  + structBufAtr * atrBT, 0.5 * atrRisk), 2.0 * atrRisk)
+structRiskS   = math.min(math.max((high - close) + structBufAtr * atrBT, 0.5 * atrRisk), 2.0 * atrRisk)
+riskLong  = slMode == 'ATR' ? atrRisk : slMode == 'Fixed %' ? close * fixedPct / 100.0 : structRiskL
+riskShort = slMode == 'ATR' ? atrRisk : slMode == 'Fixed %' ? close * fixedPct / 100.0 : structRiskS
+
+// --- entries (opposite signal reverses when flipOnOpp) ---
+enterLong  = buySignal  and allowLong  and (strategy.position_size <= 0 and (flipOnOpp or strategy.position_size == 0))
+enterShort = sellSignal and allowShort and (strategy.position_size >= 0 and (flipOnOpp or strategy.position_size == 0))
+
+// close on opposite signal even if the reverse direction is disallowed
+if flipOnOpp and sellSignal and strategy.position_size > 0 and not allowShort
+    strategy.close('Long', comment='Opp')
+if flipOnOpp and buySignal and strategy.position_size < 0 and not allowLong
+    strategy.close('Short', comment='Opp')
+
+var float stopLvl = na
+var float tpLvl   = na
+
+if enterLong
+    strategy.entry('Long', strategy.long)
+    stopLvl := close - riskLong
+    tpLvl   := close + rr * riskLong
+
+if enterShort
+    strategy.entry('Short', strategy.short)
+    stopLvl := close + riskShort
+    tpLvl   := close - rr * riskShort
+
+// --- manage open position: trailing + bracket exit ---
+if strategy.position_size > 0
+    ep   = strategy.position_avg_price
+    risk = ep - stopLvl
+    if useTrail and risk > 0 and (close - ep) >= trailActR * risk
+        stopLvl := math.max(stopLvl, close - trailMult * atrBT)
+    strategy.exit('X-L', from_entry='Long', stop=stopLvl, limit=tpLvl)
+
+if strategy.position_size < 0
+    ep   = strategy.position_avg_price
+    risk = stopLvl - ep
+    if useTrail and risk > 0 and (ep - close) >= trailActR * risk
+        stopLvl := math.min(stopLvl, close + trailMult * atrBT)
+    strategy.exit('X-S', from_entry='Short', stop=stopLvl, limit=tpLvl)
+
+// reset levels only when truly flat AND not entering this bar
+// (on the entry bar position_size still shows the prior state, so guard the reset)
+if strategy.position_size == 0 and not enterLong and not enterShort
+    stopLvl := na
+    tpLvl   := na
+
+//-----------------------------------------------------------------------------}
+//Plots / Alerts
+//-----------------------------------------------------------------------------{
+plotshape(buySignal,  'BUY',  style=shape.triangleup,   location=location.belowbar, color=colBl, size=size.small, text='BUY')
+plotshape(sellSignal, 'SELL', style=shape.triangledown, location=location.abovebar, color=colBr, size=size.small, text='SELL')
+
+plot(strategy.position_size != 0 ? stopLvl : na, 'Stop',   color=color.red,  style=plot.style_linebr)
+plot(strategy.position_size != 0 ? tpLvl   : na, 'Target', color=color.teal, style=plot.style_linebr)
+
+alertcondition(buySignal,  'Confluence BUY',  'Liquidity sweep + Ultimate RSI + SuperOsc bullish confluence on {{ticker}} {{interval}}')
+alertcondition(sellSignal, 'Confluence SELL', 'Liquidity sweep + Ultimate RSI + SuperOsc bearish confluence on {{ticker}} {{interval}}')
+
+if showTable
+    var table dash = table.new(position.top_right, 2, 4, border_width=1)
+    if barstate.islast
+        table.cell(dash, 0, 0, 'Sweep',    text_color=color.white, bgcolor=color.gray)
+        table.cell(dash, 1, 0, bullSweepEvent ? 'BULL' : bearSweepEvent ? 'BEAR' : '-', text_color=color.white, bgcolor=bullSweepEvent ? colBl : bearSweepEvent ? colBr : color.gray)
+        table.cell(dash, 0, 1, 'URSI',     text_color=color.white, bgcolor=color.gray)
+        table.cell(dash, 1, 1, str.tostring(arsi, '#.##'), text_color=color.white, bgcolor=rsiBullish ? colBl : rsiBearish ? colBr : color.gray)
+        table.cell(dash, 0, 2, 'SuperOsc', text_color=color.white, bgcolor=color.gray)
+        table.cell(dash, 1, 2, str.tostring(osc, '#.##'), text_color=color.white, bgcolor=oscBullish ? colBl : oscBearish ? colBr : color.gray)
+        table.cell(dash, 0, 3, 'Signal',   text_color=color.white, bgcolor=color.gray)
+        table.cell(dash, 1, 3, buySignal ? 'BUY' : sellSignal ? 'SELL' : '-', text_color=color.white, bgcolor=buySignal ? colBl : sellSignal ? colBr : color.gray)
