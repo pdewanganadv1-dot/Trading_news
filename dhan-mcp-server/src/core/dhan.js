@@ -1,12 +1,43 @@
 const BASE = 'https://api.dhan.co/v2';
 const SECURITY_CSV = 'https://images.dhan.co/api-data/api-scrip-master.csv';
 
+let _tokenFallback = null;
+let _clientIdFallback = null;
+
+async function loadFallback() {
+  if (_tokenFallback && _clientIdFallback) return;
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const os = await import('os');
+    const candidates = [
+      process.env.OPENCODE_CONFIG,
+      path.join(os.homedir(), '.config/opencode/opencode.jsonc'),
+      path.join(os.homedir(), '.config/opencode/opencode.json'),
+    ].filter(Boolean);
+    for (const p of candidates) {
+      try {
+        if (!fs.existsSync(p)) continue;
+        let raw = fs.readFileSync(p, 'utf8');
+        raw = raw.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+        const cfg = JSON.parse(raw);
+        const env = cfg?.mcp?.dhanhq?.env;
+        if (env) {
+          _tokenFallback = env.DHAN_ACCESS_TOKEN || _tokenFallback;
+          _clientIdFallback = env.DHAN_CLIENT_ID || _clientIdFallback;
+          if (_tokenFallback && _clientIdFallback) return;
+        }
+      } catch {}
+    }
+  } catch {}
+}
+
 function headers() {
   return {
-    'access-token': process.env.DHAN_ACCESS_TOKEN || '',
+    'access-token': process.env.DHAN_ACCESS_TOKEN || _tokenFallback || '',
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    'client-id': process.env.DHAN_CLIENT_ID || '',
+    'client-id': process.env.DHAN_CLIENT_ID || _clientIdFallback || '',
   };
 }
 
@@ -98,8 +129,9 @@ export function getSecurityId(symbol) {
 
 // --- Auth ---
 export async function renewToken() {
-  const token = process.env.DHAN_ACCESS_TOKEN || '';
-  const cid = process.env.DHAN_CLIENT_ID || '';
+  await loadFallback();
+  const token = process.env.DHAN_ACCESS_TOKEN || _tokenFallback || '';
+  const cid = process.env.DHAN_CLIENT_ID || _clientIdFallback || '';
   if (!token || !cid) return { success: false, error: 'Missing credentials' };
   const res = await fetch(`${BASE}/RenewToken`, {
     method: 'POST',
@@ -110,6 +142,20 @@ export async function renewToken() {
   const newToken = data.accessToken;
   if (newToken) {
     process.env.DHAN_ACCESS_TOKEN = newToken;
+    _tokenFallback = newToken;
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const os = await import('os');
+      const p = path.join(os.homedir(), '.config/opencode/opencode.jsonc');
+      if (fs.existsSync(p)) {
+        let raw = fs.readFileSync(p, 'utf8');
+        const re = /("DHAN_ACCESS_TOKEN"\s*:\s*")[^"]*(")/;
+        if (re.test(raw)) {
+          fs.writeFileSync(p, raw.replace(re, `$1${newToken}$2`));
+        }
+      }
+    } catch {}
     return { success: true, accessToken: newToken };
   }
   return { success: false, error: 'No accessToken in response' };
@@ -229,8 +275,10 @@ export async function placeOrder(symbol, qty, transactionType, productType = 'IN
   await ensureSecurityMap();
   const sid = getSecurityId(symbol);
   if (!sid) return { success: false, error: `Security ID not found for ${symbol}` };
+  await loadFallback();
+  const cid = process.env.DHAN_CLIENT_ID || _clientIdFallback || '';
   return post('/orders', {
-    dhanClientId: process.env.DHAN_CLIENT_ID || '',
+    dhanClientId: cid,
     transactionType: transactionType.toUpperCase(),
     exchangeSegment: 'NSE_EQ',
     productType: productType.toUpperCase(),
