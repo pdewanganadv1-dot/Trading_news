@@ -342,7 +342,14 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | `app/routes/debug.py` | Debug endpoints: Dhan status, IP, place-test, test-amo, cancel-order |
 | `app/main.py` | FastAPI entry, lifespan tasks, 6 new routers |
 | `render.yaml` | Render service config (Docker + persistent disk) |
+| `backtest_viz.html` | TradingView-style visual backtest dashboard with candlestick charts |
+| `backtest_viz.py` | API routes: stocks list, on-demand backtest per symbol, OHLC + trade data |
 | `backtest_batch.py` | Batch backtest: all 36 indicators on 149 stocks with win rate tracking |
+| `backtest_liquidity_optimize.py` | 18 confirmation combos × 149 stocks for liquidity sweep daily optimization |
+| `backtest_liquidity_mtf.py` | Multi-timeframe liquidity sweep: prior-day session H/L + next-open entry + confirmations |
+| `liquidity_sweep_backtest.py` | 1-min liquidity sweep backtest with prior session + swing sweeps |
+| `liquidity_sweep_daily.py` | Daily liquidity sweep backtest with swing level sweeps |
+| `liquidity_sweep_crypto.py` | Crypto & Gold 1-min liquidity sweep (BTC, ETH, GOLD, SILVER) |
 | `send_backtest_report.py` | Send backtest CSV + summary to Telegram | |
 
 ### Telegram Commands
@@ -420,3 +427,82 @@ Full-stack trading dashboard (trading_news) with Nifty 100 technical signals + G
 | ZLEMA+light (thr=2) | 40.5% | +283.7% | 9.32 | 6.94 |
 | **KAMA+light (thr=2, SL=5 fixed)** | **42.9%** | **+523.3%** | **1.31** | **1.92** |
 | **ALMA+light (thr=2, SL=5 fixed)** | **42.8%** | **+586.7%** | **1.26** | **1.93** |
+
+### June 24, 2026 — Liquidity Sweep Strategy Deep Dive + Confirmation Filter Optimization
+
+**Problem**: Liquidity sweep alone (daily, 149 stocks) has 8.2% WR, -55% return — random on its own. The sweep detects stop hunts but gets faked out constantly without filters.
+
+**Backtest 1: Confirmation Filter Optimization** (`backtest_liquidity_optimize.py`)
+- 18 combos tested across 149 stocks, 180-day daily OHLC
+- Sweep detected as: price breaks swing low/high, closes back beyond it (sellside/buyside)
+- Each combo layers EMA50 trend + volume spike + BOS/CHoCH + FVG + Order Blocks + LiqHunter
+
+**Best combos by Win Rate**:
+
+| Rank | Combo | Trades | WR | Total Return | PF |
+|------|-------|--------|----|-------------|----|
+| 1 | `ema50+vol150+bos` | 9 | **33.3%** | +5.15% | 1.64 |
+| 2 | `ema50+vol150+liqhunter` | 13 | **23.1%** | +2.71% | 1.26 |
+| 3 | `ema50+vol150` | 17 | 17.6% | -3.12% | 0.81 |
+| 4 | `ema50+bos` | 18 | 16.7% | -2.51% | 0.84 |
+| 5 | `bos_choch` | 39 | 12.8% | -21.20% | 0.44 |
+
+**Key finding**: Daily swing sweeps are noise. Even the best combo (33.3% WR) has only 9 trades — too few to be statistically significant. The core issue: sweep & rejection happen within 1 daily candle, so you enter at the close which is already the rejection.
+
+**Backtest 2: Multi-Timeframe Sweep** (`backtest_liquidity_mtf.py`)
+- Uses **prior-day session high/low** as levels (not just swing points)
+- Tests session sweeps vs swing sweeps, close-entry vs next-open entry
+- Also tests layered confirmations (EMA50 + Volume + BOS)
+
+**Results**:
+
+| Rank | Approach | Trades | WR | Total Return | PF | RR |
+|------|----------|--------|----|-------------|----|----|
+| 1 | **Session sweep, next-open entry** | 5,357 | **22.5%** | +3,626% | **2.85** | **9.83** |
+| 2 | Session + EMA50 + Vol + BOS, close | 73 | **21.9%** | +44.14% | 1.59 | 5.67 |
+| 3 | Session + EMA50 + Vol, close | 226 | 16.8% | +135.21% | 1.75 | 8.67 |
+| 4 | Session sweep, close entry | 4,924 | 10.8% | +244.05% | 1.09 | 8.98 |
+| 5 | Session + EMA50, close | 2,365 | 10.4% | +170.60% | 1.14 | 9.75 |
+
+**Critical insight from MTF backtest**:
+1. **Prior-day session H/L is the most actionable level** — gets swept frequently, clear S/R zone
+2. **Next-open entry outperforms close entry** by a wide margin (22.5% WR vs 10.8%, PF 2.85 vs 1.09) — entering at next day's open avoids the emotional close-candle noise and captures gap moves
+3. **Swing sweeps (20+ bar lookback) produce too few trades** on 180-day daily data to be useful
+4. **EMA50 + Volume + BOS confirmation** on session sweeps boosts WR from 10.8% → 21.9% (2x improvement) at the cost of fewer setups (73 vs 4,924)
+5. **The session-sweep strategy has a high RR (~9:1) but low WR** — this means big winners when they hit, but most trades lose. PF of 2.85 for v9 confirms it's profitable despite low WR.
+
+**Changes made**:
+1. **`backtest_liquidity_optimize.py`** — 18 confirmation combos × 149 stocks for daily swing sweeps
+2. **`backtest_liquidity_mtf.py`** — Multi-timeframe: prior-day session levels + entry timing + confirmations
+3. **`strategy_builder.py`** — Added `"Liq Sweep+Composite"` preset: leading=Liq Sweep, confirmations=[Volume, Price Action, Market Structure, BOS/CHoCH], threshold=2
+
+**Recommendation for live use**:
+- Best approach: **Session sweep (prior-day H/L) + next-open entry** — simple, high PF, abundant trades
+- For higher WR: add **EMA50 + Volume + BOS** confirmations (21.9% WR vs 22.5%, but fewer trades)
+- The live 1m system in `strategy_builder.py` has more data bars so sweep detection may perform better on intraday
+- Use the `"Liq Sweep+Composite"` preset on 1m data where sweep + rejection + entry can happen across multiple 1-minute bars
+
+### June 24, 2026 — Backtest Visualizer Dashboard (TradingView-style)
+
+**New**: Built a full visual backtest dashboard at `/backtest-viz` using TradingView's lightweight-charts library.
+
+**Features**:
+1. **Stock grid** (left sidebar) — searchable list of all 133 cached Nifty stocks
+2. **Candlestick chart** — lightweight-charts rendering with OHLC + volume histogram + buy/sell arrows on trades
+3. **Strategy selector** — dropdown to switch between 5 sweep variants:
+   - Session Sweep (close entry) — 31.4% WR on SBIN, 35 trades
+   - + EMA50 — 34.6% WR, 26 trades
+   - + EMA50 + Vol — best WR on SBIN
+   - + EMA50 + Vol + BOS — most selective (0 trades on SBIN)
+   - Session Sweep (next open entry) — 31.6% WR, 38 trades
+4. **Trade markers** — green arrows for BUY entries, red arrows for SELL, circles with PnL% at exits
+5. **Trade history table** — lists every trade with direction, entry/exit dates, prices, PnL%, bars held, exit reason, BE status
+6. **Equity curve** — Chart.js line chart of cumulative return
+7. **Stats bar** — live summary (total trades, WR, total return, avg PnL, avg hold)
+
+**Technical details**:
+- Route: `GET /backtest-viz` (HTML), `GET /api/backtest-viz/stocks` (JSON), `GET /api/backtest-viz/backtest/{symbol}` (OHLC + trades)
+- Uses `lightweight-charts` CDN for candlestick rendering (same library as TradingView)
+- Dark theme matching existing dashboard style
+- Backtest runs on-demand per symbol using cached 180-day daily OHLC data
+- Files: `app/routes/backtest_viz.py`, `app/templates/backtest_viz.html`

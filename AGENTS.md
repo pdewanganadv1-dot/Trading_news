@@ -117,3 +117,35 @@ BacktestConfig:
 - `app/templates/options_trading.html` — dashboard with Signals tab + Open buttons
 - `app/main.py` — lifespan wires all background tasks including scanner
 
+---
+
+## Liquidity Sweep Strategy (Equity, not Options)
+
+Separate from options trading. Tests stop-hunt sweeps on Nifty 149 stocks.
+
+### Concept
+- **Sell-side liquidity**: Price breaks below swing low/session low, triggers stop losses, closes back above → BUY
+- **Buy-side liquidity**: Price breaks above swing high/session high, closes back below → SELL
+
+### Key Backtest Results (June 24, 2026)
+
+**Daily swing-level sweeps are noise** (8-12% WR) — sweep & rejection happen inside 1 candle.
+
+**Prior-day session H/L sweeps work better**:
+
+| Approach | WR | PF | RR |
+|----------|----|----|----|
+| Session sweep, next-open entry | 22.5% | **2.85** | **9.83** |
+| Session + EMA50 + Vol + BOS | 21.9% | **1.59** | 5.67 |
+
+### Best Live Preset
+`"Liq Sweep+Composite"` in `strategy_builder.py`: leading=Liq Sweep, confirmations=[Volume, Price Action, Market Structure, BOS/CHoCH], threshold=2
+
+### Scripts
+- `backtest_liquidity_optimize.py` — 18 confirmation combo sweep test
+- `backtest_liquidity_mtf.py` — Multi-timeframe: session H/L + next-open entry
+- `liquidity_sweep_backtest.py` — 1-min sweep on 149 stocks
+- `liquidity_sweep_daily.py` — Daily sweep on 149 stocks
+- `app/services/market_structure.py` — JIT-compiled sweep/BOS/FVG/OB detection
+- See `SESSION_CONTEXT.md` for full details
+
