@@ -29,8 +29,10 @@ confirmWin = input.int(3, 'Confirmation window (bars)', minval=0, group=grpCfg, 
 showDash   = input.bool(true, 'Show dashboard', group=grpCfg)
 showWeak   = signalMode == 'Strong + Weak'
 
-// a plotted signal is "on" when it is a non-na, non-zero value
-isOn(s) => not na(s) and s != 0
+// A signal is a real EVENT only on the 0 -> non-zero transition.
+// This makes it impossible to fire on a continuous series (like close, or a price plot):
+// if a source is left unbound (default close) it simply stays silent instead of firing every bar.
+isOn(s) => not na(s) and s != 0 and (na(s[1]) or s[1] == 0)
 
 tpBuy   = isOn(tpBuySrc)
 tpSell  = isOn(tpSellSrc)
