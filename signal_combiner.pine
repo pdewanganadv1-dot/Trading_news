@@ -1,16 +1,17 @@
 //@version=6
 // Signal Combiner — fuses TradersParadiseView + DIY Custom Strategy Builder buy/sell
 // plots into ONE real-time signal. STRONG = both agree (within a window); WEAK = one fires.
-// Verified to compile clean in TradingView (Pine v6).
+// Signal Mode defaults to "Strong only". Verified compile-clean in TradingView (Pine v6).
 //
 // HOW TO USE:
-//   1. Add this to the SAME chart that has TradersParadiseView + DIY Custom Strategy Builder.
-//   2. Open Settings → "Signal Sources — BIND THESE" and bind the 4 dropdowns:
+//   1. Pine Editor → paste this → Save → "Add to chart"
+//      (add it to the SAME chart that has TradersParadiseView + DIY Custom Strategy Builder).
+//   2. Open its Settings → "Signal Sources — BIND THESE" and bind the 4 dropdowns:
 //        TradersParadise BUY  -> TradersParadiseView: Buy Signal
 //        TradersParadise SELL -> TradersParadiseView: Sell Signal
 //        DIY Builder BUY      -> DIY Custom Strategy Builder: Buy Signal
 //        DIY Builder SELL     -> DIY Custom Strategy Builder: Sell Signal
-//   3. Right-click chart → Add alert → Condition: "Signal Combiner",
+//   3. Right-click chart → Add alert → Condition: "Signal Combiner: TP + DIY",
 //      pick "STRONG BUY"/"STRONG SELL" (or "Any alert() function call" for everything).
 
 indicator('Signal Combiner: TP + DIY', 'Combiner', overlay=true, max_labels_count=500)
@@ -23,9 +24,10 @@ diyBuySrc  = input.source(close, 'DIY Builder  BUY', group=grpBind, tooltip='Bin
 diySellSrc = input.source(close, 'DIY Builder  SELL', group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Sell Signal"')
 
 grpCfg = 'Combine Settings'
+signalMode = input.string('Strong only', 'Signal Mode', options=['Strong only', 'Strong + Weak'], group=grpCfg, tooltip='Strong only = fire/alert ONLY when both indicators agree. Strong + Weak = also show single-indicator signals.')
 confirmWin = input.int(3, 'Confirmation window (bars)', minval=0, group=grpCfg, tooltip='Both must fire within this many bars of each other to count as STRONG.')
-showWeak   = input.bool(true, 'Show WEAK (single-indicator) signals', group=grpCfg)
 showDash   = input.bool(true, 'Show dashboard', group=grpCfg)
+showWeak   = signalMode == 'Strong + Weak'
 
 // a plotted signal is "on" when it is a non-na, non-zero value
 isOn(s) => not na(s) and s != 0
@@ -83,7 +85,7 @@ if showDash and barstate.islast
     combined = strongBuy ? 'STRONG BUY' : strongSell ? 'STRONG SELL' : weakBuy ? 'weak buy' : weakSell ? 'weak sell' : '—'
     combCol  = strongBuy ? color.green : strongSell ? color.red : (weakBuy or weakSell) ? color.orange : color.gray
     table.cell(t, 0, 0, 'Signal Combiner', text_color=color.white, bgcolor=color.new(color.gray, 0))
-    table.cell(t, 1, 0, '', bgcolor=color.new(color.gray, 0))
+    table.cell(t, 1, 0, signalMode == 'Strong only' ? 'STRONG only' : 'S+W', text_color=color.white, bgcolor=color.new(color.gray, 0))
     table.cell(t, 0, 1, 'TradersParadise', text_color=color.white, bgcolor=color.new(color.black, 20))
     table.cell(t, 1, 1, f_state(tpBuyR, tpSellR), text_color=color.white, bgcolor=tpBuyR ? color.new(color.green, 30) : tpSellR ? color.new(color.red, 30) : color.new(color.black, 20))
     table.cell(t, 0, 2, 'DIY Builder', text_color=color.white, bgcolor=color.new(color.black, 20))
