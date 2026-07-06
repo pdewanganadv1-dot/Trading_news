@@ -11,7 +11,10 @@
 //
 //  ...with THIS single line (keep //@version=6 above it exactly as-is):
 //
-//     strategy(title='DIY Custom Strategy Builder [ZP] - Backtest', shorttitle='DIY Builder [S]', overlay=true, max_bars_back=500, default_qty_type=strategy.percent_of_equity, default_qty_value=100, initial_capital=100000, commission_type=strategy.commission.percent, commission_value=0.03, slippage=2, pyramiding=0, calc_on_every_tick=false, process_orders_on_close=true)
+//     strategy(title='DIY Custom Strategy Builder [ZP] - Backtest', shorttitle='DIY [S]', overlay=true, max_bars_back=500, default_qty_type=strategy.percent_of_equity, default_qty_value=100, initial_capital=100000, commission_type=strategy.commission.percent, commission_value=0.03, slippage=2, pyramiding=0, calc_on_every_tick=false, process_orders_on_close=true)
+//
+//     ^ NOTE: shorttitle MUST be <= 10 chars (TradingView limit for strategies).
+//       'DIY [S]' is 7 chars. Verified to compile clean in Pine v6.
 //
 //  STEP 2 ─ Paste EVERYTHING BELOW THIS BANNER at the VERY END of the script
 //           (after the last `plot(shortCondition?-100:na, ...)` line). It reads

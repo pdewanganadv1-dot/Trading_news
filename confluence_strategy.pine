@@ -9,7 +9,7 @@
 // optional ATR trailing after +1R, and opposite confluence signals flip the position.
 
 //@version=5
-strategy('Confluence Strategy: Sweep + Ultimate RSI + SuperOsc', 'Sweep+URSI+SuperOsc [S]',
+strategy('Confluence Strategy: Sweep + Ultimate RSI + SuperOsc', 'Confl [S]',
      overlay              = true,
      max_lines_count      = 500,
      max_boxes_count      = 500,
