@@ -1,0 +1,92 @@
+//@version=6
+// Signal Combiner — fuses TradersParadiseView + DIY Custom Strategy Builder buy/sell
+// plots into ONE real-time signal. STRONG = both agree (within a window); WEAK = one fires.
+// Verified to compile clean in TradingView (Pine v6).
+//
+// HOW TO USE:
+//   1. Add this to the SAME chart that has TradersParadiseView + DIY Custom Strategy Builder.
+//   2. Open Settings → "Signal Sources — BIND THESE" and bind the 4 dropdowns:
+//        TradersParadise BUY  -> TradersParadiseView: Buy Signal
+//        TradersParadise SELL -> TradersParadiseView: Sell Signal
+//        DIY Builder BUY      -> DIY Custom Strategy Builder: Buy Signal
+//        DIY Builder SELL     -> DIY Custom Strategy Builder: Sell Signal
+//   3. Right-click chart → Add alert → Condition: "Signal Combiner",
+//      pick "STRONG BUY"/"STRONG SELL" (or "Any alert() function call" for everything).
+
+indicator('Signal Combiner: TP + DIY', 'Combiner', overlay=true, max_labels_count=500)
+
+// ── Bind these to the two indicators' plots (Settings → these dropdowns) ──
+grpBind = 'Signal Sources — BIND THESE'
+tpBuySrc   = input.source(close, 'TradersParadise  BUY', group=grpBind, tooltip='Bind to TradersParadiseView → "Buy Signal"')
+tpSellSrc  = input.source(close, 'TradersParadise  SELL', group=grpBind, tooltip='Bind to TradersParadiseView → "Sell Signal"')
+diyBuySrc  = input.source(close, 'DIY Builder  BUY', group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Buy Signal"')
+diySellSrc = input.source(close, 'DIY Builder  SELL', group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Sell Signal"')
+
+grpCfg = 'Combine Settings'
+confirmWin = input.int(3, 'Confirmation window (bars)', minval=0, group=grpCfg, tooltip='Both must fire within this many bars of each other to count as STRONG.')
+showWeak   = input.bool(true, 'Show WEAK (single-indicator) signals', group=grpCfg)
+showDash   = input.bool(true, 'Show dashboard', group=grpCfg)
+
+// a plotted signal is "on" when it is a non-na, non-zero value
+isOn(s) => not na(s) and s != 0
+
+tpBuy   = isOn(tpBuySrc)
+tpSell  = isOn(tpSellSrc)
+diyBuy  = isOn(diyBuySrc)
+diySell = isOn(diySellSrc)
+
+// barssince computed once each (avoids inconsistent-calc warning)
+bsTpBuy   = ta.barssince(tpBuy)
+bsDiyBuy  = ta.barssince(diyBuy)
+bsTpSell  = ta.barssince(tpSell)
+bsDiySell = ta.barssince(diySell)
+
+tpBuyR   = not na(bsTpBuy)   and bsTpBuy   <= confirmWin
+diyBuyR  = not na(bsDiyBuy)  and bsDiyBuy  <= confirmWin
+tpSellR  = not na(bsTpSell)  and bsTpSell  <= confirmWin
+diySellR = not na(bsDiySell) and bsDiySell <= confirmWin
+
+newBuy  = tpBuy or diyBuy
+newSell = tpSell or diySell
+
+strongBuy  = newBuy  and tpBuyR  and diyBuyR
+strongSell = newSell and tpSellR and diySellR
+weakBuy    = showWeak and newBuy  and not strongBuy
+weakSell   = showWeak and newSell and not strongSell
+
+// ── Visuals ──
+plotshape(strongBuy,  'STRONG BUY',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text='STRONG BUY',  textcolor=color.white, size=size.small)
+plotshape(strongSell, 'STRONG SELL', style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   text='STRONG SELL', textcolor=color.white, size=size.small)
+plotshape(weakBuy,    'Weak Buy',    style=shape.triangleup,   location=location.belowbar, color=color.new(color.teal, 30),   size=size.tiny)
+plotshape(weakSell,   'Weak Sell',   style=shape.triangledown, location=location.abovebar, color=color.new(color.maroon, 30), size=size.tiny)
+
+// ── Alerts (manual) ──
+alertcondition(strongBuy,  'STRONG BUY',  'STRONG BUY (both agree) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(strongSell, 'STRONG SELL', 'STRONG SELL (both agree) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(weakBuy,    'Weak Buy',    'Weak Buy (one indicator) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(weakSell,   'Weak Sell',   'Weak Sell (one indicator) {{ticker}} {{interval}} @ {{close}}')
+
+// single dynamic alert — pick "Any alert() function call" in the alert dialog
+if strongBuy
+    alert('STRONG BUY (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if strongSell
+    alert('STRONG SELL (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if weakBuy
+    alert('Weak Buy (one) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if weakSell
+    alert('Weak Sell (one) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+
+// ── Dashboard ──
+f_state(b, s) => b ? '▲ BUY' : s ? '▼ SELL' : '—'
+if showDash and barstate.islast
+    var table t = table.new(position.middle_right, 2, 4, border_width=1, frame_color=color.gray, frame_width=1)
+    combined = strongBuy ? 'STRONG BUY' : strongSell ? 'STRONG SELL' : weakBuy ? 'weak buy' : weakSell ? 'weak sell' : '—'
+    combCol  = strongBuy ? color.green : strongSell ? color.red : (weakBuy or weakSell) ? color.orange : color.gray
+    table.cell(t, 0, 0, 'Signal Combiner', text_color=color.white, bgcolor=color.new(color.gray, 0))
+    table.cell(t, 1, 0, '', bgcolor=color.new(color.gray, 0))
+    table.cell(t, 0, 1, 'TradersParadise', text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(t, 1, 1, f_state(tpBuyR, tpSellR), text_color=color.white, bgcolor=tpBuyR ? color.new(color.green, 30) : tpSellR ? color.new(color.red, 30) : color.new(color.black, 20))
+    table.cell(t, 0, 2, 'DIY Builder', text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(t, 1, 2, f_state(diyBuyR, diySellR), text_color=color.white, bgcolor=diyBuyR ? color.new(color.green, 30) : diySellR ? color.new(color.red, 30) : color.new(color.black, 20))
+    table.cell(t, 0, 3, 'COMBINED', text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(t, 1, 3, combined, text_color=color.white, bgcolor=color.new(combCol, 0))
