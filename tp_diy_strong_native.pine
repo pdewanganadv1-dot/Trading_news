@@ -1,0 +1,136 @@
+//@version=6
+// TP + DIY Strong (native DIY) — TP bound as a source; DIY signal REBUILT in-script
+// so we don't depend on the DIY builder feeding its signal out (it won't).
+//
+// DIY config reproduced from your settings:
+//   Leading = Range Filter (Source Close, Period 100, Multiplier 3)
+//   Confirmation = Rational Quadratic Kernel (RQK, lookback 8, weight 8, start 25)
+//   Signal Expiry = 3 candles, Alternate Signal = ON
+//
+// USE:
+//   1. Add to the SAME chart as TradersParadiseView (DIY builder no longer needs to be read).
+//   2. Settings → "TP Sources — BIND THESE": bind ONLY the two TP dropdowns:
+//        TP BUY  -> TradersParadiseView: Buy Signal
+//        TP SELL -> TradersParadiseView: Sell Signal
+//   3. The 'DIY' debug labels should now land on the same candles as the DIY builder's
+//      long/short arrows (that's your check it matches). Where TP + DIY agree within the
+//      window -> STRONG BUY / STRONG SELL.
+indicator('TP + DIY Strong N', 'TP+DIY N', overlay=true, max_labels_count=500, max_bars_back=500)
+
+// ── TP sources (bind these two only) ──
+grpBind = 'TP Sources — BIND THESE'
+tpBuySrc  = input.source(close, 'TP  BUY',  group=grpBind, tooltip='Bind to TradersParadiseView → "Buy Signal"')
+tpSellSrc = input.source(close, 'TP  SELL', group=grpBind, tooltip='Bind to TradersParadiseView → "Sell Signal"')
+
+grpCfg = 'Settings'
+win     = input.int(3, 'Both must fire within N bars', minval=0, group=grpCfg)
+showDbg = input.bool(true, 'DEBUG: label each raw fire', group=grpCfg)
+
+// ══════════ DIY signal, rebuilt natively ══════════
+// ── Range Filter (leading) : Close, period 100, mult 3 ──
+rfSrc  = close
+rfPer  = 100
+rfMult = 3.0
+smoothrng(x, t, m) =>
+    wper = t * 2 - 1
+    avrng = ta.ema(math.abs(x - x[1]), t)
+    ta.ema(avrng, wper) * m
+smrng = smoothrng(rfSrc, rfPer, rfMult)
+rngfilt(x, rr) =>
+    rf = x
+    rf := x > nz(rf[1]) ? (x - rr < nz(rf[1]) ? nz(rf[1]) : x - rr) : (x + rr > nz(rf[1]) ? nz(rf[1]) : x + rr)
+    rf
+filt = rngfilt(rfSrc, smrng)
+var float upw = 0.0
+var float dnw = 0.0
+upw := filt > filt[1] ? nz(upw[1]) + 1 : filt < filt[1] ? 0 : nz(upw[1])
+dnw := filt < filt[1] ? nz(dnw[1]) + 1 : filt > filt[1] ? 0 : nz(dnw[1])
+rfup = (rfSrc > filt and rfSrc > rfSrc[1] and upw > 0) or (rfSrc > filt and rfSrc < rfSrc[1] and upw > 0)
+rfdn = (rfSrc < filt and rfSrc < rfSrc[1] and dnw > 0) or (rfSrc < filt and rfSrc > rfSrc[1] and dnw > 0)
+
+// ── Rational Quadratic Kernel (confirmation) : 8 / 8 / 25 ──
+rqkR  = 8.0
+rqkX0 = 25
+kreg(_src, _h) =>
+    float cw = 0.0
+    float sw = 0.0
+    for i = 0 to 1 + rqkX0
+        y = _src[i]
+        w = math.pow(1 + (math.pow(i, 2) / (math.pow(_h, 2) * 2 * rqkR)), -rqkR)
+        cw += y * w
+        sw += w
+    cw / sw
+yhat = kreg(close, 8.0)
+rqkUp = yhat[1] < yhat
+rqkDn = yhat[1] > yhat
+
+// ── Signal engine: leading + RQK confirm, expiry 3, alternate ──
+sigExpiry = 3
+leadLong  = rfup
+leadShort = rfdn
+longCond  = leadLong  and rqkUp
+shortCond = leadShort and rqkDn
+
+var int llc  = 0
+var int llc2 = 0
+var int lsc  = 0
+var int lsc2 = 0
+if leadLong
+    llc := llc + 1
+    llc2 := llc
+for i = 1 to 100
+    if leadLong[i]
+        llc := llc + 1
+        llc2 := llc
+    else
+        llc := 0
+        break
+if leadShort
+    lsc := lsc + 1
+    lsc2 := lsc
+for i = 1 to 100
+    if leadShort[i]
+        lsc := lsc + 1
+        lsc2 := lsc
+    else
+        lsc := 0
+        break
+
+var int condIni = 0
+longExp  = longCond  and llc2 <= sigExpiry
+shortExp = shortCond and lsc2 <= sigExpiry
+diyBuy   = longExp  and condIni[1] == -1
+diySell  = shortExp and condIni[1] == 1
+condIni := longExp ? 1 : shortExp ? -1 : condIni[1]
+
+// ══════════ TP detection (bound source, 0->nonzero edge) ══════════
+isEvent(s) => not na(s) and s != 0 and (na(s[1]) or s[1] == 0)
+tpBuy  = isEvent(tpBuySrc)
+tpSell = isEvent(tpSellSrc)
+
+// ══════════ Combine ══════════
+bsTpBuy   = ta.barssince(tpBuy)
+bsDiyBuy  = ta.barssince(diyBuy)
+bsTpSell  = ta.barssince(tpSell)
+bsDiySell = ta.barssince(diySell)
+tpBuyR   = not na(bsTpBuy)   and bsTpBuy   <= win
+diyBuyR  = not na(bsDiyBuy)  and bsDiyBuy  <= win
+tpSellR  = not na(bsTpSell)  and bsTpSell  <= win
+diySellR = not na(bsDiySell) and bsDiySell <= win
+strongBuy  = (tpBuy  or diyBuy)  and tpBuyR  and diyBuyR
+strongSell = (tpSell or diySell) and tpSellR and diySellR
+
+plotshape(strongBuy,  'STRONG BUY',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green,0), text='STRONG BUY',  textcolor=color.white, size=size.small)
+plotshape(strongSell, 'STRONG SELL', style=shape.labeldown, location=location.abovebar, color=color.new(color.red,0),   text='STRONG SELL', textcolor=color.white, size=size.small)
+
+plotshape(showDbg and tpBuy,   'TP buy',   style=shape.labeldown, location=location.belowbar, color=color.new(color.aqua,0),    text='TP',  textcolor=color.black, size=size.tiny)
+plotshape(showDbg and tpSell,  'TP sell',  style=shape.labelup,   location=location.abovebar, color=color.new(color.red,0),     text='tp',  textcolor=color.white, size=size.tiny)
+plotshape(showDbg and diyBuy,  'DIY buy',  style=shape.labelup,   location=location.abovebar, color=color.new(color.orange,0),  text='DIY', textcolor=color.black, size=size.tiny)
+plotshape(showDbg and diySell, 'DIY sell', style=shape.labeldown, location=location.belowbar, color=color.new(color.fuchsia,0), text='diy', textcolor=color.white, size=size.tiny)
+
+alertcondition(strongBuy,  'STRONG BUY',  'STRONG BUY (TP+DIY agree) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(strongSell, 'STRONG SELL', 'STRONG SELL (TP+DIY agree) {{ticker}} {{interval}} @ {{close}}')
+if strongBuy
+    alert('STRONG BUY (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if strongSell
+    alert('STRONG SELL (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)

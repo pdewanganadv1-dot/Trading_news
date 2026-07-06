@@ -1,0 +1,54 @@
+//@version=6
+// TP + DIY Strong (DEBUG v2) — labels each raw fire ON the candle so it's unmistakable.
+//   "TP"  (aqua, below bar)   = TradersParadise buy fired here
+//   "tp"  (red, below bar)    = TradersParadise sell fired here
+//   "DIY" (orange, above bar) = DIY buy (long) fired here
+//   "diy" (fuchsia, above bar)= DIY sell (short) fired here
+// If "TP" and "DIY" sit on the SAME candle -> they agree, and STRONG BUY must print.
+indicator('TP + DIY Strong', 'TP+DIY S', overlay=true, max_labels_count=500)
+
+grpBind = 'Signal Sources — BIND THESE'
+tpBuySrc   = input.source(close, 'TP  BUY',  group=grpBind, tooltip='Bind to TradersParadiseView → "Buy Signal"')
+tpSellSrc  = input.source(close, 'TP  SELL', group=grpBind, tooltip='Bind to TradersParadiseView → "Sell Signal"')
+diyBuySrc  = input.source(close, 'DIY BUY',  group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "long Signal"')
+diySellSrc = input.source(close, 'DIY SELL', group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Short Signal"')
+
+win     = input.int(3, 'Both must fire within N bars', minval=0, group='Settings')
+showDbg = input.bool(true, 'DEBUG: label each raw fire', group='Settings')
+
+isEvent(s) => not na(s) and s != 0 and (na(s[1]) or s[1] == 0)
+
+tpBuy   = isEvent(tpBuySrc)
+diyBuy  = isEvent(diyBuySrc)
+tpSell  = isEvent(tpSellSrc)
+diySell = isEvent(diySellSrc)
+
+bsTpBuy   = ta.barssince(tpBuy)
+bsDiyBuy  = ta.barssince(diyBuy)
+bsTpSell  = ta.barssince(tpSell)
+bsDiySell = ta.barssince(diySell)
+
+tpBuyR   = not na(bsTpBuy)   and bsTpBuy   <= win
+diyBuyR  = not na(bsDiyBuy)  and bsDiyBuy  <= win
+tpSellR  = not na(bsTpSell)  and bsTpSell  <= win
+diySellR = not na(bsDiySell) and bsDiySell <= win
+
+strongBuy  = (tpBuy  or diyBuy)  and tpBuyR  and diyBuyR
+strongSell = (tpSell or diySell) and tpSellR and diySellR
+
+plotshape(strongBuy,  'STRONG BUY',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text='STRONG BUY',  textcolor=color.white, size=size.small)
+plotshape(strongSell, 'STRONG SELL', style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   text='STRONG SELL', textcolor=color.white, size=size.small)
+
+// ── DEBUG: labeled raw fires, ON the candle ──
+plotshape(showDbg and tpBuy,   'TP buy',   style=shape.labeldown, location=location.belowbar, color=color.new(color.aqua, 0),    text='TP',  textcolor=color.black, size=size.tiny)
+plotshape(showDbg and tpSell,  'TP sell',  style=shape.labelup,   location=location.abovebar, color=color.new(color.red, 0),     text='tp',  textcolor=color.white, size=size.tiny)
+plotshape(showDbg and diyBuy,  'DIY buy',  style=shape.labelup,   location=location.abovebar, color=color.new(color.orange, 0),  text='DIY', textcolor=color.black, size=size.tiny)
+plotshape(showDbg and diySell, 'DIY sell', style=shape.labeldown, location=location.belowbar, color=color.new(color.fuchsia, 0), text='diy', textcolor=color.white, size=size.tiny)
+
+alertcondition(strongBuy,  'STRONG BUY',  'STRONG BUY (TP+DIY agree) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(strongSell, 'STRONG SELL', 'STRONG SELL (TP+DIY agree) {{ticker}} {{interval}} @ {{close}}')
+
+if strongBuy
+    alert('STRONG BUY (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if strongSell
+    alert('STRONG SELL (TP+DIY agree) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
