@@ -1,0 +1,94 @@
+//@version=6
+// TP + DIY Sequential Signals
+// First indicator to fire = SUSPECTED (small "buy?/sell?" label, tagged with who fired).
+// When the OTHER indicator confirms the SAME direction within the window = STRONG.
+//
+// USE: add to the SAME chart as TradersParadiseView + DIY Custom Strategy Builder,
+// then Settings → "Signal Sources — BIND THESE":
+//   TP  BUY  -> TradersParadiseView: Buy Signal
+//   TP  SELL -> TradersParadiseView: Sell Signal
+//   DIY BUY  -> DIY Custom Strategy Builder: Buy Signal
+//   DIY SELL -> DIY Custom Strategy Builder: Sell Signal
+indicator('TP + DIY Sequential Signals', 'TP+DIY Seq', overlay=true, max_labels_count=500)
+
+grpBind = 'Signal Sources — BIND THESE'
+tpBuySrc   = input.source(close, 'TP  BUY',  group=grpBind, tooltip='Bind to TradersParadiseView → "Buy Signal"')
+tpSellSrc  = input.source(close, 'TP  SELL', group=grpBind, tooltip='Bind to TradersParadiseView → "Sell Signal"')
+diyBuySrc  = input.source(close, 'DIY BUY',  group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Buy Signal"')
+diySellSrc = input.source(close, 'DIY SELL', group=grpBind, tooltip='Bind to DIY Custom Strategy Builder → "Sell Signal"')
+
+grpCfg = 'Settings'
+confirmWin = input.int(5, 'Confirmation window (bars)', minval=1, group=grpCfg, tooltip='After the first indicator fires, the second must confirm within this many bars to become STRONG.')
+showSusp   = input.bool(true, 'Show suspected (single-indicator) signals', group=grpCfg)
+showDash   = input.bool(true, 'Show dashboard', group=grpCfg)
+
+// event = exact bar the source flips 0/na -> non-zero (never fires on continuous series)
+isEvent(s) => not na(s) and s != 0 and (na(s[1]) or s[1] == 0)
+
+tpBuy   = isEvent(tpBuySrc)
+tpSell  = isEvent(tpSellSrc)
+diyBuy  = isEvent(diyBuySrc)
+diySell = isEvent(diySellSrc)
+
+bsTpBuy   = ta.barssince(tpBuy)
+bsTpSell  = ta.barssince(tpSell)
+bsDiyBuy  = ta.barssince(diyBuy)
+bsDiySell = ta.barssince(diySell)
+
+tpBuyR   = not na(bsTpBuy)   and bsTpBuy   <= confirmWin
+tpSellR  = not na(bsTpSell)  and bsTpSell  <= confirmWin
+diyBuyR  = not na(bsDiyBuy)  and bsDiyBuy  <= confirmWin
+diySellR = not na(bsDiySell) and bsDiySell <= confirmWin
+
+newBuy  = tpBuy  or diyBuy
+newSell = tpSell or diySell
+
+// STRONG = a fresh event this bar AND the other side already fired within the window
+strongBuy  = newBuy  and tpBuyR  and diyBuyR
+strongSell = newSell and tpSellR and diySellR
+// SUSPECTED = first mover (only one has fired within the window)
+suspBuy    = showSusp and newBuy  and not strongBuy
+suspSell   = showSusp and newSell and not strongSell
+
+buyWho  = tpBuy  ? 'TP'  : 'DIY'
+sellWho = tpSell ? 'TP'  : 'DIY'
+
+// ── STRONG markers ──
+plotshape(strongBuy,  'STRONG BUY',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text='STRONG BUY',  textcolor=color.white, size=size.small)
+plotshape(strongSell, 'STRONG SELL', style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   text='STRONG SELL', textcolor=color.white, size=size.small)
+
+// ── SUSPECTED labels (show which indicator fired first) ──
+if suspBuy
+    label.new(bar_index, low,  'buy? ' + buyWho,   yloc=yloc.belowbar, style=label.style_label_up,   color=color.new(color.green, 55), textcolor=color.white, size=size.small)
+if suspSell
+    label.new(bar_index, high, 'sell? ' + sellWho, yloc=yloc.abovebar, style=label.style_label_down, color=color.new(color.red, 55),   textcolor=color.white, size=size.small)
+
+// ── Alerts ──
+alertcondition(strongBuy,  'STRONG BUY',     'STRONG BUY (both confirm) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(strongSell, 'STRONG SELL',    'STRONG SELL (both confirm) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(suspBuy,    'Suspected Buy',  'Suspected BUY (first mover) {{ticker}} {{interval}} @ {{close}}')
+alertcondition(suspSell,   'Suspected Sell', 'Suspected SELL (first mover) {{ticker}} {{interval}} @ {{close}}')
+
+if strongBuy
+    alert('STRONG BUY (TP+DIY confirm) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if strongSell
+    alert('STRONG SELL (TP+DIY confirm) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if suspBuy
+    alert('Suspected BUY (' + buyWho + ' first) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+else if suspSell
+    alert('Suspected SELL (' + sellWho + ' first) ' + syminfo.ticker + ' ' + timeframe.period + ' @ ' + str.tostring(close), alert.freq_once_per_bar)
+
+// ── Dashboard ──
+f_state(b, s) => b ? '▲ BUY' : s ? '▼ SELL' : '—'
+if showDash and barstate.islast
+    var table t = table.new(position.middle_right, 2, 4, border_width=1, frame_color=color.gray, frame_width=1)
+    combined = strongBuy ? 'STRONG BUY' : strongSell ? 'STRONG SELL' : suspBuy ? 'buy? (' + buyWho + ')' : suspSell ? 'sell? (' + sellWho + ')' : '—'
+    combCol  = strongBuy ? color.green : strongSell ? color.red : (suspBuy or suspSell) ? color.orange : color.gray
+    table.cell(t, 0, 0, 'TP + DIY Seq', text_color=color.white, bgcolor=color.new(color.gray, 0))
+    table.cell(t, 1, 0, '', bgcolor=color.new(color.gray, 0))
+    table.cell(t, 0, 1, 'TradersParadise', text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(t, 1, 1, f_state(tpBuyR, tpSellR), text_color=color.white, bgcolor=tpBuyR ? color.new(color.green, 30) : tpSellR ? color.new(color.red, 30) : color.new(color.black, 20))
+    table.cell(t, 0, 2, 'DIY Builder', text_color=color.white, bgcolor=color.new(color.black, 20))
+    table.cell(t, 1, 2, f_state(diyBuyR, diySellR), text_color=color.white, bgcolor=diyBuyR ? color.new(color.green, 30) : diySellR ? color.new(color.red, 30) : color.new(color.black, 20))
+    table.cell(t, 0, 3, 'COMBINED', text_color=color.white, bgcolor=color.new(color.black, 0))
+    table.cell(t, 1, 3, combined, text_color=color.white, bgcolor=color.new(combCol, 0))
