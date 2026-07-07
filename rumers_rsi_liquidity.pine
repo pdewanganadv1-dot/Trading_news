@@ -1,0 +1,177 @@
+//@version=6
+// Rumers RSI + Liquidity Zones — from "The ONLY INDICATOR That Predicts Every Mega Move"
+// (The Rumers / Silvia). Built for the 1H chart; works on NQ, ES, stocks, crypto, forex.
+//
+// THE 3 RULES:
+//   1) RSI: <=30 (oversold) -> look LONG ; >=70 (overbought) -> look SHORT.
+//   2) LIQUIDITY ZONE: only act if price is AT a prior swing low (support) for longs,
+//      or a prior swing high (resistance) for shorts — where smart money fills orders.
+//   3) PITCHFORK CANDLE: after red candle(s), the first GREEN candle -> buy-stop above its
+//      high; after green candle(s), the first RED candle -> sell-stop below its low.
+//   Stop: beyond the trigger candle (or the zone). Target: the opposite liquidity level
+//   (or a Reward:Risk multiple). Trailing stop rides under/over each new candle.
+strategy('Rumers RSI + Liquidity', 'RSI+Liq', overlay=true, max_lines_count=100, default_qty_type=strategy.percent_of_equity, default_qty_value=100, initial_capital=100000, commission_type=strategy.commission.percent, commission_value=0.03, slippage=2, pyramiding=0)
+
+grpR = 'RSI'
+rsiLen = input.int(14, 'RSI Length', group=grpR)
+rsiSrc = input.source(close, 'Source', group=grpR)
+obLvl  = input.float(70, 'Overbought', group=grpR)
+osLvl  = input.float(30, 'Oversold', group=grpR)
+
+grpZ = 'Liquidity Zones'
+pivLen    = input.int(10, 'Swing lookback (pivots)', group=grpZ)
+maxLv     = input.int(6, 'Levels to keep each side', group=grpZ)
+zoneAtr   = input.float(0.6, 'Zone tolerance (xATR)', group=grpZ)
+setupBars = input.int(12, 'Setup valid for N bars', group=grpZ, tooltip='RSI must have hit OB/OS within this many bars; the pitchfork candle must appear within it.')
+
+grpE = 'Entries / Exits'
+dir      = input.string('Long + Short', 'Direction', options=['Long + Short', 'Long Only', 'Short Only'], group=grpE)
+stopMode = input.string('Candle', 'Stop at', options=['Candle', 'Zone'], group=grpE)
+stopBuf  = input.float(0.25, 'Stop buffer (xATR)', group=grpE)
+rr       = input.float(2.0, 'Reward:Risk (if no opposite level)', group=grpE)
+useTrail = input.bool(true, 'Trail stop under/over prior candle', group=grpE)
+trailBuf = input.float(0.1, 'Trail buffer (xATR)', group=grpE)
+showZones= input.bool(true, 'Draw S/R lines', group=grpE)
+
+rsi = ta.rsi(rsiSrc, rsiLen)
+atr = ta.atr(14)
+
+ph = ta.pivothigh(pivLen, pivLen)
+pl = ta.pivotlow(pivLen, pivLen)
+var array<float> resLv = array.new_float()
+var array<float> supLv = array.new_float()
+if not na(ph)
+    array.unshift(resLv, ph)
+    if array.size(resLv) > maxLv
+        array.pop(resLv)
+    if showZones
+        line.new(bar_index[pivLen], ph, bar_index + 5, ph, color=color.new(color.red, 40))
+if not na(pl)
+    array.unshift(supLv, pl)
+    if array.size(supLv) > maxLv
+        array.pop(supLv)
+    if showZones
+        line.new(bar_index[pivLen], pl, bar_index + 5, pl, color=color.new(color.green, 40))
+
+f_near(arr, px) =>
+    bool n = false
+    if array.size(arr) > 0
+        for i = 0 to array.size(arr) - 1
+            if math.abs(px - array.get(arr, i)) <= zoneAtr * atr
+                n := true
+    n
+f_above(arr, px) =>
+    float best = na
+    if array.size(arr) > 0
+        for i = 0 to array.size(arr) - 1
+            v = array.get(arr, i)
+            if v > px and (na(best) or v < best)
+                best := v
+    best
+f_below(arr, px) =>
+    float best = na
+    if array.size(arr) > 0
+        for i = 0 to array.size(arr) - 1
+            v = array.get(arr, i)
+            if v < px and (na(best) or v > best)
+                best := v
+    best
+
+atSup = f_near(supLv, low)
+atRes = f_near(resLv, high)
+osRecent = ta.lowest(rsi, setupBars) <= osLvl
+obRecent = ta.highest(rsi, setupBars) >= obLvl
+
+allowLong  = dir != 'Short Only'
+allowShort = dir != 'Long Only'
+setupLong  = allowLong  and osRecent and atSup
+setupShort = allowShort and obRecent and atRes
+
+green = close > open
+red   = close < open
+
+var float armLHi = na
+var float armLLo = na
+var int   armLBar = na
+if setupLong and green and red[1]
+    armLHi := high
+    armLLo := low
+    armLBar := bar_index
+if not na(armLBar) and bar_index - armLBar > setupBars
+    armLHi := na
+    armLLo := na
+    armLBar := na
+
+var float armSHi = na
+var float armSLo = na
+var int   armSBar = na
+if setupShort and red and green[1]
+    armSHi := high
+    armSLo := low
+    armSBar := bar_index
+if not na(armSBar) and bar_index - armSBar > setupBars
+    armSHi := na
+    armSLo := na
+    armSBar := na
+
+if not na(armLHi) and strategy.position_size <= 0
+    strategy.entry('Long', strategy.long, stop=armLHi)
+else
+    strategy.cancel('Long')
+if not na(armSLo) and strategy.position_size >= 0
+    strategy.entry('Short', strategy.short, stop=armSLo)
+else
+    strategy.cancel('Short')
+
+var float lStop = na
+var float lTP   = na
+var float sStop = na
+var float sTP   = na
+justLong  = strategy.position_size > 0 and strategy.position_size[1] <= 0
+justShort = strategy.position_size < 0 and strategy.position_size[1] >= 0
+
+if justLong
+    ep = strategy.position_avg_price
+    zb = f_below(supLv, ep)
+    base = stopMode == 'Zone' and not na(zb) ? zb : armLLo
+    lStop := base - stopBuf * atr
+    tgt = f_above(resLv, ep)
+    lTP := na(tgt) ? ep + rr * (ep - lStop) : tgt
+    armLHi := na
+    armLBar := na
+if justShort
+    ep = strategy.position_avg_price
+    za = f_above(resLv, ep)
+    base = stopMode == 'Zone' and not na(za) ? za : armSHi
+    sStop := base + stopBuf * atr
+    tgt = f_below(supLv, ep)
+    sTP := na(tgt) ? ep - rr * (sStop - ep) : tgt
+    armSHi := na
+    armSBar := na
+
+if strategy.position_size > 0
+    if useTrail
+        lStop := math.max(lStop, low[1] - trailBuf * atr)
+    strategy.exit('XL', from_entry='Long', stop=lStop, limit=lTP)
+if strategy.position_size < 0
+    if useTrail
+        sStop := math.min(sStop, high[1] + trailBuf * atr)
+    strategy.exit('XS', from_entry='Short', stop=sStop, limit=sTP)
+if strategy.position_size == 0
+    lStop := na
+    lTP := na
+    sStop := na
+    sTP := na
+
+plotshape(justLong,  'BUY',  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), text='BUY',  textcolor=color.white, size=size.tiny)
+plotshape(justShort, 'SELL', style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   text='SELL', textcolor=color.white, size=size.tiny)
+
+if barstate.islast
+    var table t = table.new(position.top_right, 2, 3, border_width=1)
+    st = strategy.position_size > 0 ? 'LONG' : strategy.position_size < 0 ? 'SHORT' : not na(armLHi) ? 'armed long' : not na(armSLo) ? 'armed short' : setupLong ? 'setup long' : setupShort ? 'setup short' : '-'
+    table.cell(t, 0, 0, 'RSI',   text_color=color.white, bgcolor=color.gray)
+    table.cell(t, 1, 0, str.tostring(rsi, '#.#'), text_color=color.white, bgcolor=rsi <= osLvl ? color.green : rsi >= obLvl ? color.red : color.gray)
+    table.cell(t, 0, 1, 'At',    text_color=color.white, bgcolor=color.gray)
+    table.cell(t, 1, 1, atSup ? 'SUPPORT' : atRes ? 'RESIST' : '-', text_color=color.white, bgcolor=atSup ? color.green : atRes ? color.red : color.gray)
+    table.cell(t, 0, 2, 'State', text_color=color.white, bgcolor=color.gray)
+    table.cell(t, 1, 2, st, text_color=color.white, bgcolor=color.new(color.blue, 20))
