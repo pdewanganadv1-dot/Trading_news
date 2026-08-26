@@ -92,7 +92,7 @@ def main():
                "typical_abs_eod_move": round(med, 3), "n_base_days": len(base)}
         for iso, tag in EXPIRIES.items():
             day = d[d.date == dt.date.fromisoformat(iso)]
-            cas_close = float(r.close_25aug) if (tag.endswith("CAS") and pd.notna(r.close_25aug)) else None
+            cas_close = float(r.close_25aug) if (tag == "aug25_CAS" and pd.notna(r.close_25aug)) else None
             m = day_metrics(day, cas_close) if len(day) else None
             if m:
                 lasthr, spike, _ = m
