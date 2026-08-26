@@ -1,0 +1,90 @@
+{
+  "n_expiries": 8,
+  "source": "real bars",
+  "sebi_stance": "SEBI (Aug 2026) sees the sharp closing moves as a maturing-market effect, not a design flaw, and expects them to ease as participation rises \u2014 participation already grew day 1 to day 2. No immediate change to CAS; a derivative-stock auction reform (\u00b13% band, live imbalance) is at consultation, not yet in force.",
+  "ordinary_weeklies": {
+    "mean_abs_move_pct": 0.066,
+    "series": [
+      {
+        "date": "2026-08-11",
+        "index": "NIFTY",
+        "abs_move_pct": 0.089
+      },
+      {
+        "date": "2026-08-18",
+        "index": "NIFTY",
+        "abs_move_pct": 0.045
+      },
+      {
+        "date": "2026-08-20",
+        "index": "SENSEX",
+        "abs_move_pct": 0.064
+      }
+    ],
+    "trend": null
+  },
+  "structural_days": {
+    "mean_abs_move_pct": 0.312,
+    "note": "monthly / first-of-regime days \u2014 structural settlement & passive flow; these do NOT decay with participation"
+  },
+  "all_series": [
+    {
+      "date": "2026-08-04",
+      "index": "NIFTY",
+      "abs_move_pct": 0.621,
+      "kind": "first-of-regime",
+      "participation_proxy": 789933755.0
+    },
+    {
+      "date": "2026-08-06",
+      "index": "SENSEX",
+      "abs_move_pct": 0.218,
+      "kind": "first-of-regime",
+      "participation_proxy": 102651200.0
+    },
+    {
+      "date": "2026-08-11",
+      "index": "NIFTY",
+      "abs_move_pct": 0.089,
+      "kind": "ordinary",
+      "participation_proxy": 976457885.0
+    },
+    {
+      "date": "2026-08-13",
+      "index": "SENSEX",
+      "abs_move_pct": 0.289,
+      "kind": "manipulated",
+      "participation_proxy": 425762240.0
+    },
+    {
+      "date": "2026-08-18",
+      "index": "NIFTY",
+      "abs_move_pct": 0.045,
+      "kind": "ordinary",
+      "participation_proxy": 1341548390.0
+    },
+    {
+      "date": "2026-08-20",
+      "index": "SENSEX",
+      "abs_move_pct": 0.064,
+      "kind": "ordinary",
+      "participation_proxy": 368267320.0
+    },
+    {
+      "date": "2026-08-25",
+      "index": "BANKNIFTY",
+      "abs_move_pct": 0.102,
+      "kind": "monthly",
+      "participation_proxy": 125303520.0
+    },
+    {
+      "date": "2026-08-25",
+      "index": "NIFTY",
+      "abs_move_pct": 0.307,
+      "kind": "monthly",
+      "participation_proxy": 892072545.0
+    }
+  ],
+  "read": "too few ordinary weeklies to call a trend yet",
+  "structural_vs_ordinary_ratio": 4.7
+}

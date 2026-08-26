@@ -57,6 +57,11 @@ def _rows_from_export(zip_path: Path) -> list[dict]:
         bars5 = build_bars5(files[f"index_5m_{idx}.csv"]); d = build_daily(files[f"index_daily_{idx}.csv"], idx)
         opt = files[f"rolling_options_{idx}.csv"].copy(); opt["ts"] = pd.to_datetime(opt["ts"])
         exp = [x for x in sorted(set(opt["ts"].dt.date)) if x >= CAS_START_DATE and x in d.index.date and bool(d.loc[pd.Timestamp(x), "is_expiry"])]
+        # drop a tail label whose scheduled weekday hasn't traded yet (same guard as cas_month_check_real)
+        from expiry_edge.calendar import _regime_weekday
+        last = d.index.max().date(); sched_wd = _regime_weekday(idx, last)[0]
+        if exp and exp[-1] == last and sched_wd is not None and last.weekday() != sched_wd:
+            exp = exp[:-1]
         for date in exp:
             pre = bars5[(bars5["date"] == date) & (bars5["ts"].dt.time <= dt.time(15, 10))]
             if not len(pre):

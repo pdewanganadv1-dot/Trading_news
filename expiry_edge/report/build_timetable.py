@@ -55,12 +55,13 @@ if cas:
         up = sum(1 for m in moves if m > 0)
         ce = [t for t in c["tickets"] if t["side"] == "CE"]; pe = [t for t in c["tickets"] if t["side"] == "PE"]; bo = [t for t in c["tickets"] if t["side"] == "BOTH"]
         sigs = [f'{d["date"]}: {", ".join(d["signals"])}' for d in c["day_rows"] if d["signals"]]
-        notes_real.append(f"{idx}: {c['days']} CAS expiry days of traded prints. The auction moved the close up on {up} of {len(moves)} days "
+        notes_real.append(f"{idx}: {c['days']} CAS expiry day{'s' if c['days'] != 1 else ''} of traded prints. The auction moved the close up on {up} of {len(moves)} day{'s' if len(moves) != 1 else ''} "
                           f"(moves {', '.join(f'{m:+.0f}' for m in moves)}). The 15:10 nearest-OTM ticket settled in profit on "
                           f"{sum(1 for t in ce if t['net_pct'] > 0)}/{len(ce)} days for calls and {sum(1 for t in pe if t['net_pct'] > 0)}/{len(pe)} for puts; "
                           f"mean {sum(t['net_pct'] for t in ce) / max(len(ce), 1):+.0f}% (CE) and {sum(t['net_pct'] for t in pe) / max(len(pe), 1):+.0f}% (PE) per ticket; "
                           f"call and put together: {sum(1 for t in bo if t['net_pct'] > 0)}/{len(bo)} in profit, mean {sum(t['net_pct'] for t in bo) / max(len(bo), 1):+.0f}%. "
                           f"Signals before the cutoff: {'; '.join(sigs) if sigs else 'none'}.")
+    notes_real.append("Caveats that ride every number above: eight expiry days in total is a handful, not a sample; SENSEX 13 Aug is the day SEBI found manipulated, so its +225 auction move and its call payoff are engineered, not organic; and the auction book is young and thin — the first-of-regime blasts (4 Aug NIFTY, 6 Aug SENSEX) may never repeat at that size.")
     notes_real.append("Read the grid with the bar counts in view: a handful of expiry days can make any half-hour look like a rule. The lottery rows (any bar) are the model-free baseline; the GO rows are what the indicator would have had you do.")
 anchors = {"days": days, "notes_public": notes_public, "notes_real": notes_real}
 

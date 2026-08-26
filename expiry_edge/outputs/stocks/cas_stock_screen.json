@@ -1,0 +1,612 @@
+{
+  "n_stock_expiries": 144,
+  "n_symbols": 8,
+  "approx_close_used": true,
+  "note": "Stock F&O is monthly; the first monthly expiry under CAS was 25 Aug 2026. Single-stock auction books are thin, so blasts are larger AND more manipulation-prone than the index. 'crazy returns' are survivorship \u2014 the same OTM strikes expire worthless far more often than they hit.",
+  "biggest_auction_movers": [
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-05",
+      "auction_move_pct": -2.816,
+      "atm_oi_share": 40.2,
+      "oi_hhi": 0.165
+    },
+    {
+      "symbol": "IDFCFIRSTB",
+      "date": "2026-08-03",
+      "auction_move_pct": 1.511,
+      "atm_oi_share": 36.9,
+      "oi_hhi": 0.158
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-12",
+      "auction_move_pct": 1.351,
+      "atm_oi_share": 57.7,
+      "oi_hhi": 0.225
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-25",
+      "auction_move_pct": 1.35,
+      "atm_oi_share": 15.5,
+      "oi_hhi": 0.162
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-03",
+      "auction_move_pct": 1.026,
+      "atm_oi_share": 31.7,
+      "oi_hhi": 0.182
+    },
+    {
+      "symbol": "SBIN",
+      "date": "2026-08-03",
+      "auction_move_pct": 0.995,
+      "atm_oi_share": 21.9,
+      "oi_hhi": 0.144
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-10",
+      "auction_move_pct": 0.916,
+      "atm_oi_share": 32.4,
+      "oi_hhi": 0.18
+    },
+    {
+      "symbol": "SBIN",
+      "date": "2026-08-04",
+      "auction_move_pct": 0.89,
+      "atm_oi_share": 24.3,
+      "oi_hhi": 0.151
+    },
+    {
+      "symbol": "PNB",
+      "date": "2026-08-10",
+      "auction_move_pct": -0.873,
+      "atm_oi_share": 41.6,
+      "oi_hhi": 0.17
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-04",
+      "auction_move_pct": 0.86,
+      "atm_oi_share": 41.6,
+      "oi_hhi": 0.227
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-04",
+      "auction_move_pct": 0.835,
+      "atm_oi_share": 26.0,
+      "oi_hhi": 0.149
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-03",
+      "auction_move_pct": 0.833,
+      "atm_oi_share": 48.0,
+      "oi_hhi": 0.209
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-06",
+      "auction_move_pct": 0.81,
+      "atm_oi_share": 36.2,
+      "oi_hhi": 0.215
+    },
+    {
+      "symbol": "SBIN",
+      "date": "2026-08-21",
+      "auction_move_pct": 0.74,
+      "atm_oi_share": 29.6,
+      "oi_hhi": 0.155
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-10",
+      "auction_move_pct": 0.701,
+      "atm_oi_share": 40.5,
+      "oi_hhi": 0.229
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-12",
+      "auction_move_pct": 0.657,
+      "atm_oi_share": 47.2,
+      "oi_hhi": 0.21
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-14",
+      "auction_move_pct": 0.654,
+      "atm_oi_share": 23.8,
+      "oi_hhi": 0.177
+    },
+    {
+      "symbol": "IDFCFIRSTB",
+      "date": "2026-08-06",
+      "auction_move_pct": 0.649,
+      "atm_oi_share": 41.6,
+      "oi_hhi": 0.182
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-12",
+      "auction_move_pct": 0.649,
+      "atm_oi_share": 29.3,
+      "oi_hhi": 0.168
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-13",
+      "auction_move_pct": 0.615,
+      "atm_oi_share": 29.2,
+      "oi_hhi": 0.22
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-04",
+      "auction_move_pct": 0.612,
+      "atm_oi_share": 47.6,
+      "oi_hhi": 0.21
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-05",
+      "auction_move_pct": 0.607,
+      "atm_oi_share": 30.0,
+      "oi_hhi": 0.17
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-12",
+      "auction_move_pct": 0.594,
+      "atm_oi_share": 33.1,
+      "oi_hhi": 0.18
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-11",
+      "auction_move_pct": 0.581,
+      "atm_oi_share": 32.8,
+      "oi_hhi": 0.181
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-11",
+      "auction_move_pct": 0.575,
+      "atm_oi_share": 47.2,
+      "oi_hhi": 0.209
+    }
+  ],
+  "most_susceptible_by_setup": [
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-26",
+      "blast_score": 0.3909,
+      "oi_hhi": 0.237,
+      "atm_oi_share": 55.9,
+      "mp_dist_pct": -2.724
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-13",
+      "blast_score": 0.3886,
+      "oi_hhi": 0.227,
+      "atm_oi_share": 58.3,
+      "mp_dist_pct": 3.632
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-17",
+      "blast_score": 0.3809,
+      "oi_hhi": 0.229,
+      "atm_oi_share": 56.4,
+      "mp_dist_pct": -2.115
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-12",
+      "blast_score": 0.3804,
+      "oi_hhi": 0.225,
+      "atm_oi_share": 57.7,
+      "mp_dist_pct": 2.402
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-18",
+      "blast_score": 0.3081,
+      "oi_hhi": 0.218,
+      "atm_oi_share": 46.5,
+      "mp_dist_pct": -2.268
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-07",
+      "blast_score": 0.3047,
+      "oi_hhi": 0.236,
+      "atm_oi_share": 41.5,
+      "mp_dist_pct": -2.121
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-11",
+      "blast_score": 0.2987,
+      "oi_hhi": 0.209,
+      "atm_oi_share": 47.2,
+      "mp_dist_pct": -1.68
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-04",
+      "blast_score": 0.2926,
+      "oi_hhi": 0.227,
+      "atm_oi_share": 41.6,
+      "mp_dist_pct": -1.642
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-06",
+      "blast_score": 0.2912,
+      "oi_hhi": 0.23,
+      "atm_oi_share": 40.7,
+      "mp_dist_pct": -2.767
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-07",
+      "blast_score": 0.2874,
+      "oi_hhi": 0.21,
+      "atm_oi_share": 47.8,
+      "mp_dist_pct": -1.366
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-14",
+      "blast_score": 0.2859,
+      "oi_hhi": 0.218,
+      "atm_oi_share": 47.6,
+      "mp_dist_pct": -1.277
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-11",
+      "blast_score": 0.279,
+      "oi_hhi": 0.238,
+      "atm_oi_share": 42.1,
+      "mp_dist_pct": -1.246
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-10",
+      "blast_score": 0.2765,
+      "oi_hhi": 0.212,
+      "atm_oi_share": 48.3,
+      "mp_dist_pct": -1.232
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-10",
+      "blast_score": 0.2691,
+      "oi_hhi": 0.229,
+      "atm_oi_share": 40.5,
+      "mp_dist_pct": -1.325
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-24",
+      "blast_score": 0.2604,
+      "oi_hhi": 0.208,
+      "atm_oi_share": 40.1,
+      "mp_dist_pct": -1.86
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-18",
+      "blast_score": 0.2565,
+      "oi_hhi": 0.222,
+      "atm_oi_share": 54.9,
+      "mp_dist_pct": 0.78
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-14",
+      "blast_score": 0.2553,
+      "oi_hhi": 0.227,
+      "atm_oi_share": 53.2,
+      "mp_dist_pct": 0.78
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-05",
+      "blast_score": 0.255,
+      "oi_hhi": 0.227,
+      "atm_oi_share": 39.9,
+      "mp_dist_pct": -1.246
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-19",
+      "blast_score": 0.2522,
+      "oi_hhi": 0.214,
+      "atm_oi_share": 45.0,
+      "mp_dist_pct": -1.143
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-03",
+      "blast_score": 0.251,
+      "oi_hhi": 0.227,
+      "atm_oi_share": 41.1,
+      "mp_dist_pct": -1.167
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-06",
+      "blast_score": 0.2452,
+      "oi_hhi": 0.21,
+      "atm_oi_share": 48.0,
+      "mp_dist_pct": -1.01
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-20",
+      "blast_score": 0.2279,
+      "oi_hhi": 0.205,
+      "atm_oi_share": 42.0,
+      "mp_dist_pct": -1.143
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-21",
+      "blast_score": 0.2276,
+      "oi_hhi": 0.194,
+      "atm_oi_share": 39.6,
+      "mp_dist_pct": -1.37
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-11",
+      "blast_score": 0.2274,
+      "oi_hhi": 0.197,
+      "atm_oi_share": 40.5,
+      "mp_dist_pct": -1.285
+    },
+    {
+      "symbol": "YESBANK",
+      "date": "2026-08-03",
+      "blast_score": 0.2223,
+      "oi_hhi": 0.209,
+      "atm_oi_share": 48.0,
+      "mp_dist_pct": -0.833
+    }
+  ],
+  "crazy_option_returns": [
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 185.0,
+      "entry": 0.01,
+      "settle": 1.94,
+      "ret_pct": 19300.0
+    },
+    {
+      "symbol": "PNB",
+      "date": "2026-08-25",
+      "side": "PE",
+      "strike": 116.0,
+      "entry": 0.02,
+      "settle": 0.07,
+      "ret_pct": 250.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-05",
+      "side": "PE",
+      "strike": 175.0,
+      "entry": 5.56,
+      "settle": 4.54,
+      "ret_pct": -18.0
+    },
+    {
+      "symbol": "IDFCFIRSTB",
+      "date": "2026-08-03",
+      "side": "CE",
+      "strike": 85.0,
+      "entry": 2.05,
+      "settle": 1.0,
+      "ret_pct": -51.0
+    },
+    {
+      "symbol": "PNB",
+      "date": "2026-08-19",
+      "side": "CE",
+      "strike": 117.0,
+      "entry": 1.44,
+      "settle": 0.48,
+      "ret_pct": -67.0
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-03",
+      "side": "CE",
+      "strike": 190.0,
+      "entry": 4.49,
+      "settle": 1.0,
+      "ret_pct": -78.0
+    },
+    {
+      "symbol": "PNB",
+      "date": "2026-08-10",
+      "side": "PE",
+      "strike": 114.0,
+      "entry": 2.47,
+      "settle": 0.5,
+      "ret_pct": -80.0
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-06",
+      "side": "CE",
+      "strike": 390.0,
+      "entry": 10.05,
+      "settle": 2.0,
+      "ret_pct": -80.0
+    },
+    {
+      "symbol": "IDFCFIRSTB",
+      "date": "2026-08-06",
+      "side": "CE",
+      "strike": 85.0,
+      "entry": 1.87,
+      "settle": 0.35,
+      "ret_pct": -81.0
+    },
+    {
+      "symbol": "SBIN",
+      "date": "2026-08-03",
+      "side": "CE",
+      "strike": 1040.0,
+      "entry": 27.65,
+      "settle": 5.0,
+      "ret_pct": -82.0
+    },
+    {
+      "symbol": "SBIN",
+      "date": "2026-08-13",
+      "side": "CE",
+      "strike": 1080.0,
+      "entry": 17.2,
+      "settle": 3.0,
+      "ret_pct": -83.0
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-10",
+      "side": "CE",
+      "strike": 390.0,
+      "entry": 8.75,
+      "settle": 1.0,
+      "ret_pct": -89.0
+    },
+    {
+      "symbol": "SBIN",
+      "date": "2026-08-04",
+      "side": "CE",
+      "strike": 1040.0,
+      "entry": 26.6,
+      "settle": 2.7,
+      "ret_pct": -90.0
+    },
+    {
+      "symbol": "TATASTEEL",
+      "date": "2026-08-05",
+      "side": "CE",
+      "strike": 192.5,
+      "entry": 4.89,
+      "settle": 0.49,
+      "ret_pct": -90.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-06",
+      "side": "PE",
+      "strike": 175.0,
+      "entry": 5.3,
+      "settle": 0.34,
+      "ret_pct": -94.0
+    },
+    {
+      "symbol": "RBLBANK",
+      "date": "2026-08-04",
+      "side": "CE",
+      "strike": 380.0,
+      "entry": 12.1,
+      "settle": 0.55,
+      "ret_pct": -95.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-24",
+      "side": "CE",
+      "strike": 175.0,
+      "entry": 1.2,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-21",
+      "side": "CE",
+      "strike": 180.0,
+      "entry": 0.28,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-20",
+      "side": "CE",
+      "strike": 175.0,
+      "entry": 1.8,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-19",
+      "side": "CE",
+      "strike": 170.0,
+      "entry": 1.55,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-18",
+      "side": "CE",
+      "strike": 175.0,
+      "entry": 0.93,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-17",
+      "side": "CE",
+      "strike": 175.0,
+      "entry": 1.1,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-14",
+      "side": "CE",
+      "strike": 175.0,
+      "entry": 2.5,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-13",
+      "side": "CE",
+      "strike": 180.0,
+      "entry": 1.25,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    },
+    {
+      "symbol": "BANDHANBNK",
+      "date": "2026-08-12",
+      "side": "CE",
+      "strike": 180.0,
+      "entry": 0.4,
+      "settle": 0.0,
+      "ret_pct": -100.0
+    }
+  ]
+}

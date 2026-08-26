@@ -31,6 +31,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "scripts"))
+from expiry_edge.calendar import _regime_weekday                                  # noqa: E402
 from expiry_edge.config import CAS_START_DATE, CONTRACT                           # noqa: E402
 from cas_month_check_real import build_bars5, build_daily, load_export            # noqa: E402
 
@@ -91,6 +92,10 @@ def main():
         bars5 = build_bars5(files[f"index_5m_{idx}.csv"]); d = build_daily(files[f"index_daily_{idx}.csv"], idx)
         opt = files[f"rolling_options_{idx}.csv"].copy(); opt["ts"] = pd.to_datetime(opt["ts"])
         dates = [x for x in sorted(set(opt["ts"].dt.date)) if x >= since and x in d.index.date and bool(d.loc[pd.Timestamp(x), "is_expiry"])]
+        # drop a tail label whose scheduled weekday hasn't traded yet (same guard as cas_month_check_real)
+        last = d.index.max().date(); sched_wd = _regime_weekday(idx, last)[0]
+        if dates and dates[-1] == last and sched_wd is not None and last.weekday() != sched_wd:
+            dates = dates[:-1]
         rows = [r for r in (anatomy_for(idx, x, bars5, d, opt) for x in dates) if r]
         if rows:
             out[idx] = rows

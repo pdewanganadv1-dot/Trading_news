@@ -130,16 +130,16 @@
       </div>
       <div class="tier">
         <span class="tag"><b>4 · the day's trend</b> — a weak proxy, not a cause</span>
-        <p>Across the seven expiries so far, the bigger the day's own high-low range, the bigger the auction move (correlation ≈ 0.87). But a trending day both leaves more directional OI to unwind and reflects the same one-way pressure — the range is downstream of the imbalance, not its source. With seven days and one of them manipulated, treat it as a hint, never the signal.</p>
+        <p>Across the eight expiries traded so far, the bigger the day's own high-low range, the bigger the auction move (correlation ≈ 0.78 on the real prints; ≈ 0.79 with the manipulated day excluded). But a trending day both leaves more directional OI to unwind and reflects the same one-way pressure — the range is downstream of the imbalance, not its source. With eight days and one of them manipulated, treat it as a hint, never the signal.</p>
       </div>
     </div>
   </section>
 
   <section>
-    <h2>The seven expiries, read through the mechanism</h2>
+    <h2>The CAS expiries, read through the mechanism</h2>
     <p id="daysIntro"></p>
     <div class="tablewrap"><table id="days"></table></div>
-    <p class="note warn">13 August is marked because SEBI found it manipulated — its +218 is engineered, not organic, and it should be excluded from any honest model even though it was the fattest option payoff of the month. The two next-biggest moves were the <em>first</em> CAS weekly on each exchange (4 Aug NIFTY, 6 Aug SENSEX), when positioning was largest and the book least settled, plus the monthly on the 25th. The small-move days were ordinary mid-cycle weeklies with balanced books.</p>
+    <p class="note warn">13 August is marked because SEBI found it manipulated — its +225 (real prints, 15:10 bar to the CAS close) is engineered, not organic, and it should be excluded from any honest model even though it was the fattest option payoff of the month. Setting it aside, the biggest moves were the <em>first</em> CAS weekly on each exchange (4 Aug NIFTY +0.62%, 6 Aug SENSEX +0.22%), when positioning was largest and the book least settled, and the NIFTY monthly on the 25th (+0.31%). The BANKNIFTY monthly on the same day moved just +0.10% — a monthly label alone does not make a blast — and the ordinary mid-cycle weeklies with balanced books all closed within ±0.09%. Seven of the eight auction moves were upward, and six of the eight went <em>toward</em> max-pain.</p>
   </section>
 
   <section>
@@ -165,8 +165,8 @@
   </section>
 
   <section>
-    <h2>What the Dhan run will measure</h2>
-    <p>Every feature below is model-free — computed from traded prints and real open interest, on the CAS expiries only. <code>scripts/cas_auction_anatomy.py</code> already emits them for each expiry alongside the move it is trying to predict; as expiries accumulate, this is what the prediction gets fitted on, in place of the chart features.</p>
+    <h2>What the Dhan run measures</h2>
+    <p>Every feature below is model-free — computed from traded prints and real 15:10 open interest, on the CAS expiries only. <code>scripts/cas_auction_anatomy.py</code> now emits them for each real expiry (the table above carries the measured values); as expiries accumulate, this is what the prediction gets fitted on, in place of the chart features.</p>
     <ul class="clean">
       <li><strong>max-pain distance</strong> — 15:10 spot minus the max-pain strike, signed: the direction and pull of the pin.</li>
       <li><strong>ATM OI share</strong> — how much open interest sits within one strike of spot, where it can flip in- or out-of-the-money in the auction.</li>
@@ -174,7 +174,7 @@
       <li><strong>monthly / rebalance flag</strong> — the passive-flow multiplier.</li>
       <li><strong>realized auction move</strong> — 15:10 to CAS close, the target — plus, when captured, the live imbalance at 15:25 as the tier-B check.</li>
     </ul>
-    <p class="note">With seven expiries this is a hypothesis with the plumbing built, not a fitted model — a handful of days cannot separate four causes, and one of the seven is a spoof. The value now is that every new expiry pulled through Dhan drops into a frame that already knows what to measure and why.</p>
+    <p class="note">With eight expiries this is a hypothesis with the plumbing built, not a fitted model — a handful of days cannot separate four causes, and one of the eight is a spoof. The first real read cuts both ways: the OI anatomy barely varied across the month (concentration ~0.16–0.19 on every day, ATM share 34–60%), and the day with the <em>heaviest</em> ATM share (11 Aug, 60%) produced one of the smallest moves — so nothing here separates big days from quiet ones yet. The value is that every new expiry pulled through Dhan drops into a frame that already knows what to measure and why.</p>
   </section>
 
   <section>
@@ -253,11 +253,15 @@ const DAYS = {{DAYS}};
 const $ = id => document.getElementById(id);
 const fmt = (v, d) => v == null || isNaN(v) ? "–" : Number(v).toFixed(d);
 const blast = d => d.abs_move >= 0.20;                      // >= 0.20% of the index = a "blast" here
-$("daysIntro").innerHTML = `Same mechanism, seven data points. The move is the auction's, 15:15 to the CAS close; the last column is the nearest-OTM call bought at 15:15 and held through it — the payoff the imbalance produced. Ordered by date.`;
-let html = `<thead><tr><th>date</th><th>index</th><th>expiry</th><th>day range %</th><th>auction move</th><th>move %</th><th>OTM call @15:15</th></tr></thead><tbody>`;
+const REAL = DAYS.length > 0 && DAYS[0].real === true;
+$("daysIntro").innerHTML = `Same mechanism, ${DAYS.length} data points${REAL ? " — real Dhan prints and real 15:10 open interest" : ""}. The move is the auction's, from the last pre-freeze print (the 15:10 bar close) to the CAS close; the OTM-call column is the nearest out-of-the-money call bought at that last print and held through the auction — the payoff the imbalance produced.${REAL ? " Spot−MP is where spot sat versus the max-pain strike at 15:10 (signed %); ATM OI is the share of open interest within one strike of spot; → pin marks an auction that moved toward max-pain." : ""} Ordered by date.`;
+let html = REAL
+  ? `<thead><tr><th>date</th><th>index</th><th>expiry</th><th>day range %</th><th>auction move</th><th>move %</th><th>spot−MP %</th><th>ATM OI</th><th>→ pin</th><th>OTM call @15:10</th></tr></thead><tbody>`
+  : `<thead><tr><th>date</th><th>index</th><th>expiry</th><th>day range %</th><th>auction move</th><th>move %</th><th>OTM call @15:15</th></tr></thead><tbody>`;
 DAYS.forEach(d => {
   const b = blast(d);
-  html += `<tr class="${b ? "blast" : ""}"><td>${d.date}${d.manip ? ' <span class="chip manip">manip.</span>' : (b ? ' <span class="chip blast">blast</span>' : "")}</td><td>${d.index}</td><td>${d.monthly ? "monthly" : "weekly"}${d.first ? ' <span class="chip">1st CAS</span>' : ""}</td><td>${fmt(d.range, 2)}</td><td class="big">${d.move > 0 ? "+" : ""}${fmt(d.move, 0)}</td><td class="big">${d.move_pct > 0 ? "+" : ""}${fmt(d.move_pct, 2)}%</td><td>${d.ce_net == null ? "–" : (d.ce_net > 0 ? "+" : "") + fmt(d.ce_net, 0) + "%"}</td></tr>`;
+  const anat = REAL ? `<td>${d.mp_dist > 0 ? "+" : ""}${fmt(d.mp_dist, 2)}</td><td>${fmt(d.atm_share, 0)}%</td><td>${d.toward ? "→ pin" : "away"}</td>` : "";
+  html += `<tr class="${b ? "blast" : ""}"><td>${d.date}${d.manip ? ' <span class="chip manip">manip.</span>' : (b ? ' <span class="chip blast">blast</span>' : "")}</td><td>${d.index}</td><td>${d.monthly ? "monthly" : "weekly"}${d.first ? ' <span class="chip">1st CAS</span>' : ""}</td><td>${fmt(d.range, 2)}</td><td class="big">${d.move > 0 ? "+" : ""}${fmt(d.move, 0)}</td><td class="big">${d.move_pct > 0 ? "+" : ""}${fmt(d.move_pct, 2)}%</td>${anat}<td>${d.ce_net == null ? "–" : (d.ce_net > 0 ? "+" : "") + fmt(d.ce_net, 0) + "%"}</td></tr>`;
 });
 $("days").innerHTML = html + "</tbody>";
 
@@ -267,7 +271,10 @@ const DECAY = {{DECAY}};
   const ow = DECAY.ordinary_weeklies, sd = DECAY.structural_days;
   $("decayRead").innerHTML = `In the ${DECAY.n_expiries} CAS expiries so far (${DECAY.source}), the difference is already stark: ordinary weeklies averaged <strong>${fmt(ow.mean_abs_move_pct, 2)}%</strong> of the index in the auction, the structural days (monthly, first-of-regime) <strong>${fmt(sd.mean_abs_move_pct, 2)}%</strong> — about <strong>${DECAY.structural_vs_ordinary_ratio}×</strong> larger. ${DECAY.read.charAt(0).toUpperCase() + DECAY.read.slice(1)}. Three ordinary weeklies is too thin to fit a line to, which is the point of the monitor: it will call the trend once there are enough.`;
   $("decayFades").innerHTML = `The novelty blast. The two first-of-regime days (4 Aug NIFTY, 6 Aug SENSEX) were the biggest organic moves of the month; the plain weeklies right after them were a fraction of that. As the auction book deepens — SEBI's mechanism — the everyday expiry stops paying like a lottery ticket.`;
-  $("decaySurvives").innerHTML = `The monthly and rebalance spikes. 25 Aug (monthly) re-blasted to ${fmt(Math.abs(DECAY.all_series.find(s => s.kind === "monthly")?.abs_move_pct || 0), 2)}% even after the weeklies had calmed, because settlement and passive-fund flow are structural — they don't thin out with familiarity. A thicker book shrinks them but never to zero.`;
+  const monthlies = DECAY.all_series.filter(s => s.kind === "monthly");
+  const mMax = monthlies.length ? Math.max(...monthlies.map(s => Math.abs(s.abs_move_pct))) : 0;
+  const mMin = monthlies.length ? Math.min(...monthlies.map(s => Math.abs(s.abs_move_pct))) : 0;
+  $("decaySurvives").innerHTML = `The monthly and rebalance spikes. The 25 Aug NIFTY monthly re-blasted to ${fmt(mMax, 2)}% even after the weeklies had calmed, because settlement and passive-fund flow are structural — they don't thin out with familiarity. A thicker book shrinks them but never to zero.${monthlies.length > 1 ? ` (The BANKNIFTY monthly the same day moved only ${fmt(mMin, 2)}% — structural flow makes a spike possible, not guaranteed.)` : ""}`;
   // chart: |move %| per expiry, chronological, coloured by kind
   const S = DECAY.all_series, W = 640, H = 260, padL = 44, padR = 16, padT = 30, padB = 64;
   const maxY = Math.max(0.7, ...S.map(s => s.abs_move_pct)) * 1.1;
