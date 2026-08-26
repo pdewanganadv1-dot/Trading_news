@@ -1,0 +1,4 @@
+fh_rel,days,abs_last_hour_med,p_last_hour_gt_0_3,range_1430_1525_med
+tight,148,0.22,42.568,0.495
+mid,147,0.231,35.374,0.444
+wide,147,0.205,40.136,0.581

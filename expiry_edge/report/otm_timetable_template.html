@@ -1,0 +1,307 @@
+<title>Expiry OTM Timetable</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f6f8f5; --surface: #ffffff; --surface-2: #eef2ee; --ink: #14211c; --ink-2: #33423c; --muted: #5e6b66; --rule: #d3dbd5;
+    --accent: #0e7c66; --accent-ink: #ffffff; --accent-soft: #dcefe8; --amber: #a8620f; --amber-soft: #fbeed7;
+    --pos: #2a78d6; --neg: #e34948; --mid: #f0efec;                      /* data colors: diverging blue <-> red, neutral midpoint */
+    --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+    --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1614; --surface: #16201c; --surface-2: #1d2924; --ink: #e6ece8; --ink-2: #c3cdc7; --muted: #98a59f; --rule: #2b3832;
+      --accent: #3fbf9f; --accent-ink: #0b1512; --accent-soft: #163229; --amber: #e2a44e; --amber-soft: #3a2a12;
+      --pos: #3987e5; --neg: #e66767; --mid: #383835;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1614; --surface: #16201c; --surface-2: #1d2924; --ink: #e6ece8; --ink-2: #c3cdc7; --muted: #98a59f; --rule: #2b3832;
+    --accent: #3fbf9f; --accent-ink: #0b1512; --accent-soft: #163229; --amber: #e2a44e; --amber-soft: #3a2a12;
+    --pos: #3987e5; --neg: #e66767; --mid: #383835;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 18px 72px; display: grid; gap: 36px; }
+  header { display: grid; gap: 12px; padding-bottom: 22px; border-bottom: 1px solid var(--rule); }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 6vw, 42px); line-height: 1.06; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  h2 { font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1.2; margin: 0 0 10px; text-wrap: balance; }
+  h3 { font-family: var(--body); font-weight: 600; font-size: 15px; margin: 0 0 6px; }
+  p { margin: 0 0 12px; max-width: 64ch; color: var(--ink-2); }
+  p:last-child { margin-bottom: 0; }
+  strong { color: var(--ink); font-weight: 600; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; color: var(--ink); overflow-wrap: anywhere; }
+  section { display: grid; gap: 12px; }
+  .rule { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 640px) { .rule { grid-template-columns: 1fr; } }
+  .rule > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+  .rule .k { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .rule .big { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1.1; }
+  .rule p { font-size: 14px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 9px; overflow: hidden; background: var(--surface); }
+  .seg button { font-family: var(--body); font-size: 14px; font-weight: 500; color: var(--ink-2); background: transparent; border: 0; padding: 7px 12px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--rule); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .seg-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 6px; }
+  .gridwrap { overflow-x: auto; }
+  table.heat { border-collapse: separate; border-spacing: 2px; width: 100%; min-width: 372px; font-variant-numeric: tabular-nums; }
+  table.heat th { font-family: var(--mono); font-weight: 500; font-size: 11.5px; letter-spacing: 0.04em; color: var(--muted); text-align: center; padding: 6px 4px; }
+  table.heat th.row { text-align: right; padding-right: 6px; white-space: nowrap; }
+  table.heat td { padding: 0; }
+  table.heat button.cell { width: 100%; min-height: 40px; border: 0; border-radius: 6px; font-family: var(--body); font-size: 13.5px; font-weight: 500; color: var(--ink);
+                           background: color-mix(in oklab, var(--tone, var(--mid)) var(--mix, 0%), var(--surface)); cursor: pointer; display: grid; place-items: center; gap: 0; padding: 4px 2px; }
+  table.heat button.cell small { font-size: 10.5px; font-weight: 400; color: var(--muted); line-height: 1.1; }
+  table.heat button.cell.thin { color: var(--muted); font-weight: 400; background: var(--surface); box-shadow: inset 0 0 0 1px var(--rule); }
+  table.heat button.cell[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+  table.heat tr.all th, table.heat tr.all td { border-top: 6px solid transparent; }
+  .legend { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); flex-wrap: wrap; }
+  .legend .bar { width: 160px; height: 10px; border-radius: 5px; border: 1px solid var(--rule); }
+  .legend .bar.div { background: linear-gradient(90deg, color-mix(in oklab, var(--neg) 70%, var(--surface)), var(--surface) 45%, color-mix(in oklab, var(--pos) 70%, var(--surface))); }
+  .legend .bar.seq { background: linear-gradient(90deg, var(--surface), color-mix(in oklab, var(--pos) 70%, var(--surface))); }
+  .detail { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; }
+  .detail .title { font-family: var(--display); font-weight: 700; font-size: 18px; }
+  .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 14px; margin: 0; }
+  .kv div { display: grid; gap: 1px; }
+  .kv dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .kv dd { margin: 0; font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .kv dd .sub { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+  table.plain { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+  table.plain th, table.plain td { text-align: right; padding: 7px 6px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  table.plain th:first-child, table.plain td:first-child { text-align: left; }
+  table.plain th { font-family: var(--mono); font-weight: 500; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .tablewrap { overflow-x: auto; min-width: 0; max-width: 100%; }
+  .gridwrap { min-width: 0; max-width: 100%; }
+  section > *, details > div > * { min-width: 0; }
+  .note { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--ink-2); font-size: 15px; }
+  .note.warn { border-color: var(--amber); }
+  .status { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 12px 16px; border-radius: 10px; background: var(--amber-soft); }
+  .status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); margin-top: 7px; }
+  .status p { color: var(--ink); font-size: 15px; }
+  details summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+  footer { border-top: 1px solid var(--rule); padding-top: 16px; color: var(--muted); font-size: 14px; }
+  .pos { color: var(--ink); } .neg { color: var(--ink); }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">expiry_edge · buyer only · CAS regime (exit by 15:15)</div>
+    <h1>Expiry OTM Timetable</h1>
+    <p>Which strike to buy and at what time on a NIFTY or BANKNIFTY expiry day, from every 5-minute bar of the test expiry days (2022–24) priced under the CAS model. Tap any cell for the full odds.</p>
+  </header>
+
+  <section>
+    <h2>The rule, in three parts</h2>
+    <div class="rule" id="rule"></div>
+  </section>
+
+  <section>
+    <h2>When × which strike</h2>
+    <div class="controls" role="group" aria-label="Chart controls">
+      <span><span class="seg-label">Index</span><span class="seg" id="segIndex"></span></span>
+      <span><span class="seg-label">Bars</span><span class="seg" id="segCond"></span></span>
+      <span><span class="seg-label">Show</span><span class="seg" id="segMetric"></span></span>
+    </div>
+    <p id="gridCaption" style="font-size:14px"></p>
+    <div class="gridwrap"><table class="heat" id="heat"></table></div>
+    <div class="legend" id="legend"></div>
+    <div class="detail" id="detail"></div>
+    <details>
+      <summary>Show these numbers as a table</summary>
+      <div class="tablewrap" style="margin-top:10px"><table class="plain" id="flat"></table></div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Why the signal matters</h2>
+    <p id="whyText"></p>
+    <div class="tablewrap"><table class="plain" id="why"></table></div>
+  </section>
+
+  <section>
+    <h2>Same rule, different years and regimes</h2>
+    <p>GO bars, the indicator's strike, all entry windows. The edge is lumpy: it lives in the years and volatility regimes where a late breakout still finds cheap premiums.</p>
+    <div class="two">
+      <div class="tablewrap"><table class="plain" id="byYear"></table></div>
+      <div class="tablewrap"><table class="plain" id="byRegime"></table></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Reading it live</h2>
+    <p>The timetable says <em>when</em> and <em>which offset</em>; the exact strike comes from the indicator on the day. In TradingView, <code>ExpiryEdge_BuyScore</code> prints the suggested strike and its estimated premium in the status table and in the alert JSON (<code>strike</code>, <code>est_premium</code>). In Python, <code>scripts/live_indicator.py --index NIFTY --source dhan --watch</code> prints the same in the <code>strike</code> column. <code>scripts/otm_timetable.py</code> regenerates every number on this page.</p>
+  </section>
+
+  <section>
+    <div class="status" role="note">
+      <span class="dot" aria-hidden="true"></span>
+      <p><strong>What these numbers are.</strong> Real index paths, modelled premiums: a Black-Scholes kernel on the expiry-day variance profile with reactive IV, the CAS variant reserving 25 % of the day's variance for the auction, a premium floor (₹1.5 NIFTY, ₹3 BANKNIFTY, ₹5 SENSEX) and costs of ₹0.5 / ₹1 per side. Returns are net; "exit" means the 15:10 bar or 60 minutes, whichever comes first. The August-2026 real-data check through Dhan is what turns these into exact numbers — until then treat the ranking (late GO bars, nearest cheap OTM, never the 3rd strike) as the robust part and the means as model-dependent. SENSEX is shown for completeness only: 45 Friday-regime expiry days, 37 GO bars, negative — the buy-score does not transfer to it.</p>
+    </div>
+  </section>
+
+  <footer>Part of the Expiry Edge toolkit. Report: <a href="https://claude.ai/code/artifact/51c5c664-09dd-4a3d-bf3d-b96bdcdbc8da">the full write-up</a> · data: outputs/otm/&lt;IDX&gt;_timetable.csv</footer>
+</main>
+
+<script>
+const DATA = {{DATA}};
+const CTX = {{CTX}};
+const KS = [{k: 0, label: "auto", long: "indicator strike (nearest OTM ≤ cap)"}, {k: 1, label: "1-OTM", long: "1 strike OTM"}, {k: 2, label: "2-OTM", long: "2 strikes OTM"}, {k: 3, label: "3-OTM", long: "3 strikes OTM"}];
+const CONDS = [{id: "GO", label: "GO bars", long: "score ≥ 0.40 on a range-break bar"}, {id: "LEAN", label: "LEAN", long: "score 0.30–0.40 on a range-break bar"}, {id: "ANY", label: "Any bar", long: "every bar, no signal (the lottery)"}];
+const METRICS = [
+  {id: "net_mean", label: "Mean net %", kind: "div", lo: -100, hi: 150, fmt: v => (v > 0 ? "+" : "") + Math.round(v) + "%"},
+  {id: "p_5x", label: "P(5×)", kind: "seq", lo: 0, hi: 25, fmt: v => Math.round(v) + "%"},
+  {id: "p_net_pos", label: "P(profit)", kind: "seq", lo: 0, hi: 60, fmt: v => Math.round(v) + "%"},
+  {id: "signals_per_day", label: "Signals / day", kind: "seq", lo: 0, hi: 0.7, fmt: v => v.toFixed(2)},
+];
+const CAP_TXT = {NIFTY: "₹10", BANKNIFTY: "₹25", SENSEX: "₹30"};
+const state = {index: "NIFTY", cond: "GO", metric: "net_mean", sel: null};
+const MIN_N = 8;
+const $ = id => document.getElementById(id);
+const fmtPct = (v, sign) => v == null || isNaN(v) ? "–" : (sign && v > 0 ? "+" : "") + Math.round(v) + "%";
+const fmtNum = (v, d) => v == null || isNaN(v) ? "–" : Number(v).toFixed(d);
+
+function seg(el, items, get, set) {
+  el.innerHTML = "";
+  items.forEach(it => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = it.label; b.setAttribute("aria-pressed", get() === it.id);
+    b.addEventListener("click", () => { set(it.id); render(); });
+    el.appendChild(b);
+  });
+}
+function cell(cond, k, win) { return DATA[state.index].cells[`${cond}|${k}|${win}`] || {n: 0}; }
+
+function renderRule() {
+  const d = DATA[state.index], w = d.windows[d.windows.length - 1];
+  const last = cell("GO", 0, w), prev = cell("GO", 0, d.windows[d.windows.length - 2]), all = cell("GO", 0, "all");
+  const k1 = cell("GO", 1, w), k2 = cell("GO", 2, w), k3 = cell("GO", 3, w);
+  const share = last.k_share || {}; const s1 = Math.round((share["1"] || 0) * 100);
+  const bestK = (state.index === "BANKNIFTY" && k2.net_mean > k1.net_mean) ? 2 : 1;
+  if ((last.n >= MIN_N ? last.net_mean : all.net_mean) < 0) {
+    $("rule").innerHTML = `<div style="grid-column:1/-1"><div class="k">${state.index}</div><div class="big">no edge on this index</div>
+      <p>The GO rule loses here: ${all.n} GO bars, mean ${fmtPct(all.net_mean, true)}, profit odds ${fmtPct(all.p_net_pos)}, half lost ${fmtPct(all.p_lose_half)} of the time. The buy-score was trained on NIFTY and BANKNIFTY and does not transfer to ${state.index} (test AUC 0.56). Keep it as a diary, not a trade, until it is retrained on real ${state.index} premiums.</p></div>`;
+    return;
+  }
+  const when = `<div><div class="k">When</div><div class="big">${w}</div>
+    <p>Entries on a GO bar only; the last entry is the bar closing 14:55. This window holds ${Math.round(100 * last.n / Math.max(all.n, 1))}% of all GO bars and ${last.n >= MIN_N ? "a mean of " + fmtPct(last.net_mean, true) : "too few bars to judge"}; ${prev.n >= MIN_N ? "the half-hour before is " + fmtPct(prev.net_mean, true) + " (n=" + prev.n + ")" : "earlier windows rarely fire"}. Before 13:45 the score almost never says GO.</p></div>`;
+  const which = `<div><div class="k">Which strike</div><div class="big">${bestK === 2 ? "2-OTM" : "nearest OTM ≤ " + CAP_TXT[state.index]}</div>
+    <p>${bestK === 2
+      ? `On ${state.index} the 2-OTM (≈₹${fmtNum(k2.p0_med, 0)}, ${fmtNum(k2.otm_pts_med, 0)} pts out) beats the 1-OTM here: ${fmtPct(k2.net_mean, true)} vs ${fmtPct(k1.net_mean, true)}, P(5×) ${fmtPct(k2.p_5x)} vs ${fmtPct(k1.p_5x)}, profit odds ${fmtPct(k2.p_net_pos)} vs ${fmtPct(k1.p_net_pos)}.`
+      : `In this window that is the 1-OTM ${s1}% of the time (≈₹${fmtNum(k1.p0_med, 0)}, ${fmtNum(k1.otm_pts_med, 0)} pts out), otherwise the 2-OTM (≈₹${fmtNum(k2.p0_med, 1)}). 2-OTM alone: ${fmtPct(k2.net_mean, true)} but loses half ${fmtPct(k2.p_lose_half)} of the time.`}
+    Never the 3rd strike: ${fmtPct(k3.net_mean, true)}, loses half ${fmtPct(k3.p_lose_half)} of the time.</p></div>`;
+  const how = `<div><div class="k">How</div><div class="big">hold to 15:10</div>
+    <p>Exit at the 15:10 bar or after 60 minutes. Selling at 5× instead gives ${fmtPct(last.take5_mean, true)} vs ${fmtPct(last.net_mean, true)}: the 10× tail (${fmtPct(last.p_10x)} of trades) pays for the ${fmtPct(100 - last.p_net_pos)} that lose. Expect ${fmtNum(last.signals_per_day, 2)} GO bars per expiry day here; median trade ${fmtPct(last.net_median, true)}.</p></div>`;
+  $("rule").innerHTML = when + which + how;
+}
+
+function toneFor(m, v) {
+  if (m.kind === "div") {
+    const a = Math.min(Math.abs(v) / (v < 0 ? -m.lo : m.hi), 1);
+    return {tone: v < 0 ? "var(--neg)" : "var(--pos)", mix: Math.round(a * 70) + "%"};
+  }
+  const a = Math.min(Math.max((v - m.lo) / (m.hi - m.lo), 0), 1);
+  return {tone: "var(--pos)", mix: Math.round(a * 70) + "%"};
+}
+
+function renderGrid() {
+  const d = DATA[state.index], m = METRICS.find(x => x.id === state.metric), condObj = CONDS.find(c => c.id === state.cond);
+  const metricOk = !(state.cond === "ANY" && state.metric === "signals_per_day");
+  $("gridCaption").innerHTML = `<strong>${state.index}</strong> · ${condObj.long} · ${metricOk ? m.label : "count of bars"} · ${d.days} test expiry days. Cells with fewer than ${MIN_N} bars stay uncoloured.`;
+  let html = `<thead><tr><th class="row">entry window</th>${KS.map(k => `<th>${k.label}</th>`).join("")}</tr></thead><tbody>`;
+  let rows = d.windows.concat(["all"]);
+  if (state.cond !== "ANY") {                                   // fold the leading windows in which nothing fires into one line
+    let lead = 0;
+    while (lead < d.windows.length && KS.every(k => !cell(state.cond, k.k, d.windows[lead]).n)) lead++;
+    if (lead > 1) {
+      const span = d.windows[0].split("–")[0] + "–" + d.windows[lead - 1].split("–")[1];
+      html += `<tr><th class="row">${span}</th><td colspan="4"><div class="cell thin" style="display:grid;place-items:center;min-height:40px;border-radius:6px;box-shadow:inset 0 0 0 1px var(--rule);color:var(--muted);font-size:13px">no ${state.cond} bars in ${d.days} expiry days</div></td></tr>`;
+      rows = d.windows.slice(lead).concat(["all"]);
+    }
+  }
+  rows.forEach(w => {
+    html += `<tr class="${w === "all" ? "all" : ""}"><th class="row">${w === "all" ? "whole day" : w}</th>`;
+    KS.forEach(k => {
+      const c = cell(state.cond, k.k, w);
+      const v = metricOk ? c[m.id] : c.n;
+      const thin = c.n < MIN_N || v == null;
+      const t = thin ? {tone: "var(--mid)", mix: "0%"} : toneFor(metricOk ? m : {kind: "seq", lo: 0, hi: 2500}, v);
+      const pressed = state.sel && state.sel.k === k.k && state.sel.w === w;
+      const label = thin ? (c.n ? `n=${c.n}` : "–") : (metricOk ? m.fmt(v) : String(v));
+      const sub = !thin && state.cond !== "ANY" ? `<small>n=${c.n}</small>` : "";
+      html += `<td><button type="button" class="cell${thin ? " thin" : ""}" style="--tone:${t.tone};--mix:${t.mix}" data-k="${k.k}" data-w="${w}" aria-pressed="${pressed}" aria-label="${w}, ${k.long}: ${label}">${label}${sub}</button></td>`;
+    });
+    html += "</tr>";
+  });
+  $("heat").innerHTML = html + "</tbody>";
+  $("heat").querySelectorAll("button.cell").forEach(b => b.addEventListener("click", () => { state.sel = {k: +b.dataset.k, w: b.dataset.w}; render(); }));
+  const lg = $("legend");
+  if (!metricOk) lg.innerHTML = `<span>number of bars in the window</span>`;
+  else if (m.kind === "div") lg.innerHTML = `<span>${m.fmt(m.lo)}</span><span class="bar div" aria-hidden="true"></span><span>${m.fmt(m.hi)}</span><span>· blue = gain, red = loss, white = zero</span>`;
+  else lg.innerHTML = `<span>${m.fmt(m.lo)}</span><span class="bar seq" aria-hidden="true"></span><span>${m.fmt(m.hi)}</span>`;
+}
+
+function renderDetail() {
+  const d = DATA[state.index];
+  if (!state.sel) state.sel = {k: 0, w: d.windows[d.windows.length - 1]};
+  const c = cell(state.cond, state.sel.k, state.sel.w), kk = KS.find(x => x.k === state.sel.k);
+  const wl = state.sel.w === "all" ? "whole day" : state.sel.w;
+  if (!c.n) { $("detail").innerHTML = `<div class="title">${wl} · ${kk.label}</div><p>No bars of this kind in the window.</p>`; return; }
+  const share = c.k_share ? Object.entries(c.k_share).sort().map(([k, v]) => `${Math.round(v * 100)}% ${k}-OTM`).join(", ") : null;
+  $("detail").innerHTML = `<div class="title">${wl} · ${kk.long}</div>
+    <dl class="kv">
+      <div><dt>bars</dt><dd>${c.n}${c.signals_per_day != null ? ` <span class="sub">${fmtNum(c.signals_per_day, 2)} per expiry day</span>` : ""}</dd></div>
+      <div><dt>entry premium (median)</dt><dd>₹${fmtNum(c.p0_med, 1)} <span class="sub">${fmtNum(c.otm_pts_med, 0)} pts OTM</span></dd></div>
+      <div><dt>mean net</dt><dd>${fmtPct(c.net_mean, true)} <span class="sub">median ${fmtPct(c.net_median, true)}</span></dd></div>
+      <div><dt>profit odds</dt><dd>${fmtPct(c.p_net_pos)} <span class="sub">loses ≥ half: ${fmtPct(c.p_lose_half)}</span></dd></div>
+      <div><dt>reached 2× / 3×</dt><dd>${fmtPct(c.p_2x)} / ${fmtPct(c.p_3x)}</dd></div>
+      <div><dt>reached 5× / 10×</dt><dd>${fmtPct(c.p_5x)} / ${fmtPct(c.p_10x)}</dd></div>
+      <div><dt>if sold at 5× / 3×</dt><dd>${fmtPct(c.take5_mean, true)} / ${fmtPct(c.take3_mean, true)} <span class="sub">mean net</span></dd></div>
+      ${share ? `<div><dt>strike mix</dt><dd style="font-size:14px">${share}</dd></div>` : ""}
+    </dl>`;
+}
+
+function renderFlat() {
+  const d = DATA[state.index];
+  let html = `<thead><tr><th>window</th><th>strike</th><th>n</th><th>₹ entry</th><th>P(2×)</th><th>P(5×)</th><th>P(10×)</th><th>mean net</th><th>median</th><th>P(profit)</th><th>lose ½</th></tr></thead><tbody>`;
+  d.windows.concat(["all"]).forEach(w => KS.forEach(k => {
+    const c = cell(state.cond, k.k, w); if (!c.n) return;
+    html += `<tr><td>${w === "all" ? "whole day" : w}</td><td>${k.label}</td><td>${c.n}</td><td>${fmtNum(c.p0_med, 1)}</td><td>${fmtPct(c.p_2x)}</td><td>${fmtPct(c.p_5x)}</td><td>${fmtPct(c.p_10x)}</td><td>${fmtPct(c.net_mean, true)}</td><td>${fmtPct(c.net_median, true)}</td><td>${fmtPct(c.p_net_pos)}</td><td>${fmtPct(c.p_lose_half)}</td></tr>`;
+  }));
+  $("flat").innerHTML = html + "</tbody>";
+}
+
+function renderWhy() {
+  const d = DATA[state.index], w = d.windows[d.windows.length - 1];
+  const rows = [["GO bar", cell("GO", 0, w)], ["LEAN bar", cell("LEAN", 0, w)], ["any bar (lottery)", cell("ANY", 0, w)]];
+  $("whyText").innerHTML = `Same window (${w}), same strike rule, ${state.index}. A bar without a signal is a different bet — and the lottery row's late-window mean leans entirely on the model's auction-variance reserve, so it is the first number the real-data check should overturn or confirm.`;
+  let html = `<thead><tr><th>bought on</th><th>n</th><th>₹ entry</th><th>P(5×)</th><th>mean net</th><th>P(profit)</th><th>lose ½</th></tr></thead><tbody>`;
+  rows.forEach(([name, c]) => { html += `<tr><td>${name}</td><td>${c.n || 0}</td><td>${fmtNum(c.p0_med, 1)}</td><td>${fmtPct(c.p_5x)}</td><td>${fmtPct(c.net_mean, true)}</td><td>${fmtPct(c.p_net_pos)}</td><td>${fmtPct(c.p_lose_half)}</td></tr>`; });
+  $("why").innerHTML = html + "</tbody>";
+}
+
+function renderCtx() {
+  const c = CTX[state.index];
+  const tbl = (rows, key, head) => {
+    let html = `<thead><tr><th>${head}</th><th>n</th><th>₹ entry</th><th>P(5×)</th><th>mean net</th><th>P(profit)</th></tr></thead><tbody>`;
+    rows.forEach(r => { html += `<tr><td>${r[key]}</td><td>${Math.round(r.n)}</td><td>${fmtNum(r.p0_med, 1)}</td><td>${fmtPct(r.p_5x)}</td><td>${fmtPct(r.net_mean, true)}</td><td>${fmtPct(r.p_net_pos)}</td></tr>`; });
+    return html + "</tbody>";
+  };
+  $("byYear").innerHTML = tbl(c.year, "yr", "year");
+  $("byRegime").innerHTML = tbl(c.vol_regime, "vol_regime", "20-day vol regime");
+}
+
+function render() {
+  seg($("segIndex"), Object.keys(DATA).map(i => ({id: i, label: i})), () => state.index, v => { state.index = v; state.sel = null; });
+  seg($("segCond"), CONDS, () => state.cond, v => { state.cond = v; if (v === "ANY" && state.metric === "signals_per_day") state.metric = "net_mean"; });
+  seg($("segMetric"), METRICS.filter(m => !(state.cond === "ANY" && m.id === "signals_per_day")), () => state.metric, v => { state.metric = v; });
+  renderRule(); renderGrid(); renderDetail(); renderFlat(); renderWhy(); renderCtx();
+}
+render();
+</script>

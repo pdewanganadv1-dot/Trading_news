@@ -1,0 +1,263 @@
+//@version=6
+// ============================================================================
+//  Expiry Edge — Buy Score  (NIFTY / SENSEX / BANKNIFTY expiry-day option buying)
+//  Apply on a 5-minute chart of the INDEX (NSE:NIFTY, BSE:SENSEX, NSE:BANKNIFTY).
+//
+//  Score = P( ATM straddle bought at this bar close touches +30% within 60 min ).
+//  It is a standardised logistic regression fitted on 238k 5-min bars (NIFTY + BANKNIFTY,
+//  2016-2024, expiry and non-expiry days) with options priced along the real index path.
+//  Out-of-sample (2022-24) AUC 0.68 on expiry days; top-decile bars reach ~50% vs 21% base.
+//  The SIDE is NOT predictable (direction AUC 0.51) — it comes from the breakout itself:
+//      new day HIGH on this bar  -> CE ;   new day LOW on this bar -> PE.
+//  Strike: the status table and the alert carry a suggested strike with a model premium
+//  estimate — backtest says the nearest OTM strike priced <= ~10 pts (NIFTY) is the sweet
+//  spot for a "blast" (5x within the hour ~20% of GO signals); 3 strikes OTM is negative.
+//  Verdict:  GO   = score >= go threshold AND breakout bar
+//            LEAN = score >= lean threshold AND breakout bar (half size)
+//            WAIT = no breakout on this bar ;  NO = breakout but score below lean
+//  CAS (from 3-Aug-2026): cash index freezes 15:15, options settle on the auction close.
+//  No new entries after the cutoff (default 15:00); exit everything by 15:15.
+//
+//  Same arithmetic as expiry_edge/score.py (Python) — coefficients from buy_score_logit.json.
+//  Not financial advice. Validate on your own data before trading size.
+// ============================================================================
+indicator("Expiry Edge — Buy Score", shorttitle = "EE Score", overlay = false, max_labels_count = 200)
+
+// ---------------------------------------------------------------- inputs
+string profileSel = input.string("NIFTY", "Variance profile", options = ["NIFTY", "BANKNIFTY"],
+     tooltip = "Intraday variance profile used for the 'variance spent' feature. Use NIFTY for SENSEX too.")
+string expiryDay  = input.string("Tuesday", "Weekly expiry weekday", options = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+     tooltip = "NIFTY = Tuesday, SENSEX = Thursday (since 1-Sep-2025).")
+bool   forceExpiry = input.bool(false, "Treat today as expiry day (holiday shift)")
+float  goThr   = input.float(0.40, "GO threshold",   minval = 0.05, maxval = 0.95, step = 0.01)
+float  leanThr = input.float(0.30, "LEAN threshold", minval = 0.05, maxval = 0.95, step = 0.01)
+int    cutoffHour = input.int(15, "No new entries after (hour)", minval = 9, maxval = 15)
+int    cutoffMin  = input.int(0,  "No new entries after (minute)", minval = 0, maxval = 59)
+bool   showTable  = input.bool(true, "Show status table")
+bool   onlyExpiryAlerts = input.bool(true, "Alerts only on expiry days")
+float  strikeStep = input.float(50, "Strike step (NIFTY 50, SENSEX/BANKNIFTY 100)", minval = 1)
+string otmMode = input.string("auto (nearest OTM ≤ cap)", "Strike to buy", options = ["auto (nearest OTM ≤ cap)", "ATM", "1 OTM", "2 OTM"],
+     tooltip = "Backtest: on GO signals the nearest OTM strike priced ≤ cap had the best expectancy; 3 strikes OTM was negative.")
+float  premCap   = input.float(10, "Premium cap for auto strike (index pts)", minval = 0.5)
+float  premFloor = input.float(1.5, "Minimum realistic premium (index pts)", minval = 0.05, tooltip = "NIFTY ~1.5, BANKNIFTY ~3, SENSEX ~5")
+float  vrp = 1.10   // implied / trailing realised vol multiplier used in training
+
+// ---------------------------------------------------------------- constants (from buy_score_logit.json)
+var float[] MEAN = array.from(0.477348, 0.302529, 0.211702, 0.101052, 0.470384, 0.465317, 0.459484, 0.712499, 0.533309, 1.532841, 0.115463, 0.154587, 0.968894, 49.663584, 0.644726, -0.410219, 0.092202, 0.044041)
+var float[] STD  = array.from(0.273256, 0.269276, 0.408515, 0.232016, 0.513401, 0.300975, 0.231302, 0.396879, 0.286426, 1.087697, 0.145505, 0.204079, 0.443174, 30.184012, 0.514804, 0.776376, 0.289312, 0.205187)
+var float[] COEF = array.from(-0.352616, 0.894872, 0.009139, 0.040244, 0.043647, -0.079019, 0.056581, 0.140414, -0.153557, -0.154739, 0.041198, -0.086485, 0.065625, -0.060420, 0.015590, 0.230344, 0.045092, 0.002660)
+float B0 = -1.465463
+// cumulative share of the day's variance elapsed at each 5-min bar close (bar 0 = 09:15-09:20 ... bar 74)
+var float[] CP_NIFTY = array.from(0.0878, 0.1165, 0.1412, 0.1650, 0.1854, 0.2028, 0.2208, 0.2357, 0.2498, 0.2640, 0.2765, 0.2877, 0.3004, 0.3119, 0.3232, 0.3340, 0.3430, 0.3526, 0.3621, 0.3703, 0.3788, 0.3884, 0.3968, 0.4047, 0.4141, 0.4220, 0.4300, 0.4391, 0.4474, 0.4557, 0.4642, 0.4719, 0.4805, 0.4898, 0.4981, 0.5067, 0.5162, 0.5248, 0.5341, 0.5444, 0.5527, 0.5612, 0.5708, 0.5800, 0.5894, 0.6011, 0.6118, 0.6224, 0.6335, 0.6440, 0.6547, 0.6671, 0.6797, 0.6915, 0.7043, 0.7171, 0.7306, 0.7462, 0.7590, 0.7718, 0.7872, 0.8015, 0.8174, 0.8358, 0.8509, 0.8644, 0.8797, 0.8929, 0.9131, 0.9457, 0.9618, 0.9752, 0.9845, 0.9930, 1.0000)
+var float[] CP_BANK  = array.from(0.0997, 0.1293, 0.1513, 0.1725, 0.1907, 0.2072, 0.2230, 0.2365, 0.2497, 0.2639, 0.2765, 0.2872, 0.2984, 0.3086, 0.3189, 0.3288, 0.3373, 0.3461, 0.3552, 0.3634, 0.3719, 0.3810, 0.3893, 0.3973, 0.4058, 0.4133, 0.4214, 0.4299, 0.4378, 0.4461, 0.4544, 0.4623, 0.4707, 0.4795, 0.4877, 0.4961, 0.5054, 0.5138, 0.5226, 0.5324, 0.5418, 0.5505, 0.5600, 0.5695, 0.5792, 0.5900, 0.6006, 0.6117, 0.6229, 0.6336, 0.6450, 0.6574, 0.6699, 0.6818, 0.6947, 0.7076, 0.7211, 0.7361, 0.7492, 0.7632, 0.7787, 0.7940, 0.8099, 0.8283, 0.8444, 0.8595, 0.8753, 0.8903, 0.9096, 0.9377, 0.9548, 0.9690, 0.9811, 0.9906, 1.0000)
+
+// ---------------------------------------------------------------- option pricing helpers (same kernel as expiry_edge/options.py)
+f_ncdf(float x) =>
+    float ax = math.abs(x)
+    float t = 1.0 / (1.0 + 0.2316419 * ax)
+    float poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))))
+    float pdf = math.exp(-0.5 * ax * ax) / math.sqrt(2 * math.pi)
+    float c = 1.0 - pdf * poly
+    x >= 0 ? c : 1.0 - c
+
+f_bs(float S, float K, float V, bool isCall) =>
+    float intrinsic = isCall ? math.max(S - K, 0) : math.max(K - S, 0)
+    float out = intrinsic
+    if V > 1e-12
+        float sv = math.sqrt(V)
+        float d1 = (math.log(S / K) + 0.5 * V) / sv
+        float d2 = d1 - sv
+        out := isCall ? S * f_ncdf(d1) - K * f_ncdf(d2) : K * f_ncdf(-d2) - S * f_ncdf(-d1)
+    math.max(out, 0.05)
+
+// ---------------------------------------------------------------- daily context (completed days only: [1] + lookahead_on = no repaint)
+float parkD   = math.pow(math.log(high / low), 2) / (4 * math.log(2))
+float rv20e   = math.sqrt(ta.sma(parkD, 20)) * 100
+float rng20e  = ta.sma((high - low) / open * 100, 20)
+float rvRankE = ta.percentrank(rv20e, 250) / 100
+[rv20, range20, rvRank, prevClose] = request.security(syminfo.tickerid, "D", [rv20e[1], rng20e[1], rvRankE[1], close[1]], lookahead = barmerge.lookahead_on)
+float sigma0 = vrp * rv20 / 100
+
+// ---------------------------------------------------------------- session bookkeeping (IST)
+string TZ = "Asia/Kolkata"
+bool firstBar = session.isfirstbar
+var int   bi = -1            // bar index within the session (0 = 09:15 bar)
+var float dayOpen = na
+var float dayHigh = na
+var float dayLow  = na
+var float prevDayHigh = na   // cumulative high BEFORE this bar
+var float prevDayLow  = na
+var float orHigh = na
+var float orLow  = na
+var float r2cum = 0.0
+if firstBar
+    bi := 0
+    dayOpen := open
+    dayHigh := high
+    dayLow  := low
+    prevDayHigh := na
+    prevDayLow  := na
+    orHigh := high
+    orLow  := low
+    r2cum := math.pow(math.log(close / open), 2)
+else
+    bi += 1
+    prevDayHigh := dayHigh
+    prevDayLow  := dayLow
+    dayHigh := math.max(dayHigh, high)
+    dayLow  := math.min(dayLow, low)
+    if bi <= 5
+        orHigh := math.max(orHigh, high)
+        orLow  := math.min(orLow, low)
+    r2cum += math.pow(math.log(close / close[1]), 2)
+
+int m0 = (hour(time, TZ) - 9) * 60 + minute(time, TZ) - 15 + 4        // bar-close minute index (4 .. 374)
+bool inSession = m0 >= 4 and m0 <= 374 and timeframe.period == "5"
+
+// expiry flag: weekday match (Sunday = 1 in Pine) or manual override
+int wd = dayofweek(time, TZ)
+int expWd = expiryDay == "Monday" ? 2 : expiryDay == "Tuesday" ? 3 : expiryDay == "Wednesday" ? 4 : expiryDay == "Thursday" ? 5 : 6
+bool isExpiry = forceExpiry or wd == expWd
+bool casRegime = time >= timestamp(TZ, 2026, 8, 3, 0, 0)
+
+// ---------------------------------------------------------------- intraday indicators (unconditional so they update every bar)
+float atr14 = ta.atr(14)
+float ema9  = ta.ema(close, 9)
+float ema21 = ta.ema(close, 21)
+float basis = ta.sma(close, 20)
+float dev   = 2 * ta.stdev(close, 20)
+float bbBw  = (basis + dev - (basis - dev)) / basis * 100
+float bbPct = ta.percentrank(bbBw, 150)
+
+// ---------------------------------------------------------------- raw features (same definitions as expiry_edge/model.py)
+float tod = m0 / 375.0
+float gapAbs = math.min(math.abs(dayOpen / prevClose - 1) * 100, 3)
+float rng = dayHigh - dayLow
+float rangeSoFarRel = math.min(rng / dayOpen * 100 / range20, 4)
+float or30Rel = bi >= 5 ? math.min((orHigh - orLow) / dayOpen * 100 / range20, 3) : rangeSoFarRel
+float posInRange = rng > 0 ? (close - dayLow) / rng : 0.5
+float posEdge = math.abs(posInRange - 0.5) * 2
+float distEdgeAtr = math.min(math.min(dayHigh - close, close - dayLow) / atr14, 5)
+float absRet15 = bi >= 3 ? math.min(math.abs(close / close[3] - 1) * 100, 2) : 0.0
+float absRet30 = bi >= 6 ? math.min(math.abs(close / close[6] - 1) * 100, 3) : 0.0
+float barRangeAtr = math.min((high - low) / atr14, 6)
+float absEmaSpread = math.min(math.abs(ema9 - ema21) / atr14, 5)
+float cpNow = bi >= 0 and bi <= 74 ? array.get(profileSel == "NIFTY" ? CP_NIFTY : CP_BANK, bi) : 1.0
+float expVar = sigma0 * sigma0 * math.max(cpNow, 0.000001)
+float varSpent = r2cum / expVar
+float logVarSpent = math.log(math.max(math.min(varSpent, 20), 0.05))
+bool newHigh = bi > 0 and close > prevDayHigh
+bool newLow  = bi > 0 and close < prevDayLow
+float breakout = newHigh or newLow ? 1.0 : 0.0
+bool orBreakUp = bi >= 6 and close > orHigh and (bi == 6 or close[1] <= orHigh)
+bool orBreakDn = bi >= 6 and close < orLow  and (bi == 6 or close[1] >= orLow)
+float orBreak = orBreakUp or orBreakDn ? 1.0 : 0.0
+float isExp = isExpiry ? 1.0 : 0.0
+
+// ---------------------------------------------------------------- logistic score
+float z = B0
+z += (tod - array.get(MEAN, 0)) / array.get(STD, 0) * array.get(COEF, 0)
+z += (tod * tod - array.get(MEAN, 1)) / array.get(STD, 1) * array.get(COEF, 1)
+z += (isExp - array.get(MEAN, 2)) / array.get(STD, 2) * array.get(COEF, 2)
+z += (tod * isExp - array.get(MEAN, 3)) / array.get(STD, 3) * array.get(COEF, 3)
+z += (gapAbs - array.get(MEAN, 4)) / array.get(STD, 4) * array.get(COEF, 4)
+z += (rvRank - array.get(MEAN, 5)) / array.get(STD, 5) * array.get(COEF, 5)
+z += (or30Rel - array.get(MEAN, 6)) / array.get(STD, 6) * array.get(COEF, 6)
+z += (rangeSoFarRel - array.get(MEAN, 7)) / array.get(STD, 7) * array.get(COEF, 7)
+z += (posEdge - array.get(MEAN, 8)) / array.get(STD, 8) * array.get(COEF, 8)
+z += (distEdgeAtr - array.get(MEAN, 9)) / array.get(STD, 9) * array.get(COEF, 9)
+z += (absRet15 - array.get(MEAN, 10)) / array.get(STD, 10) * array.get(COEF, 10)
+z += (absRet30 - array.get(MEAN, 11)) / array.get(STD, 11) * array.get(COEF, 11)
+z += (barRangeAtr - array.get(MEAN, 12)) / array.get(STD, 12) * array.get(COEF, 12)
+z += (bbPct - array.get(MEAN, 13)) / array.get(STD, 13) * array.get(COEF, 13)
+z += (absEmaSpread - array.get(MEAN, 14)) / array.get(STD, 14) * array.get(COEF, 14)
+z += (logVarSpent - array.get(MEAN, 15)) / array.get(STD, 15) * array.get(COEF, 15)
+z += (breakout - array.get(MEAN, 16)) / array.get(STD, 16) * array.get(COEF, 16)
+z += (orBreak - array.get(MEAN, 17)) / array.get(STD, 17) * array.get(COEF, 17)
+float score = inSession and not na(rv20) and not na(atr14) ? 1 / (1 + math.exp(-z)) : na
+
+// ---------------------------------------------------------------- strike suggestion with estimated premiums
+// remaining variance: pre-CAS = sigma^2 * (1 - elapsed share); CAS = 25% reserved for the auction, cash session ends 15:15 (bar 71)
+float cpT = array.get(profileSel == "NIFTY" ? CP_NIFTY : CP_BANK, 71)
+float remShare = casRegime ? (bi <= 71 ? 0.75 * math.max(1 - cpNow / cpT, 0) + 0.25 : 0.25) : math.max(1 - cpNow, 0)
+// reactive vol: blend the day's prior with realised vol of the last 6 bars (30 min), clamped to [0.5, 3] x prior
+float rvWin = 0.0
+for i = 0 to 5
+    rvWin += bi - i >= 1 ? math.pow(math.log(close[i] / close[i + 1]), 2) : 0.0
+float shareWin = bi >= 6 ? cpNow - array.get(profileSel == "NIFTY" ? CP_NIFTY : CP_BANK, bi - 6) : cpNow
+float sigHat2 = shareWin > 0 ? rvWin / shareWin : sigma0 * sigma0
+float sigNow = bi >= 6 ? math.min(math.max(math.sqrt(0.5 * sigma0 * sigma0 + 0.5 * sigHat2), 0.5 * sigma0), 3 * sigma0) : sigma0
+float Vrem = sigNow * sigNow * remShare
+float K0 = math.round(close / strikeStep) * strikeStep
+bool  sideCall = newHigh or (not newLow and close >= K0)      // display side: breakout side, else nearer side
+float sgn = sideCall ? 1.0 : -1.0
+float premATM = math.max(f_bs(close, K0, Vrem, sideCall), premFloor)
+float prem1 = math.max(f_bs(close, K0 + sgn * strikeStep, Vrem, sideCall), premFloor)
+float prem2 = math.max(f_bs(close, K0 + 2 * sgn * strikeStep, Vrem, sideCall), premFloor)
+// auto = nearest OTM strike whose estimated premium is <= cap (1 OTM, else 2 OTM), else 1 OTM; 3 OTM is never suggested
+int kSel = otmMode == "ATM" ? 0 : otmMode == "1 OTM" ? 1 : otmMode == "2 OTM" ? 2 : (prem1 <= premCap ? 1 : prem2 <= premCap ? 2 : 1)
+float Ksel = K0 + kSel * sgn * strikeStep
+float premSel = kSel == 0 ? premATM : kSel == 1 ? prem1 : prem2
+string strikeTxt = str.tostring(Ksel, "#") + (sideCall ? " CE" : " PE") + " ~" + str.tostring(premSel, "#.#")
+
+// ---------------------------------------------------------------- verdict
+int cutoffMinute = (cutoffHour - 9) * 60 + cutoffMin - 15
+bool pastCutoff = m0 > cutoffMinute
+bool blackout = casRegime and m0 >= 360            // 15:15 onward: cash index frozen (CAS)
+bool goCE   = inSession and not pastCutoff and newHigh and score >= goThr
+bool goPE   = inSession and not pastCutoff and newLow  and score >= goThr
+bool leanCE = inSession and not pastCutoff and newHigh and score >= leanThr and score < goThr
+bool leanPE = inSession and not pastCutoff and newLow  and score >= leanThr and score < goThr
+bool alertOK = not onlyExpiryAlerts or isExpiry
+string verdict = not inSession ? "off-session" : blackout ? "CAS BLACKOUT — exit by 15:15" : pastCutoff ? "CUTOFF — no new entries" :
+     goCE ? "GO — buy ATM CE" : goPE ? "GO — buy ATM PE" : leanCE ? "LEAN — ATM CE half size" : leanPE ? "LEAN — ATM PE half size" :
+     (newHigh or newLow) ? "NO — breakout but score low" : "WAIT — no breakout"
+
+// ---------------------------------------------------------------- plots
+color cGo = color.new(#0a7d0a, 0)
+color cLean = color.new(#c98500, 0)
+color cScore = color.new(#2a78d6, 0)
+plot(score * 100, "Buy score (%)", color = cScore, linewidth = 2)
+hline(goThr * 100, "GO", color = color.new(#0a7d0a, 40), linestyle = hline.style_dashed)
+hline(leanThr * 100, "LEAN", color = color.new(#c98500, 40), linestyle = hline.style_dashed)
+hline(21, "base rate", color = color.new(#898781, 60), linestyle = hline.style_dotted)
+bgcolor(goCE or goPE ? color.new(#0a7d0a, 80) : leanCE or leanPE ? color.new(#c98500, 85) : blackout ? color.new(#d03b3b, 88) : na)
+plotshape(goCE or leanCE, "CE signal", shape.triangleup, location.bottom, color = goCE ? cGo : cLean, size = size.small, text = "CE")
+plotshape(goPE or leanPE, "PE signal", shape.triangledown, location.top, color = goPE ? cGo : cLean, size = size.small, text = "PE")
+
+// ---------------------------------------------------------------- status table
+var table tb = table.new(position.top_right, 2, 10, border_width = 1)
+if showTable and barstate.islast
+    table.cell(tb, 0, 0, "Expiry Edge", text_color = color.white, bgcolor = color.new(#1c5cab, 0))
+    table.cell(tb, 1, 0, verdict, text_color = color.white, bgcolor = goCE or goPE ? cGo : leanCE or leanPE ? cLean : color.new(#52514e, 0))
+    table.cell(tb, 0, 1, "score")
+    table.cell(tb, 1, 1, na(score) ? "n/a" : str.tostring(score * 100, "#") + "%")
+    table.cell(tb, 0, 2, "expiry day")
+    table.cell(tb, 1, 2, isExpiry ? "YES" : "no")
+    table.cell(tb, 0, 3, "gap")
+    table.cell(tb, 1, 3, str.tostring((dayOpen / prevClose - 1) * 100, "+#.##") + "%")
+    table.cell(tb, 0, 4, "rv20 / rank")
+    table.cell(tb, 1, 4, str.tostring(rv20, "#.##") + "% / " + str.tostring(rvRank, "#.##"))
+    table.cell(tb, 0, 5, "range vs typical")
+    table.cell(tb, 1, 5, str.tostring(rangeSoFarRel, "#.##") + "x")
+    table.cell(tb, 0, 6, "variance spent")
+    table.cell(tb, 1, 6, str.tostring(varSpent, "#.##") + "x budget")
+    table.cell(tb, 0, 7, "day high / low")
+    table.cell(tb, 1, 7, str.tostring(dayHigh, "#") + " / " + str.tostring(dayLow, "#"))
+    table.cell(tb, 0, 8, "CAS")
+    table.cell(tb, 1, 8, casRegime ? "exit by 15:15" : "pre-CAS")
+    table.cell(tb, 0, 9, "strike (est. prem)")
+    table.cell(tb, 1, 9, strikeTxt + "  | ATM ~" + str.tostring(premATM, "#.#") + " · +1 ~" + str.tostring(prem1, "#.#") + " · +2 ~" + str.tostring(prem2, "#.#"))
+
+// ---------------------------------------------------------------- alerts (webhook-friendly JSON)
+string side = goCE or leanCE ? "CE" : "PE"
+string grade = goCE or goPE ? "GO" : "LEAN"
+if barstate.isconfirmed and alertOK and (goCE or goPE or leanCE or leanPE)
+    alert('{"src":"ExpiryEdge","symbol":"' + syminfo.ticker + '","grade":"' + grade + '","side":"' + side +
+         '","score":' + str.tostring(score, "#.###") + ',"spot":' + str.tostring(close, "#.##") +
+         ',"strike":' + str.tostring(Ksel, "#") + ',"est_premium":' + str.tostring(premSel, "#.##") +
+         ',"time":"' + str.format_time(time_close, "HH:mm", TZ) + '","expiry":' + (isExpiry ? "true" : "false") + '}', alert.freq_once_per_bar_close)
+alertcondition(goCE, "EE GO CE", "Expiry Edge: GO — buy ATM CE (score >= GO threshold, new day high)")
+alertcondition(goPE, "EE GO PE", "Expiry Edge: GO — buy ATM PE (score >= GO threshold, new day low)")
+alertcondition(leanCE or leanPE, "EE LEAN", "Expiry Edge: LEAN signal (half size)")
+alertcondition(blackout and not blackout[1], "EE CAS blackout", "Expiry Edge: 15:15 — cash index frozen, exit expiring options")

@@ -1,0 +1,4 @@
+vol_regime,days,range_pct_med,abs_last_hour_med,p_range_gt_straddle,p_close_outside_straddle
+low,22,0.785,0.142,0.909,0.455
+mid,10,0.636,0.185,0.9,0.2
+high,13,0.705,0.083,0.615,0.154

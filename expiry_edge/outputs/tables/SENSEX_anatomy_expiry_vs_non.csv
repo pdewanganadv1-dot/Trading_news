@@ -1,0 +1,3 @@
+is_expiry,days,range_pct_med,range_pct_mean,fh_range_pct_med,abs_move_1430_1525_med,abs_move_1430_1525_mean,p_abs_last_hour_gt_0.3pct,p_abs_last_hour_gt_0.5pct,abs_move_1500_1525_med,p_abs_1500_1525_gt_0.25pct,range_1430_1525_med,last_hour_same_sign_pct,straddle_open_pct_med,p_range_gt_straddle,p_range_gt_2straddle,p_close_outside_straddle
+False,170.0,0.74,0.82,0.4,0.13,0.18,16.47,4.12,0.09,9.41,0.27,52.35,0.43,90.0,35.88,37.65
+True,45.0,0.69,0.76,0.43,0.15,0.17,17.78,4.44,0.09,13.33,0.33,40.0,0.44,82.22,31.11,31.11

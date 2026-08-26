@@ -1,0 +1,507 @@
+<title>Expiry Edge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@87.5,500;87.5,700;100,400;100,600;100,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f3f5f8;
+    --surface: #ffffff;
+    --surface-2: #e9edf3;
+    --ink: #16233b;
+    --ink-2: #4b5670;
+    --muted: #7d8699;
+    --line: #d6dbe5;
+    --accent: #1c5cab;
+    --accent-ink: #ffffff;
+    --grid: #dfe3ea;
+    --good: #0a7d0a; --good-bg: #e3f4e3;
+    --warn: #8a5a00; --warn-bg: #fff1cc;
+    --bad: #b02a2a; --bad-bg: #fbe3e3;
+    --blue: #2a78d6; --orange: #eb6834; --aqua: #1baf7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0f1420; --surface: #171e2e; --surface-2: #1f2739;
+      --ink: #e7eaf0; --ink-2: #b4bccb; --muted: #8b95a8; --line: #2b3549;
+      --accent: #7fb0f0; --accent-ink: #0f1420; --grid: #2b3244;
+      --good: #6fd36f; --good-bg: #16331a; --warn: #f2c14e; --warn-bg: #3a2d0c; --bad: #ff8a8a; --bad-bg: #3d1717;
+      --blue: #3987e5; --orange: #d95926; --aqua: #199e70;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1420; --surface: #171e2e; --surface-2: #1f2739;
+    --ink: #e7eaf0; --ink-2: #b4bccb; --muted: #8b95a8; --line: #2b3549;
+    --accent: #7fb0f0; --accent-ink: #0f1420; --grid: #2b3244;
+    --good: #6fd36f; --good-bg: #16331a; --warn: #f2c14e; --warn-bg: #3a2d0c; --bad: #ff8a8a; --bad-bg: #3d1717;
+    --blue: #3987e5; --orange: #d95926; --aqua: #199e70;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Source Serif 4", Georgia, "Times New Roman", serif; font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .page { max-width: 1120px; margin: 0 auto; padding: 32px 20px 80px; display: grid; grid-template-columns: 1fr; gap: 0 40px; }
+  @media (min-width: 980px) { .page { grid-template-columns: 220px minmax(0, 1fr); } }
+  nav.toc { display: none; }
+  @media (min-width: 980px) {
+    nav.toc { display: block; position: sticky; top: 24px; align-self: start; font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 13px; }
+    nav.toc ol { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--line); }
+    nav.toc li a { display: block; padding: 6px 0 6px 14px; color: var(--ink-2); text-decoration: none; border-left: 2px solid transparent; margin-left: -1px; }
+    nav.toc li a:hover { color: var(--ink); border-left-color: var(--accent); }
+    nav.toc .eyebrow { margin-bottom: 10px; }
+  }
+  main { min-width: 0; }
+  .eyebrow { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 40px; }
+  h1 { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-variation-settings: "wdth" 87.5; font-weight: 700; font-size: clamp(38px, 6vw, 60px); line-height: 1.02; letter-spacing: -0.02em; margin: 10px 0 14px; text-wrap: balance; }
+  .lede { font-size: 20px; line-height: 1.5; max-width: 66ch; color: var(--ink-2); margin: 0 0 18px; }
+  .meta { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 22px; }
+  h2 { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-variation-settings: "wdth" 87.5; font-weight: 700; font-size: 30px; line-height: 1.12; letter-spacing: -0.015em; margin: 56px 0 16px; text-wrap: balance; }
+  h3 { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-weight: 600; font-size: 19px; margin: 32px 0 10px; letter-spacing: -0.005em; }
+  p { max-width: 68ch; margin: 0 0 16px; }
+  p.wide { max-width: none; }
+  section { scroll-margin-top: 20px; }
+  .findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 22px 0 8px; }
+  .finding { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px 14px; }
+  .finding .k { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-weight: 700; font-size: 30px; letter-spacing: -0.02em; line-height: 1; color: var(--ink); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  .finding .k small { font-size: 14px; font-weight: 600; color: var(--muted); letter-spacing: 0; }
+  .finding .t { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 14.5px; line-height: 1.4; color: var(--ink-2); }
+  figure { margin: 26px 0 30px; }
+  figure .chart { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 10px 6px; overflow-x: auto; }
+  figure .chart svg { width: 100%; height: auto; display: block; max-width: 100%; }
+  figcaption { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); margin-top: 10px; max-width: 80ch; }
+  .clock { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 14px 8px; margin: 22px 0 8px; overflow-x: auto; }
+  .clock svg { width: 100%; min-width: 640px; height: auto; display: block; }
+  .clock text { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; }
+  .clock .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  table { border-collapse: collapse; width: 100%; font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; margin: 18px 0 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
+  th { font-weight: 600; color: var(--ink-2); font-size: 11.5px; letter-spacing: 0.03em; text-transform: uppercase; background: var(--surface-2); white-space: normal; line-height: 1.25; vertical-align: bottom; }
+  th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 150px; }
+  tr:last-child td { border-bottom: none; }
+  td.pos { color: var(--good); font-weight: 600; } td.neg { color: var(--bad); }
+  table.wrap td { white-space: normal; font-size: 13px; text-align: left; vertical-align: top; } table.wrap th { text-align: left; }
+  table.cas td:first-child { min-width: 120px; font-weight: 600; } table.cas .pos { color: var(--good); font-weight: 600; } table.cas .neg { color: var(--bad); font-weight: 600; }
+  .chip { display: inline-block; font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; line-height: 1.3; }
+  .chip.go { background: var(--good-bg); color: var(--good); } .chip.lean { background: var(--warn-bg); color: var(--warn); } .chip.no { background: var(--bad-bg); color: var(--bad); }
+  .callout { border-left: 3px solid var(--accent); background: var(--surface); padding: 14px 18px; margin: 22px 0; border-radius: 0 6px 6px 0; }
+  .callout p { margin-bottom: 8px; } .callout p:last-child { margin-bottom: 0; }
+  .callout.warn { border-left-color: var(--warn); }
+  .playbook { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 12px; }
+  .playbook li { display: grid; grid-template-columns: 96px 1fr; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+  .playbook .when { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 13px; color: var(--accent); font-weight: 500; padding-top: 3px; }
+  .playbook .what { font-size: 15.5px; line-height: 1.5; }
+  .playbook .what b { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-weight: 600; }
+  .checklist { list-style: none; padding: 0; margin: 14px 0 24px; max-width: 72ch; }
+  .checklist li { padding: 8px 0 8px 30px; position: relative; border-bottom: 1px dashed var(--line); font-size: 15.5px; }
+  .checklist li::before { content: ""; position: absolute; left: 4px; top: 13px; width: 14px; height: 14px; border: 1.5px solid var(--muted); border-radius: 3px; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 0.88em; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; }
+  pre { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .sources { font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+  .sources ol { padding-left: 20px; } .sources li { margin-bottom: 5px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-family: "Archivo", "Helvetica Neue", Arial, sans-serif; font-size: 13px; color: var(--ink-2); margin: 6px 0 0; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="page">
+<nav class="toc" aria-label="Contents">
+  <div class="eyebrow">Contents</div>
+  <ol>
+    <li><a href="#tldr">The short version</a></li>
+    <li><a href="#cas">What CAS changed</a></li>
+    <li><a href="#anatomy">Anatomy of an expiry day</a></li>
+    <li><a href="#signals">Do technicals predict expansion?</a></li>
+    <li><a href="#sellers">Buyer vs seller</a></li>
+    <li><a href="#score">The buy-score indicator</a></li>
+    <li><a href="#otm">Cheap OTM blasts</a></li>
+    <li><a href="#casmonth">The CAS month, checked</a></li>
+    <li><a href="#playbook">The playbook</a></li>
+    <li><a href="#toolkit">Using the toolkit</a></li>
+    <li><a href="#limits">Limits &amp; next steps</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">NIFTY (Tue) · SENSEX (Thu) · 0DTE option entries after the Closing Auction Session</div>
+  <h1>Expiry Edge</h1>
+  <p class="lede">Which technical triggers actually precede option-premium expansion on an index expiry day, what the new Closing Auction Session did to the last 25 minutes, a calibrated buy-score you can put on a chart, and a clock-based rulebook for deciding whether to take the entry at all.</p>
+  <div class="meta">
+    <span>prepared 26 Aug 2026</span>
+    <span>data: 268 NIFTY · 442 BANKNIFTY · 45 SENSEX expiry days (1-min index bars, 2016–2026)</span>
+    <span>CAS live since 3 Aug 2026 (4 expiries per index observed)</span>
+    <span>buy-score model: 238k bars, out-of-sample 2022–24</span>
+    <span>August 2026 CAS expiries checked against published data (7 of 7)</span>
+  </div>
+</header>
+
+<section id="tldr">
+  <h2>The short version</h2>
+  <p>Most of what retail expiry-day playbooks recommend for option buying — EMA crossovers, RSI, VWAP reclaims, first-15-minute breakouts, previous-day-high breaks — shows no edge once you price the option honestly and net out costs. Bought at those triggers on expiry days, an ATM NIFTY option returns about the same as one bought at a random moment: roughly −5% to −12% per hour of holding. The index moves the trader's way about half the time (50–55%), which is not enough to beat time decay.</p>
+  <p>Two things do pay buyers, and both are about <em>where in the day</em> and <em>how compressed</em> the day is rather than about any indicator: a breakout of the day's range after 14:15 on a day with no big opening gap, and (weaker, more model-dependent) an opening-range breakout in the direction of a gap larger than 0.5%. Both edges live in the tail — the trade is positive after an hour only 37–47% of the time — so a −30% stop with a +50% target destroys them.</p>
+  <p>Those two findings are now a single number. The buy-score is the probability, computed on every 5-minute bar from features a chart can see, that an ATM straddle bought at that bar touches +30% within the hour. Out of sample it separates well (AUC 0.68 on expiry days) and is calibrated: bars scored 50% delivered 50%. Paired with the bar's own breakout for direction, a score of 0.40 or more produced 1.3 entries per NIFTY expiry with a +52% mean net return over the next hour (BANKNIFTY +70%). It is a Pine Script indicator and a Python script in the toolkit. Since the goal is cheap options that “blast”, the strike question was tested separately: on GO signals the nearest out-of-the-money strike priced under about ₹10 reached 5× within the hour on 21% of NIFTY signals (BANKNIFTY 27%) with a mean net return of +83% — and lost most of its premium four times in five. Three strikes out is a losing lottery even on GO signals; bought at random moments, every OTM strike loses.</p>
+  <p>Run against the seven August expiries that have actually happened under CAS (reconstructed from NSE's daily files, live-blog timestamps, Zerodha's readings and SEBI's order), the rule produced two NIFTY GO signals — a −63% (4 Aug, the auction reversed the day) and a +231% by 15:15 that became a 14× at settlement (25 Aug) — kept you out of four days where nothing happened or the move came after the cutoff, and rejected the one SENSEX breakout that would have lost 89%. The month's largest single fact is CAS-specific: the 15:15-to-close auction move averaged 0.23%, was positive on six of seven expiries, and turned the nearest OTM call at 15:15 into a multi-bagger four times. That is seven observations, not a strategy — but it is where the blasts went.</p>
+  <p>CAS moved the theta. Before 3 August a 0DTE straddle bled to about 15–20% of its opening value by 15:15; now roughly 50% is still there at 15:15, because the market prices the auction print as a coin-flip that options cannot hedge. Sellers no longer collect the last 25 minutes of decay by trading; they collect it only by holding through an auction that SEBI has already found was manipulated once (SENSEX, 13 August). Buyers get a cheaper afternoon but a hard 15:15 deadline.</p>
+  <div class="findings">
+    <div class="finding"><div class="k">−7.1%<small> /hr</small></div><div class="t">Mean net return of an ATM NIFTY option bought at a random moment on expiry day and held 60 minutes (BANKNIFTY −5.7%, SENSEX −7.6%).</div></div>
+    <div class="finding"><div class="k">+7.9% · +30%</div><div class="t">Net 60-min return of an ATM option bought on a post-14:15 range breakout, NIFTY (n=140) and BANKNIFTY (n=201). Premium touched +100% in 36% / 42% of cases.</div></div>
+    <div class="finding"><div class="k">+7.7%</div><div class="t">ORB30 in the gap direction when the gap exceeds 0.5% (NIFTY, n=106, index hit-rate 60%). Without the gap filter: −0.4%.</div></div>
+    <div class="finding"><div class="k">50%<small> at 15:15</small></div><div class="t">Share of the opening 0DTE straddle still intact at 15:15 under CAS (18 Aug NIFTY 88→44, 20 Aug SENSEX 266→138). Pre-CAS model: ~19%.</div></div>
+    <div class="finding"><div class="k">+151 · −11</div><div class="t">NIFTY points moved between the 15:15 print and the auction close on the two clean CAS expiries so far (4 Aug, 18 Aug). SENSEX: +171, +250*, +52 (*SEBI: manipulated).</div></div>
+    <div class="finding"><div class="k">0.68<small> AUC</small></div><div class="t">Buy-score out-of-sample discrimination on expiry days; top-decile bars deliver a +30% straddle move 50% of the time vs a 21% base rate. Direction remains a coin flip (AUC 0.51).</div></div>
+    <div class="finding"><div class="k">21%<small> 5× odds</small></div><div class="t">Share of NIFTY GO signals where the nearest OTM strike priced ≤ ₹10 reached 5× within 60 min (10×: 11%); BANKNIFTY 27% / 13%. Random-moment OTM buys: 3–4% and negative expectancy.</div></div>
+    <div class="finding"><div class="k">86.6%</div><div class="t">Expiry days whose high–low range exceeds the opening ATM straddle (NIFTY 2019–24). Zerodha's 2026 sample: 83%. The close ends outside the straddle only 36% of the time.</div></div>
+  </div>
+</section>
+
+<section id="cas">
+  <h2>What the Closing Auction Session changed</h2>
+  <p>SEBI's circular of 16 January 2026 replaced the last-30-minute VWAP close with a call auction for every cash-segment stock that has derivatives — 208 stocks, which includes all 50 NIFTY and all 30 SENSEX constituents. It went live on Monday 3 August 2026 on both NSE and BSE with identical timings. Continuous trading in those stocks now stops at 15:15; the closing price is a single equilibrium price discovered between 15:30 and 15:35; and the whole equity-derivatives segment — index options included — trades until 15:40.</p>
+  <div class="clock">
+    <svg viewBox="0 0 920 270" role="img" aria-label="CAS timeline from 15:00 to 15:40">
+      <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--ink-2)"/></marker></defs>
+      <!-- x map: 15:00→40, 15:15→220 (12px/min), then 130px per 5 min: 15:20→350, 15:25→480, 15:30→610, 15:35→740, 15:40→870 -->
+      <line x1="40" y1="130" x2="870" y2="130" stroke="var(--line)" stroke-width="2"/>
+      <rect x="40" y="108" width="180" height="44" fill="var(--blue)" opacity="0.18"/>
+      <rect x="220" y="108" width="130" height="44" fill="var(--muted)" opacity="0.22"/>
+      <rect x="350" y="108" width="130" height="44" fill="var(--orange)" opacity="0.28"/>
+      <rect x="480" y="108" width="130" height="44" fill="var(--orange)" opacity="0.45"/>
+      <rect x="610" y="108" width="130" height="44" fill="var(--aqua)" opacity="0.35"/>
+      <rect x="740" y="108" width="130" height="44" fill="var(--surface-2)" stroke="var(--line)"/>
+      <g class="mono" font-size="12" fill="var(--ink-2)">
+        <text x="40" y="172" text-anchor="middle">15:00</text>
+        <text x="220" y="172" text-anchor="middle">15:15</text>
+        <text x="350" y="172" text-anchor="middle">15:20</text>
+        <text x="480" y="172" text-anchor="middle">15:25</text>
+        <text x="610" y="172" text-anchor="middle">15:30</text>
+        <text x="740" y="172" text-anchor="middle">15:35</text>
+        <text x="870" y="172" text-anchor="middle">15:40</text>
+      </g>
+      <g font-size="12.5" fill="var(--ink)" font-weight="600">
+        <text x="130" y="98" text-anchor="middle">reference VWAP</text>
+        <text x="285" y="98" text-anchor="middle">transition</text>
+        <text x="415" y="98" text-anchor="middle">orders: limit + market</text>
+        <text x="545" y="98" text-anchor="middle">orders: limit only</text>
+        <text x="675" y="98" text-anchor="middle">matching</text>
+        <text x="805" y="98" text-anchor="middle">close known</text>
+      </g>
+      <g font-size="11" fill="var(--ink-2)">
+        <text x="130" y="127" text-anchor="middle">stocks trade</text><text x="130" y="141" text-anchor="middle">normally</text>
+        <text x="285" y="127" text-anchor="middle">no orders,</text><text x="285" y="141" text-anchor="middle">cash index frozen</text>
+        <text x="415" y="127" text-anchor="middle">indicative price and</text><text x="415" y="141" text-anchor="middle">imbalance published</text>
+        <text x="545" y="127" text-anchor="middle">random close</text><text x="545" y="141" text-anchor="middle">15:28–15:30</text>
+        <text x="675" y="127" text-anchor="middle">one equilibrium</text><text x="675" y="141" text-anchor="middle">price per stock</text>
+        <text x="805" y="127" text-anchor="middle">options trade</text><text x="805" y="141" text-anchor="middle">at intrinsic</text>
+      </g>
+      <rect x="40" y="200" width="830" height="18" rx="3" fill="var(--accent)" opacity="0.92"/>
+      <text x="455" y="213" text-anchor="middle" font-size="12" font-weight="700" fill="var(--accent-ink)">index &amp; stock F&amp;O trade continuously 09:15 → 15:40 — no auction in F&amp;O</text>
+      <line x1="220" y1="62" x2="220" y2="104" stroke="var(--ink-2)" stroke-width="1" marker-end="url(#arr)"/>
+      <text x="224" y="56" text-anchor="start" font-size="12" fill="var(--ink-2)">15:15: continuous trading in F&amp;O stocks ends; the cash index stops updating</text>
+      <line x1="740" y1="248" x2="740" y2="222" stroke="var(--ink-2)" stroke-width="1" marker-end="url(#arr)"/>
+      <text x="885" y="264" text-anchor="end" font-size="12" fill="var(--ink-2)">~15:35: closing index published = settlement value of today's expiring index options</text>
+    </svg>
+  </div>
+  <p class="wide" style="font-family:'Archivo',sans-serif;font-size:13px;color:var(--muted);margin-top:6px">Price band during the auction: ±3% around the 15:00–15:15 VWAP. If no equilibrium price is found, the reference price becomes the close. Stop-loss and iceberg orders are not accepted in CAS; unexecuted limit orders carry over.</p>
+
+  <h3>Why this matters for a NIFTY or SENSEX option</h3>
+  <p>Some of the commentary in circulation claims index options are “not affected by CAS”. The circular says otherwise, in paragraph 4.9: the final settlement price of an index derivative is the closing price of the underlying index on expiry day, and that closing index is built from the constituents' closing prices — which are now auction prices. SEBI's own interim order of 19 August applies exactly this rule to SENSEX weekly options and computes the offenders' gains from it. So the expiring contract you are holding at 15:15 settles on a number that does not exist yet, is produced by a mechanism you cannot see in the option chain, and is published around 15:35 while your option still has five minutes of trading left.</p>
+  <p>Three consequences follow. First, the cash index you chart is frozen from 15:15 to 15:35, so every intraday technique — VWAP, EMA, breakouts — has no input for the last 25 minutes; only the exchange's indicative index (derived from the running equilibrium prices) carries information. Second, the option market keeps pricing the auction as uncertain: on the two clean NIFTY expiries so far, the ATM straddle was still worth 105% and 50% of its opening value at 15:15, against roughly 15–20% under the old close. Third, from about 15:35 to 15:40 the settlement value is public and options should trade at intrinsic — a five-minute window where “the market knows the answer”.</p>
+
+  <h3>What the first four weeks looked like</h3>
+  <figure>
+    <div class="chart">{{CHART:cas_observed}}</div>
+    <figcaption>Move from the 15:15 print to the auction-derived close on each expiry day since launch. Nifty's day-one non-expiry move was +201 points (0.82%). The 13 August SENSEX print is the subject of SEBI's ex-parte interim order against Copthall Mauritius (a JPMorgan entity) and Mansi Share &amp; Stock: ₹66.6 crore of limit buys placed 3% above reference across all 30 constituents within two seconds pushed the indicative SENSEX up 362 points, and the alleged gains (₹3.68 crore) were impounded.</figcaption>
+  </figure>
+  <p>The asymmetry between exchanges is the part to remember. On day one NSE's auction turned over ₹1,276 crore; BSE's turned over ₹10.8 crore. A SENSEX settlement can therefore be moved by tens of crores, which is what the 13 August order describes, whereas moving NIFTY's requires participation on a different scale. Both exchanges' auction volumes are still below 1% of daily cash turnover, and expiry-day option activity has dropped — Nuvama counted BSE expiry-day contracts down 33% and Jefferies put NSE options turnover down 14% in August versus July. SEBI has said the design will not be changed.</p>
+  <div class="callout warn">
+    <p><strong>Broker clocks moved too.</strong> Zerodha now squares off MIS positions in CAS stocks at 15:12 and in F&amp;O at 15:26; other brokers use 15:05–15:20. Check yours — a forced square-off inside the 15:15–15:35 information blackout is the worst possible exit.</p>
+  </div>
+</section>
+
+<section id="anatomy">
+  <h2>Anatomy of an expiry day</h2>
+  <p>The first question is whether expiry days are special at the index level at all. Across 268 NIFTY expiries (Thursday regime, Feb 2019–Mar 2024) they are not louder: the median high–low range is 0.96% against 0.99% on other days, and the last hour (14:30→15:25) moves a median 0.17% versus 0.19%. What changes is the <em>shape</em> of the day. The opening fifteen minutes carry 14% of the day's variance on expiry days against 17% otherwise, and the afternoon carries more; the 15:00–15:15 slot runs 17% hotter per minute on NIFTY expiries, 32% hotter on BANKNIFTY, and on SENSEX's 45 Friday expiries the 14:15–15:15 hour carried 30% of the day's variance against 18% on ordinary days.</p>
+  <figure>
+    <div class="chart">{{CHART:variance_profiles}}</div>
+    <figcaption>Share of the session's variance per minute, by time bucket. Expiry days (blue) front-load less and back-load more than other days (orange). The profile is what the option model uses for time decay, so this shape is also why afternoon premiums under-decay relative to a square-root-of-time rule.</figcaption>
+  </figure>
+  <p>The last hour also trends slightly more on expiry days. The 14:30→15:25 move has the same sign as the 09:15→14:30 move 58% of the time on NIFTY expiries against 53% on other days (BANKNIFTY 54% vs 49%). It is a small continuation bias, but it is the direction of the edge in the late-breakout trigger below.</p>
+  <figure>
+    <div class="chart">{{CHART:last_hour_hist}}</div>
+    <figcaption>Distribution of the NIFTY move from 14:30 to 15:25. The two curves are nearly identical: expiry days are not systematically wilder in the last hour, they are just a little more one-directional.</figcaption>
+  </figure>
+  <h3>How much does the opening straddle buy you?</h3>
+  <p>The modelled ATM straddle at 09:15 comes to a median 0.62% of spot for NIFTY in that period (BANKNIFTY 0.75%, SENSEX 0.43%). The day's range exceeded it on 86.6% of expiry days and exceeded twice the straddle on 28.7% — Zerodha's twelve 2026 readings give 83% and 25%, so the model sits where the market does. But a range is not a payoff: the close finished outside the opening straddle on only 36% of expiry days, and in the low-volatility tercile (where the trailing vol that prices the straddle is lowest) that rises to 44%, versus 29% in the middle tercile. Calm regimes are where opening straddles are cheapest relative to what the day delivers.</p>
+  <p>A quiet first hour does not predict a quiet last hour — the opposite. Split NIFTY expiries by first-hour range relative to a normal day, and the last hour moved more than 0.3% on 42% of the wide-first-hour days but only 24–27% of the tight or middle ones. Volatility clusters within the day; it does not “save up”.</p>
+  <div class="callout">
+    <p><strong>Tuesday check.</strong> The free NIFTY history ends before the September 2025 move to Tuesday expiries. As a proxy, BANKNIFTY minute bars on NIFTY's 35 Tuesday expiries (Sep 2025–Apr 2026) show the same signature at the close — the 15:00–15:15 slot runs 28% hotter than on other days — but a heavier open (28% of variance in the first 15 minutes vs 22%). Treat the afternoon findings as regime-stable and the morning ones as unverified for Tuesdays until you extend the data (see <a href="#limits">next steps</a>).</p>
+  </div>
+</section>
+
+<section id="signals">
+  <h2>Do technicals predict premium expansion?</h2>
+  <p>The test: at every 5-minute close on an expiry day where a trigger fired, buy the ATM option in the trigger's direction and follow it minute by minute along the real index path. The option is priced with a Black-Scholes kernel whose remaining variance follows the empirical expiry-day profile above, with implied vol that re-prices toward realised vol within the day (the way real 0DTE premiums fatten after a big bar). Costs are 0.5 index points per side for NIFTY and 1.0 for BANKNIFTY and SENSEX. The baseline is the same purchase made at every 15-minute mark in both directions — what a trader with no signal gets.</p>
+  <figure>
+    <div class="chart">{{CHART:signal_edge}}</div>
+    <figcaption>Mean 60-minute return, net of costs, of an ATM option bought at each trigger on expiry days. Dotted lines mark the no-signal baseline. Only the top two bars clear it by a margin worth having; everything from opening-range-15 downward is baseline or worse.</figcaption>
+  </figure>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Trigger (NIFTY expiry days)</th><th>events</th><th>index went your way (30 min)</th><th>premium touched +50% (60 min)</th><th>premium touched +100% (60 min)</th><th>mean 60-min return, net</th><th>positive after 60 min</th><th>verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Late-day range break (after 14:15)</td><td>140</td><td>49%</td><td>50%</td><td>36%</td><td class="pos">+7.9%</td><td>37%</td><td><span class="chip go">go</span></td></tr>
+      <tr><td>Range-expansion bar (5m range &gt; 2.5× ATR)</td><td>201</td><td>49%</td><td>44%</td><td>27%</td><td class="pos">+3.8%</td><td>39%</td><td><span class="chip lean">lean</span></td></tr>
+      <tr><td>ORB30, gap &gt; 0.5% only</td><td>106</td><td>60%</td><td>40%</td><td>19%</td><td class="pos">+7.7%</td><td>52%</td><td><span class="chip go">go</span></td></tr>
+      <tr><td>ORB30, all days</td><td>339</td><td>55%</td><td>33%</td><td>12%</td><td class="neg">−0.4%</td><td>44%</td><td><span class="chip lean">lean</span></td></tr>
+      <tr><td>Day-range break 10:15–12:00</td><td>202</td><td>53%</td><td>27%</td><td>9%</td><td class="neg">−1.2%</td><td>39%</td><td><span class="chip no">no</span></td></tr>
+      <tr><td>Bollinger squeeze break</td><td>629</td><td>50%</td><td>31%</td><td>17%</td><td class="neg">−3.6%</td><td>36%</td><td><span class="chip no">no</span></td></tr>
+      <tr><td>Session-mean (VWAP proxy) cross</td><td>1424</td><td>51%</td><td>36%</td><td>17%</td><td class="neg">−5.2%</td><td>39%</td><td><span class="chip no">no</span></td></tr>
+      <tr><td>RSI momentum (cross 60 / 40)</td><td>1460</td><td>51%</td><td>35%</td><td>17%</td><td class="neg">−5.3%</td><td>37%</td><td><span class="chip no">no</span></td></tr>
+      <tr><td>ORB15</td><td>373</td><td>52%</td><td>29%</td><td>10%</td><td class="neg">−6.4%</td><td>39%</td><td><span class="chip no">no</span></td></tr>
+      <tr><td>Random entry (baseline)</td><td>11790</td><td>50%</td><td>33%</td><td>15%</td><td class="neg">−7.1%</td><td>37%</td><td>—</td></tr>
+      <tr><td>Previous-day high / low break</td><td>176</td><td>53%</td><td>30%</td><td>13%</td><td class="neg">−9.7%</td><td>37%</td><td><span class="chip no">no</span></td></tr>
+      <tr><td>EMA 9/21 cross (with / without EMA50 trend)</td><td>573 / 741</td><td>51% / 50%</td><td>35%</td><td>18%</td><td class="neg">−10.8% / −9.6%</td><td>34%</td><td><span class="chip no">no</span></td></tr>
+      <tr><td>RSI reversal (back from 30 / 70)</td><td>651</td><td>46%</td><td>31%</td><td>14%</td><td class="neg">−11.7%</td><td>31%</td><td><span class="chip no">no</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Read the “index up your way” column first, because it needs no option model: with the exception of gap-day ORB30 (60%), no trigger gets the direction right more than 55% of the time on expiry days. Momentum indicators on a 5-minute chart are near coin-flips on an index; the option's time decay then decides the outcome. The “premium ≥ +50%” column is the number people quote in screenshots — and it is high for <em>every</em> afternoon entry, including random ones, because afternoon premiums are small. It says nothing about expectancy.</p>
+
+  <h3>The two triggers that survive scrutiny</h3>
+  <p><strong>Late-day range break.</strong> The first 5-minute close above the day's high (buy the call) or below the day's low (buy the put) after 14:15. On NIFTY it returns +7.9% net over the next hour and +30% on BANKNIFTY, with the premium doubling within the hour on 36% and 42% of occasions. It is strongest when the day opened without a gap — under 0.2%: +40% on NIFTY (n=49) and +40% on BANKNIFTY — and weakest, even negative on NIFTY (−21%), after gaps above 0.5%, which are days that have already spent their move at the open. Low-vol regimes help (+21% / +52%). Within the day, however, volatility clusters rather than saves up: a wide first hour and a day running at or above its variance budget make the late break <em>more</em> likely to pay, which is what the buy-score below quantifies. It is not an expiry-only effect: the same trigger works on non-expiry days at the index level, but on those days you would be buying a next-week option with far less gamma, so the tradeable version is the 0DTE one.</p>
+  <figure>
+    <div class="chart">{{CHART:latebreak_by_year}}</div>
+    <figcaption>Year-by-year net return of the late-day breakout on expiry days. Two of NIFTY's five full years are negative (2020, 2021) and BANKNIFTY's 2024 sample (n=15) is deeply negative. This is what a tail-driven edge looks like: most years positive, some years a string of small losses with no big winner to pay for them.</figcaption>
+  </figure>
+  <p><strong>Opening-range breakout on a gap day.</strong> ORB30 — first 5-minute close beyond the 09:15–09:45 range — is a wash across all expiry days (−0.4%, 55% direction hit-rate). Restrict it to days that gapped more than 0.5% and it becomes +7.7% net with a 60% hit-rate; it is the only trigger where the bracket (stop −30%, target +50%) is also positive (+4.3%), which means it is a genuine directional edge rather than a lottery. The bulk of it sits in the 10:00–11:00 hour (62% hit-rate). There is a second, late version: when the opening range holds all day and finally breaks after 14:15, the NIFTY ATM option returned +42% net (n=26) — the same compression-then-release mechanism as the late-day break.</p>
+  <p><strong>Range-expansion bars</strong> — a 5-minute bar wider than 2.5× the 14-bar ATR — return +3.8% on NIFTY and +11.7% on BANKNIFTY, but the number is the most model-sensitive of the set: it is +8.9% with static IV, −1.6% under the CAS profile, and on NIFTY it is entirely the up-bars (+27%) while down-bars lose (−10%). Treat it as a filter (a day that has already produced one such bar is a day worth being long gamma on), not as a stand-alone trigger.</p>
+
+  <h3>Why the bracket kills it</h3>
+  <p>Every buyer edge in this study is positive on average and negative in the median. The late-day break is up after an hour only 37% of the time; its mean is carried by the 36% of cases where the premium doubled and the handful where it went five- to ten-fold. Apply the retail-standard bracket — stop at −30%, book at +50% — and the same trigger returns −11%: the stop takes you out of the noise before the move, and the target takes you out of the move before the tail. If you buy on expiry day, size so that a −100% outcome is acceptable, hold for the hour or to 15:15, and let the winners run. Anything else converts a positive-skew bet into a negative-expectancy one.</p>
+  <figure>
+    <div class="chart">{{CHART:baseline_by_hour}}</div>
+    <figcaption>Random ATM purchases by hour of the day, NIFTY. The chance of “touching +50%” rises through the afternoon purely because premiums shrink; the expected net return is negative in every hour and worst from 13:00 to 15:00. The afternoon is where buyers <em>with</em> a compression setup do best and buyers <em>without</em> one do worst.</figcaption>
+  </figure>
+  <p>One-strike OTM options do not improve any of this. Their mean gross returns look spectacular (the late-day OTM buy averages +372%) because a two-rupee option occasionally becomes a fifty-rupee one, but the trade is positive only 12% of the time and the bid–ask spread alone is a quarter of the premium. Buy the ATM.</p>
+</section>
+
+<section id="sellers">
+  <h2>Buyer versus seller</h2>
+  <p>The seller's side is where the model matters most, so it is presented with its sensitivity. The straddle premium is set at 1.10 times the trailing twenty-session realised vol (a typical variance risk premium); at 1.00 the seller has no edge by construction, at 1.25 a large one. What the data adds is the <em>timing and conditions</em>: which entries suffer, and what CAS did.</p>
+  <figure>
+    <div class="chart">{{CHART:short_straddle}}</div>
+    <figcaption>Left: 09:20 short ATM straddle with a 30% stop on the combined premium, bought back at 15:15, by year. Right: the same NIFTY trade under different pricing assumptions and under the CAS model, where the 15:15 buy-back price still holds half the opening premium.</figcaption>
+  </figure>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Straddle strategy (expiry days, exit 15:15 unless stated)</th><th>NIFTY win rate</th><th>NIFTY mean, % of premium</th><th>NIFTY profit factor</th><th>BANKNIFTY mean</th><th>note</th></tr></thead>
+    <tbody>
+      <tr><td>Short 09:20, no stop</td><td>63%</td><td class="pos">+2.3%</td><td>1.23</td><td>+2.4%</td><td>worst day −395% of premium</td></tr>
+      <tr><td>Short 09:20, 30% stop</td><td>49%</td><td class="pos">+8.7%</td><td>1.69</td><td class="pos">+11.1%</td><td>at VRP 1.00: +2.1%; at 1.25: +18.4%</td></tr>
+      <tr><td>Short 09:20, 50% stop</td><td>58%</td><td class="pos">+8.3%</td><td>1.63</td><td>—</td><td>2023 was the losing year (−6.8%)</td></tr>
+      <tr><td>Short 13:00, 30% stop</td><td>47%</td><td class="pos">+6.8%</td><td>1.54</td><td class="pos">+12.2%</td><td>SENSEX (n=45): +18.6%, PF 3.6</td></tr>
+      <tr><td>Short 15:00, 30% stop (pre-CAS last 25 min)</td><td>58%</td><td class="pos">+4.1%</td><td>1.37</td><td class="pos">+6.6%</td><td>under CAS model: −4.5%</td></tr>
+      <tr><td>Short 09:20, 30% stop, <b>CAS model</b></td><td>48%</td><td class="pos">+1.8%</td><td>1.24</td><td class="pos">+2.4%</td><td>the last 25 minutes of theta now sit in the auction</td></tr>
+      <tr><td>Long 09:20, sell 15:25</td><td>38%</td><td class="neg">−6.9%</td><td>0.71</td><td class="neg">−4.8%</td><td>5th pct −92%, 95th +123%</td></tr>
+      <tr><td>Long 14:30, sell 15:25</td><td>36%</td><td class="neg">−6.5%</td><td>0.72</td><td class="neg">−11.2%</td><td>low-vol regime: +1.7% (break-even)</td></tr>
+      <tr><td>Long 15:00, sell 15:25 (“long gamma after 3 PM”)</td><td>35%</td><td class="neg">−8.9%</td><td>0.72</td><td class="neg">−11.0%</td><td>Zerodha's hypothesis: not supported pre-CAS</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Three things stand out. Sellers' results are concentrated in mid- and high-volatility regimes — in the low-vol tercile the 09:20 NIFTY straddle is flat (−0.5%, 39% win rate) — which is the mirror image of the buyers' finding that calm days deliver more than they price. Second, 2022–2023 were poor years for the morning straddle (−1.7%, +1.7%) while 2019–2021 were strong; the edge is real but lumpy. Third, CAS removes most of what the trade-to-close seller used to earn: with the 15:15 buy-back still worth half the opening premium, the 09:20 straddle's mean falls from +8.7% to +1.8%, and the 15:00 entry turns negative. To collect that premium now you must hold through settlement — unhedgeable, and on SENSEX demonstrably manipulable.</p>
+  <div class="callout">
+    <p><strong>The new battleground is the 15:15 straddle versus the auction print.</strong> Four clean observations so far: NIFTY 4 Aug — straddle ~100, auction move 151 (buyer wins); NIFTY 18 Aug — straddle 44, move 11 (seller); SENSEX 6 Aug — straddle ~500, move 171 (seller); SENSEX 20 Aug — straddle 138, move 52 (seller). Three of four went to the seller, one paid the buyer 1.5×. That is a sample of four; log every expiry (the toolkit has a place for it) before drawing a conclusion.</p>
+  </div>
+</section>
+
+<section id="score">
+  <h2>The buy-score indicator</h2>
+  <p>The question you actually face at 14:20 is not “which indicator is best” but “given everything visible on the chart right now, what is the probability that an option bought on this bar expands enough to pay?” So the second stage turns the findings into one number per 5-minute bar. The target is deliberately option-shaped: <em>the ATM straddle bought at this bar's close touches +30% within 60 minutes</em>. That threshold is what a single leg needs to roughly double on the right side; using the straddle keeps the target direction-neutral, because the side turns out to be the one thing the chart cannot tell you.</p>
+  <p>The model is a standardised logistic regression on 18 features a 5-minute chart can compute — time of day and its square, gap size, the trailing-volatility rank, opening-range and range-so-far relative to a typical day, position within the day's range, distance to the range edge in ATR units, 15- and 30-minute momentum, the current bar's range, Bollinger bandwidth rank, the EMA 9/21 spread, the day's realised variance relative to the budget implied by trailing vol and the intraday profile, and whether the bar itself breaks the day's range or the opening range. A gradient-boosted model on 25 features did no better (AUC 0.676 vs 0.675), which is why the simple, portable version is the one deployed. It was fitted on 149,000 bars of NIFTY and BANKNIFTY from 2016 to 2021 and tested on 90,000 bars from 2022 to 2024 that it never saw.</p>
+  <figure>
+    <div class="chart">{{CHART:model_calibration}}</div>
+    <figcaption>Left: on out-of-sample expiry-day bars the score is calibrated — bars predicted at 39% delivered 39%, bars predicted at 51% delivered 50%; the low end is slightly under-predicted (7% predicted, 12% observed), which is harmless for a buy filter. Right: net 60-minute return of buying the breakout leg only when the score clears a threshold; labels are trade counts over 117 NIFTY and 150 BANKNIFTY test expiries.</figcaption>
+  </figure>
+  <h3>What the score is made of</h3>
+  <p>Two things carry it. Time of day is the dominant term — the squared term's standardised coefficient (+0.89) dwarfs every other — which is the theta structure of an expiring option: the same 60-point move is worth far more at 14:30 than at 10:30. The second is the day's realised variance relative to its budget (+0.23): a day that has already moved more than trailing volatility implied keeps moving. Behind those come range-so-far (+0.14), the opening-range width (+0.06), the current bar's range (+0.07) and the breakout flag (+0.05), all positive; the trailing-vol rank (−0.08, calm regimes are cheaper), Bollinger bandwidth rank (−0.06) and a 30-minute momentum term (−0.09, a move that already happened is partly spent) are negative. The RSI/EMA family does not enter at all.</p>
+  <figure>
+    <div class="chart">{{CHART:model_heat}}</div>
+    <figcaption>The two main effects, observed rather than modelled: probability that the straddle expands +30% within the hour, by time of day and by how much of the day's variance budget has been spent (out-of-sample expiry days, NIFTY + BANKNIFTY). After 14:00, a warm day is twice as likely to pay a buyer as a cold one.</figcaption>
+  </figure>
+  <p>A separate model was fitted to predict the <em>direction</em> of the next 60 minutes from the same features. Its out-of-sample AUC is 0.51 for the logistic and 0.51 for the boosted version: a coin flip. That is the empirical basis for the rule that the side comes from the bar itself — a close above the day's high buys the call, a close below the day's low buys the put — and the score only decides whether that breakout is worth paying for.</p>
+  <h3>The rule and its out-of-sample record</h3>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Rule on test expiry days (2022–24)</th><th>trades</th><th>per expiry</th><th>premium touched +50%</th><th>touched +100%</th><th>mean net 60-min return</th><th>positive after 60 min</th><th>index went your way</th></tr></thead>
+    <tbody>
+      <tr><td>NIFTY · every range breakout, no score</td><td>939</td><td>8.0</td><td>36%</td><td>18%</td><td class="pos">+3%</td><td>39%</td><td>53%</td></tr>
+      <tr><td>NIFTY · breakout + score ≥ 0.30 (LEAN)</td><td>240</td><td>2.1</td><td>57%</td><td>40%</td><td class="pos">+25%</td><td>41%</td><td>59%</td></tr>
+      <tr><td>NIFTY · breakout + score ≥ 0.40 (GO)</td><td>150</td><td>1.3</td><td>67%</td><td>53%</td><td class="pos">+52%</td><td>46%</td><td>66%</td></tr>
+      <tr><td>NIFTY · plain post-14:15 breakout (stage-1 rule)</td><td>134</td><td>1.1</td><td>63%</td><td>53%</td><td class="pos">+47%</td><td>43%</td><td>64%</td></tr>
+      <tr><td>NIFTY · GO rule under CAS pricing (exit 15:15)</td><td>109</td><td>0.9</td><td>54%</td><td>33%</td><td class="pos">+23%</td><td>48%</td><td>62%</td></tr>
+      <tr><td>BANKNIFTY · every range breakout, no score</td><td>951</td><td>6.3</td><td>36%</td><td>20%</td><td class="pos">+11%</td><td>39%</td><td>52%</td></tr>
+      <tr><td>BANKNIFTY · breakout + score ≥ 0.40 (GO)</td><td>161</td><td>1.1</td><td>63%</td><td>51%</td><td class="pos">+70%</td><td>50%</td><td>64%</td></tr>
+      <tr><td>BANKNIFTY · plain post-14:15 breakout</td><td>142</td><td>0.9</td><td>63%</td><td>48%</td><td class="pos">+69%</td><td>47%</td><td>61%</td></tr>
+      <tr><td>BANKNIFTY · GO rule under CAS pricing (exit 15:15)</td><td>123</td><td>0.8</td><td>54%</td><td>40%</td><td class="pos">+48%</td><td>56%</td><td>60%</td></tr>
+      <tr><td>SENSEX · breakout + score ≥ 0.40 (never trained on)</td><td>50</td><td>1.1</td><td>42%</td><td>26%</td><td class="neg">−9%</td><td>22%</td><td>46%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Read this honestly. The score is a refinement of the stage-1 rule, not a different animal: on NIFTY it lifts the mean from +47% to +52% and the index hit-rate from 64% to 66% while trading slightly more often, and on BANKNIFTY the gain is a point. Its real value is that it is graded and continuous — it tells you a 13:40 breakout on a warm, range-bound day is a 45% proposition while a 14:30 breakout after a 0.8% gap is a 25% one — and that it never fires in the morning by accident: fewer than one GO signal in ten occurs before 14:00. The payoff shape is unchanged. Even at GO the trade is up after an hour less than half the time; the mean is paid by the doubles, so the no-stop, no-cap rule from the previous section still applies.</p>
+  <figure>
+    <div class="chart">{{CHART:model_walkforward}}</div>
+    <figcaption>Walk-forward: each year scored by a model trained only on the years before it (threshold 0.35). Two of six NIFTY years and one of six BANKNIFTY years are negative. A tail-driven edge has losing years; size for them.</figcaption>
+  </figure>
+  <div class="callout warn">
+    <p><strong>SENSEX is not covered yet.</strong> Applied to SENSEX's 45 Friday-regime expiries — which the model never saw — the score discriminates poorly (AUC 0.56) and the GO rule loses money except at the very top of the scale (score ≥ 0.50, 26 trades, +33%). SENSEX's intraday profile in that sample was far more back-loaded than NIFTY's, and the Thursday regime it now trades in has no free intraday history at all. Run the indicator on SENSEX as a diary, not a trigger, until the bhavcopy validation in the next-steps section has been done on Thursday expiries.</p>
+  </div>
+  <h3>Running it</h3>
+  <p>The Pine Script (<code>pine/ExpiryEdge_BuyScore.pine</code>) is a v6 indicator for a 5-minute chart of the index. It plots the score from 0 to 100 with the LEAN and GO lines, shades GO and LEAN bars, marks CE/PE triangles, shows a status table (gap, trailing vol and its rank, range versus typical, variance spent versus budget, day high/low, CAS status), and raises four alerts: GO CE, GO PE, LEAN, and the 15:15 CAS blackout. The <code>alert()</code> payload is JSON — grade, side, score, spot, time, expiry flag — so it drops straight into the webhook flow you already run. Inputs: the expiry weekday (Tuesday for NIFTY, Thursday for SENSEX), a holiday-shift override, the two thresholds, and the no-new-entries cutoff (15:00 by default; the cash index stops at 15:15). Daily context is taken from completed daily bars only, so the score does not repaint.</p>
+  <p>The Python version (<code>scripts/live_indicator.py</code>) computes the identical number — the two implementations were checked bar by bar to zero difference on the training data — from yfinance or NSE's charting API on your own machine, prints the score, the breakout side and the verdict for every bar of the session, and can replay any historical date from the cached data so you can see how a given expiry would have read. <code>--watch</code> re-runs every five minutes.</p>
+<pre><code># replay a past expiry (works anywhere)
+python scripts/live_indicator.py --index NIFTY --replay 2023-11-23
+
+# live, on your Mac (Yahoo/NSE block cloud IPs)
+python scripts/live_indicator.py --index NIFTY --source yf --watch
+
+# retrain after extending the data
+python scripts/build_dataset.py && python scripts/train_model.py</code></pre>
+  <p>Retraining writes a new <code>buy_score_logit.json</code>; copy its mean, standard deviation and coefficient vectors into the three arrays at the top of the Pine file and the chart indicator is updated too.</p>
+</section>
+
+<section id="otm">
+  <h2>Cheap OTM blasts: which strike, and what the odds really are</h2>
+  <p>The stage-2 score was built on the ATM straddle because that is where the model is most reliable. The trade you actually want is different: a cheap out-of-the-money option that multiplies. So the same GO signals were re-priced for the 1-, 2- and 3-strike OTM options in the breakout direction (NIFTY 50-point strikes, BANKNIFTY 100), with a realistic premium floor — a deep OTM expiry-day option never trades at its Black-Scholes value of a few paise, so a floor of ₹1.5 (NIFTY) and ₹3 (BANKNIFTY) is applied to entry and exit alike, and costs of 0.5 and 1.0 points a side are charged. Sensitivity to the floor (₹1 to ₹5) does not change any conclusion below.</p>
+  <figure>
+    <div class="chart">{{CHART:otm_blast}}</div>
+    <figcaption>Left: the chance that a randomly-timed OTM buy reaches 5× within the hour, by hour of the expiry day. It only becomes material after 13:00, and only for the nearest strike; the 3-OTM strike collapses after 14:00 because there is no time left for a 150-point move. Right: mean net 60-minute return of buying each strike on GO signals, before and under CAS pricing. “Auto” is the rule the indicator implements — the nearest OTM strike whose premium is at or below ₹10 (NIFTY) / ₹25 (BANKNIFTY), never further than two strikes.</figcaption>
+  </figure>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>NIFTY test expiry days (2022–24), 60-min hold</th><th>signals</th><th>median entry</th><th>reached 3×</th><th>reached 5×</th><th>reached 10×</th><th>mean net</th><th>positive</th><th>lost ≥ half</th><th>sell-at-5× rule</th></tr></thead>
+    <tbody>
+      <tr><td>Random bar, 1 strike OTM (lottery)</td><td>16,614</td><td>₹12.5</td><td>10%</td><td>3.5%</td><td>1.2%</td><td class="neg">−4%</td><td>26%</td><td>50%</td><td>—</td></tr>
+      <tr><td>Random bar, 2 strikes OTM</td><td>16,614</td><td>₹3.8</td><td>10%</td><td>3.8%</td><td>1.0%</td><td class="neg">−18%</td><td>17%</td><td>67%</td><td>—</td></tr>
+      <tr><td>Random bar, 3 strikes OTM</td><td>16,614</td><td>₹1.5</td><td>8%</td><td>3.5%</td><td>1.1%</td><td class="neg">−28%</td><td>10%</td><td>82%</td><td>—</td></tr>
+      <tr><td>GO signal · ATM (from the previous section)</td><td>150</td><td>~₹20</td><td>—</td><td>—</td><td>—</td><td class="pos">+52%</td><td>46%</td><td>—</td><td>—</td></tr>
+      <tr><td>GO signal · auto strike (nearest OTM ≤ ₹10)</td><td>142</td><td>₹1.5</td><td>26%</td><td>21%</td><td>11%</td><td class="pos">+83%</td><td>15%</td><td>79%</td><td class="pos">+17%</td></tr>
+      <tr><td>GO signal · 1 strike OTM</td><td>142</td><td>₹1.5</td><td>25%</td><td>21%</td><td>11%</td><td class="pos">+64%</td><td>15%</td><td>79%</td><td class="pos">+17%</td></tr>
+      <tr><td>GO signal · 2 strikes OTM</td><td>142</td><td>₹1.5</td><td>11%</td><td>6%</td><td>4%</td><td class="pos">+10%</td><td>6%</td><td>92%</td><td class="neg">−31%</td></tr>
+      <tr><td>GO signal · 3 strikes OTM</td><td>142</td><td>₹1.5</td><td>4%</td><td>3%</td><td>3%</td><td class="neg">−22%</td><td>2%</td><td>97%</td><td class="neg">−42%</td></tr>
+      <tr><td>GO · auto strike, <b>CAS pricing</b> (exit 15:15)</td><td>109</td><td>₹5.8</td><td>26%</td><td>15%</td><td>3%</td><td class="pos">+58%</td><td>39%</td><td>42%</td><td class="pos">+38%</td></tr>
+      <tr><td>GO · 2 strikes OTM, CAS pricing</td><td>109</td><td>₹1.5</td><td>16%</td><td>12%</td><td>6%</td><td class="pos">+40%</td><td>23%</td><td>71%</td><td class="pos">+5%</td></tr>
+      <tr><td>BANKNIFTY · GO · auto strike (≤ ₹25)</td><td>154</td><td>₹13</td><td>38%</td><td>27%</td><td>13%</td><td class="pos">+161%</td><td>30%</td><td>65%</td><td class="pos">+47%</td></tr>
+      <tr><td>BANKNIFTY · GO · auto strike, CAS pricing</td><td>124</td><td>₹24</td><td>27%</td><td>10%</td><td>2%</td><td class="pos">+88%</td><td>52%</td><td>31%</td><td class="pos">+63%</td></tr>
+      <tr><td>BANKNIFTY · GO · 3 strikes OTM</td><td>154</td><td>₹3</td><td>19%</td><td>16%</td><td>7%</td><td class="pos">+83%</td><td>10%</td><td>88%</td><td class="pos">+2%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Four things follow. First, the “blast” is real but it is a property of the signal, not of the strike: bought at random moments, every OTM strike loses money and reaches 5× only three to four times in a hundred; on GO signals the nearest OTM strike reaches 5× one time in five on NIFTY and one in four on BANKNIFTY. Second, going further out does not buy more blast — it buys less. The 2-OTM strike's 5× odds on GO signals are a third of the 1-OTM strike's (6% vs 21%) and the 3-OTM strike is negative even there, because a 150-point move inside an hour is rare and the premium is already at the floor, so the only thing the extra distance changes is how often you lose everything. Third, the expectancy is carried by a small minority: the auto strike is up after an hour only 15% of the time before CAS (39% under CAS pricing, where premiums are fatter) and loses at least half its value four times in five. Fourth, a mechanical “sell at 5×” exit keeps the trade positive (+17% NIFTY, +47% BANKNIFTY) but gives up most of the mean, which lives in the 10–30× tail; holding to the close does slightly better than the 60-minute exit (+88% NIFTY) at the price of more zeros.</p>
+  <p>Under CAS the shape changes in the buyer's favour in one respect: premiums at 14:30 are larger (the auction keeps a variance reserve in every strike), so the auto strike costs ~₹6 rather than ₹1.5, the 10× tail shrinks from 11% to 3%, but the trade is positive 39% of the time instead of 15% and the mean stays at +58%. The 2-OTM strike becomes viable under CAS (+40%, 5× in 12%) — that is the one case where the second strike out is worth considering, and only on GO signals.</p>
+  <div class="callout">
+    <p><strong>The strike rule the indicator implements.</strong> On a GO or LEAN bar, take the nearest OTM strike in the breakout direction whose model premium is at or below the cap (₹10 NIFTY, ₹25 BANKNIFTY, ₹30 SENSEX); if the first strike is too rich, the second; never the third. The status table shows the suggested strike with estimated premiums for ATM, +1 and +2, and the alert JSON carries <code>strike</code> and <code>est_premium</code>. Size every ticket as a full loss — the modal outcome is −50% or worse — and never average down: the edge is in the count of independent tickets taken on GO bars, not in any single one.</p>
+  </div>
+</section>
+
+<section id="casmonth">
+  <h2>The CAS month, checked</h2>
+  <p>The backtest ends before CAS, so the last question is what the rules would have done on the seven index expiries that have actually traded under the auction: NIFTY on 4, 11, 18 and 25 August (the 25th is the first monthly), SENSEX on 6, 13 and 20 August. This sandbox cannot reach the exchanges, so each day is reconstructed from public sources — NSE's archived daily index files for the official open, high, low, close and India VIX, the time-stamped entries of the Business Standard live blogs (which log the frozen 15:15 print), Zerodha's Aftermarket Reports and Weekly Market Metrics for the intraday narrative and the straddle readings, Reuters, and SEBI's interim order for the 13 August auction. The daily files also give the trailing-volatility context the model needs; the modelled opening straddle came out at 112 against Zerodha's ~95 on 4 August and 88 against 88 on the 18th, and the modelled 15:15 straddle at 44 against 44 on the 18th and 161 against 138 for SENSEX on the 20th, so the pricing is in the right place for this regime. The one day it was not is 4 August, when the market paid ~100 for the 15:15 straddle against a model 48 — traders were pricing the auction after day one's +201-point close, and they were right to.</p>
+  <div class="tablewrap">
+  <table class="wrap cas">
+    <thead><tr><th>Expiry</th><th>Day: gap · pre-auction range (typical)</th><th>15:15 print → CAS close (auction move)</th><th>Qualifying breakout before 15:00?</th><th>Score → verdict</th><th>1-OTM ticket (model): 15:15 exit → held to the actual settlement</th></tr></thead>
+    <tbody>
+      <tr><td>NIFTY Tue 4 Aug</td><td>−0.28% · 1.12% (0.78%) — a trend day</td><td>24,463 → 24,615 <b class="pos">(+151, +0.62%)</b></td><td>Yes: new lows through the afternoon; PE at ~13:40</td><td>0.44 → <span class="chip go">go</span> PE</td><td><span class="neg">−63%</span> (24,400 PE ₹26 → ₹10) → <span class="neg">−100%</span>: the auction reversed the day</td></tr>
+      <tr><td>NIFTY Tue 11 Aug</td><td>−0.04% · 0.60% (0.67%)</td><td>24,450 → 24,472 (+21, +0.09%)</td><td>No: the low printed at 12:00 and was never broken</td><td>— no trade</td><td>— every OTM strike expired at 0</td></tr>
+      <tr><td>NIFTY Tue 18 Aug</td><td>−0.26% · 0.43% (0.64%) — range-bound</td><td>24,166 → 24,155 (−11, −0.05%)</td><td>No: the only new low came 15:00–15:15, after the cutoff</td><td>— no trade</td><td>— the after-cutoff 24,100 PE settled at 0</td></tr>
+      <tr><td>NIFTY Tue 25 Aug (monthly)</td><td>−0.18% · 0.60% (0.58%)</td><td>24,260 → 24,335 <b class="pos">(+75, +0.31%)</b></td><td>Yes: the 14:30–15:00 rally crossed the morning high ~14:45; CE</td><td>0.44 → <span class="chip go">go</span> CE</td><td><span class="pos">+231%</span> (24,250 CE ₹6 → ₹22) → <span class="pos">14×</span> at ₹84.55; the 2-OTM 24,300 CE 23×</td></tr>
+      <tr><td>SENSEX Thu 6 Aug</td><td>+0.19% · 0.36% (0.75%)</td><td>78,786 → 78,955 <b class="pos">(+169, +0.21%)</b></td><td>No: under 300 points all session</td><td>— no trade</td><td>— indicative index swung 78,600–79,450 inside the auction</td></tr>
+      <tr><td>SENSEX Thu 13 Aug</td><td>+0.19% · 0.58% (0.75%)</td><td>77,861 → 78,080 <b class="pos">(+218, +0.28%)*</b></td><td>Yes: afternoon slide to the day low ≈14:05; PE</td><td>0.33 → <span class="chip lean">lean</span> PE</td><td><span class="neg">−90%</span> (77,600 PE ₹39 → ₹5) → <span class="neg">−100%</span>: every put went to 0 on the engineered close</td></tr>
+      <tr><td>SENSEX Thu 20 Aug</td><td>+0.73% · 0.30% (0.75%) — gap-up</td><td>77,485 → 77,538 (+52, +0.07%)</td><td>Day-high break ~12:40 (CE), then range-bound</td><td>0.12 → <span class="chip no">no</span></td><td><span class="neg">−89%</span> had it been taken → −100%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="wide" style="font-family:'Archivo',sans-serif;font-size:13px;color:var(--muted);margin-top:-8px">*SEBI's order measures the 13 Aug move from the 15:15 reference price (77,829.60): +250 points, +0.32%. Scores are computed from the reconstructed day (time, gap, range so far, variance spent, at-the-edge breakout) with the unobservable bar-level features set to typical breakout-bar values; varying those across their interquartile range moves the score by less than 0.02. Ticket prices are the model's CAS-regime estimates with the ₹1.5 / ₹5 floors; settlement values are exact.</p>
+  <h3>What the month says about the rules</h3>
+  <p>The shape matches the backtest. Two GO signals on NIFTY: one lost most of the ticket, one paid several times over — and the payer was the one that ran into the close, exactly the tail the bracket rule tells you not to cap. The score kept you out of four days on which no afternoon breakout existed (11 Aug, 6 Aug) or on which the breakout came after the 15:00 cutoff and was erased by the auction (18 Aug: the 24,100 put bought on the 15:10 new low settled at zero), and it rejected the one SENSEX breakout that would have lost 89% (20 Aug, score 0.12 at 12:40). The SENSEX 13 August LEAN put is the instructive loss: the day's low printed in the afternoon, the index bounced 130 points into 15:15, and then the auction was pushed 250 points higher by two participants — the put was dead on both counts, and the SEBI order documents that the same two entities already held positions for the 20 August expiry. Nothing in a chart could have seen either.</p>
+  <p>Across the three tickets the rule would have taken (two GO at full size, one LEAN at half), the average net return by the 15:15 exit is about +40% before any slippage on cheap strikes; held to settlement it is dominated by the 25 August 14×. Three tickets is not evidence of expectancy. What the month does show is that the 15:15 exit is not optional: on two of the three signal days the auction moved the index by more than the whole pre-auction afternoon move, in the direction opposite to the breakout.</p>
+  <h3>Where the blasts actually went: the auction</h3>
+  <p>The CAS-specific finding is in the last column. The 15:15-to-close move averaged 0.23% in absolute size across the seven expiries — against a median last-25-minute move of 0.11% on pre-CAS expiries — and it was positive on six of the seven (the exception is 18 August at −11 points; the non-expiry day one was +201). Every multi-bagger that made the news this month was an auction print, not a chart move: the 24,400 call from ₹97 to ₹217 on 4 August, the 78,000 call settling at ₹80 on 13 August, the 79,000 call reportedly touching ₹330 on 6 August before the close left it worthless, the 24,300 call at ₹34.55 on 25 August. Priced at the model's 15:15 values and settled on the actual closes, the nearest out-of-the-money call bought at 15:15 returned +724%, −107%, −106%, +436%, +91%, +174% and −50% on the seven days; the nearest put returned −102% on all seven.</p>
+  <div class="callout warn">
+    <p><strong>Treat that as an observation, not a rule.</strong> Seven prints, one of them the subject of an enforcement order, on an auction whose buy-side is dominated by passive funds tracking the close and whose sell-side liquidity is thin (BSE's whole auction turned over ₹10.8 crore on day one). The upward bias could be structural, could be manipulation that SEBI has now priced out, or could be noise — and the losing side of this ticket is a total loss every time. If you want exposure to it, it is a separate, deliberately tiny ticket bought at 15:14 with a one-line log of the outcome, not something the indicator can time: after 15:15 there is no cash print for it to read. Note also that on 4 August the market priced the auction far richer than the model (a ₹25–30 call where the model says ₹13), so real returns on the auction ticket are lower than the model column above.</p>
+  </div>
+  <p>Reproduce or extend this with <code>scripts/cas_month_check.py</code> — every anchor carries its source, and replacing the reconstructed path with real 5-minute bars (the <code>export_recent.py</code> route from your own machine) turns the approximate scores into exact ones.</p>
+</section>
+
+<section id="playbook">
+  <h2>The playbook</h2>
+  <p>Order matters here because the day's information arrives in sequence — so the rules are written as a clock. NIFTY expires Tuesday, SENSEX Thursday; CAS applies to both. Lot sizes at the time of writing: NIFTY 65, SENSEX 20.</p>
+  <ol class="playbook">
+    <li><span class="when">before 09:15</span><div class="what"><b>Classify the day.</b> Overnight gap (from Gift Nifty / pre-open) and the vol regime (trailing 20-session realised vol or India VIX tercile). Gap &gt; 0.5% → the morning belongs to ORB30 in the gap direction. Gap &lt; 0.2% → morning is seller territory unless the vol regime is low, in which case nobody has a morning edge; wait.</div></li>
+    <li><span class="when">09:45–11:00</span><div class="what"><b>Only trade the gap-day ORB30.</b> First 5-minute close beyond the 09:15–09:45 range, in the gap direction, ATM option. Historical: 60% direction hit-rate, +7.7% net per hour, bracket-positive (a −30% / +50% bracket is acceptable here). Skip ORB15, EMA, RSI, VWAP triggers for buying — none beat a random entry.</div></li>
+    <li><span class="when">11:00–14:15</span><div class="what"><b>Dead zone for buyers.</b> Random entries lose 3–7% per hour and mid-day range breaks are baseline. If short a straddle, keep the 30% combined-premium stop. Note whether the first hour was wide (predicts a louder last hour: 42% vs 25% chance of a &gt;0.3% move) and whether a range-expansion bar has printed.</div></li>
+    <li><span class="when">14:15–15:15</span><div class="what"><b>The buyer's window.</b> First 5-minute close above the day's high → ATM call; below the day's low → ATM put — when the buy-score on that bar reads GO (≥ 0.40; LEAN 0.30–0.40 at half size). Best when the gap was &lt; 0.2% and the day is running warm (variance spent at or above budget, price at the edge of its range) — i.e. the buy-score reads GO. Strike: ATM for the steadier version (up after an hour ~46% of the time, mean +52%), or the nearest OTM strike priced ≤ ₹10 for the blast version (5× within the hour on 21% of GO signals, mean +83%, but four in five lose most of the ticket) — never three strikes out. No tight stop, no +50% target; hold up to 60 minutes and never past 15:15. Size every ticket for a total loss.</div></li>
+    <li><span class="when">15:15</span><div class="what"><b>Hard deadline.</b> The cash index stops. From here the only inputs are NSE's indicative index and per-stock imbalance figures, and any position you hold settles on an auction print you cannot influence. Flat by 15:15 unless the position is deliberately a bet on the auction. On SENSEX, always flat by 15:15 — the BSE auction is thin enough (₹10 cr/day) that the print can be moved by one participant. (August's auctions closed above the 15:15 print six times in seven — see <a href="#casmonth">the CAS month</a> — a pattern worth logging, not yet worth trading.)</div></li>
+    <li><span class="when">15:35–15:40</span><div class="what"><b>Settlement is public, options still trade.</b> Nothing to do as a directional trader; if you must exit here, use limit orders at intrinsic value — the last five minutes are the one time an expiry-day option has a known fair value.</div></li>
+  </ol>
+  <h3>Go / no-go before any expiry-day buy</h3>
+  <ul class="checklist">
+    <li>Is it a NIFTY Tuesday or SENSEX Thursday, and is the contract the one expiring today?</li>
+    <li>Is the trigger one of the two with evidence (post-14:15 range break; ORB30 with a &gt; 0.5% gap)? If not, no entry.</li>
+    <li>For the late break: gap &lt; 0.5%, ideally &lt; 0.2%; vol regime low or mid; buy-score ≥ 0.40 on the breakout bar; at least 60 minutes before 15:15 remaining (enter by 14:15–14:40).</li>
+    <li>Strike: ATM, or the nearest OTM strike priced ≤ ₹10 (NIFTY) / ₹25 (BANKNIFTY) for a blast ticket — the indicator's suggested strike. Never the third strike out; the second only if the score is ≥ 0.50 or CAS premiums have made the first too rich.</li>
+    <li>Position size assumes −100% on every ticket; for OTM blasts the modal outcome is −50% or worse and the edge is in the count of GO tickets, not in one of them. No stop inside the −30% noise; no profit target below a double (for OTM, a mechanical 5× exit keeps the trade positive but forfeits the tail).</li>
+    <li>Exit timer set for 15:15, broker auto-square-off time confirmed, and no MIS product that squares off inside the blackout.</li>
+    <li>Run the scorecard (<code>scripts/scorecard.py</code>) with today's gap, vol regime and OR width — if it prints NO or INSUFFICIENT SAMPLE, believe it.</li>
+  </ul>
+</section>
+
+<section id="toolkit">
+  <h2>Using the toolkit</h2>
+  <p>Everything above is reproducible from the <code>expiry_edge</code> package that accompanies this page. It loads free minute-level index history (mirrored on GitHub), labels expiry days for each regime change (Thursday→Tuesday for NIFTY, Friday→Tuesday→Thursday for SENSEX, holiday shifts, monthly expiries), computes the features and triggers, prices options along each day's real path, and writes the tables and charts. Two scripts turn it into a decision tool.</p>
+<pre><code>pip install -r requirements.txt
+python scripts/build_cache.py            # first run clones ~150 MB of 1-min history
+python scripts/run_analysis.py           # ~3 min: tables + summary.json for all three indices
+python scripts/make_charts.py
+
+# decision tool: rank triggers for an hour, or score the one that just fired
+python scripts/scorecard.py --index NIFTY --rank --time 14:30
+python scripts/scorecard.py --index NIFTY --signal ORB30 --time 10:20 --gap 0.6 --vol mid
+python scripts/scorecard.py --index SENSEX --signal LateBreak_1415 --time 14:40 --gap 0.1
+
+# on expiry day, from your Mac (NSE/BSE/Yahoo block cloud IPs):
+pip install yfinance openchart
+python scripts/live_day.py --index NIFTY --source yf   # today's bars → fired triggers → scorecard</code></pre>
+  <p>The scorecard reads the per-event results, filters by hour, gap, vol regime and opening-range width, compares with a random entry at the same hour, and prints GO / LEAN / NO. A sample of fewer than fifteen events is reported as insufficient rather than as a number. The buy-score lives in <code>expiry_edge/score.py</code> (with <code>scripts/build_dataset.py</code> and <code>scripts/train_model.py</code> to rebuild it) and in <code>pine/ExpiryEdge_BuyScore.pine</code> for TradingView.</p>
+  <p>Pricing knobs live in <code>expiry_edge/config.py</code>: the VRP multiplier, the CAS auction share (25% reproduces the observed 50%-intact straddle at 15:15), the cost per side, and lot sizes. To price from India VIX or from an observed opening straddle instead of trailing realised vol, use <code>options.sigma_from_vix</code> or <code>options.sigma_from_straddle</code>.</p>
+</section>
+
+<section id="limits">
+  <h2>Limits and what to do next</h2>
+  <p>The option prices are modelled, not observed. Directional and gamma P&amp;L come from the real index path, but the time-value component is a Black-Scholes kernel calibrated to trailing realised vol and the empirical intraday variance profile. That makes the <em>ranking</em> of triggers and the <em>conditional</em> contrasts (gap, vol regime, hour) the robust output, and the absolute expectancies the model-dependent one; the sensitivity tables show which findings survive a 25% richer premium (the late-day break does, at break-even; the gap ORB30 nearly does; the range-expansion bar does not).</p>
+  <p>The history predates both regime changes that matter. NIFTY's free 1-minute data ends in March 2024, before the Tuesday expiry (September 2025) and before CAS (August 2026); SENSEX's 45 expiries are all from the Friday regime. The CAS conclusions rest on the mechanism, on four expiries per index, and on a modelled auction variance share. A structural change of this size deserves its own sample before anything here is traded at size.</p>
+  <p>Three concrete steps, in order of value. First, pull the NSE F&amp;O and BSE derivatives bhavcopies for every expiry since July 2024 (<code>data.fetch_nse_fo_bhavcopy</code>, <code>data.fetch_bse_fo_bhavcopy</code>, run from your own machine): they give the actual open, high, low and settlement of every strike, which validates the modelled premiums and the “touched +100%” frequencies directly. Second, extend the intraday index history through <code>openchart</code> (NSE's charting API) so the Tuesday regime and the CAS weeks enter the sample, and append it with <code>data.append_recent_to_raw</code>. Third, log every expiry's 15:15 straddle and auction move — it is the one new statistic that decides whether the last 25 minutes now belong to buyers or sellers, and after twenty or thirty observations the answer will be visible.</p>
+  <p>A last, non-statistical point. SEBI's FY26 study found that 97% of retail F&amp;O participants are option buyers and 88% of them lost money, with 59% of index-option turnover happening on expiry day. The findings here are consistent with that: on expiry day the buyer's edge is narrow, late, tail-driven and easy to destroy with ordinary risk management. The toolkit's job is to keep you out of the other 90% of entries.</p>
+</section>
+
+<section id="sources" class="sources">
+  <h2>Sources</h2>
+  <ol>
+    <li>SEBI circular HO/47/11/11(3)2025-MRD-POD2/I/2765/2026, 16 Jan 2026 — <a href="https://www.sebi.gov.in/legal/circulars/jan-2026/introduction-of-closing-auction-session-cas-in-the-equity-cash-segment-and-certain-modifications-in-the-pre-open-auction-session_99122.html">Introduction of Closing Auction Session</a> (para 4.2.3 derivatives to 15:40; 4.6.6 fallback; 4.9 settlement prices)</li>
+    <li>NSE — <a href="https://www.nseindia.com/static/products-services/closing-auction-session">Closing Auction Session</a>; NSE circular <a href="https://nsearchives.nseindia.com/content/circulars/CMTR73362.pdf">NSE/CMTR/73362</a> (SOP); <a href="https://nsearchives.nseindia.com/content/circulars/FAOP75472.pdf">NSE/FAOP/75472</a> (derivatives go-live); NSE FAQ on CAS and equity-derivatives changes (Q4, Q47, Q56)</li>
+    <li>SEBI ex-parte interim order, 19 Aug 2026 — <a href="https://www.sebi.gov.in/enforcement/orders/aug-2026/ex-parte-interim-order-in-the-matter-of-manipulative-trades-during-cas-on-sensex-expiry-at-bse-august-13-2026_103778.html">manipulative trades during CAS on SENSEX expiry, 13 Aug 2026</a></li>
+    <li>Zerodha — <a href="https://zerodha.com/z-connect/general/everything-you-need-to-know-about-closing-auction-session-cas">Everything you need to know about CAS</a>; <a href="https://support.zerodha.com/category/trading-and-markets/trading-faqs/general/articles/closing-auction-session">support note</a> (square-off timings); Weekly Market Metrics <a href="https://tradingqna.com/t/weekly-market-metrics-week-32-03-august-2026-07-august-2026-what-to-expect-next-week/196870">week 32</a> and <a href="https://tradingqna.com/t/weekly-market-metrics-week-34-17-21-august-2026-cas-faces-its-first-big-test/197344">week 34</a> (straddle readings, auction moves)</li>
+    <li>Reuters / Business Recorder — <a href="https://www.brecorder.com/news/40433266/indias-new-closing-auction-stokes-sharp-nifty-swings-options-volatility-on-weekly-expiry">closing auction stokes sharp Nifty swings on weekly expiry</a> (4 Aug)</li>
+    <li>Business Standard — <a href="https://www.business-standard.com/markets/news/nifty-closing-gap-narrows-two-weeks-after-cas-rollout-sensex-stays-higher-126081401828_1.html">closing gaps two weeks after rollout</a>; <a href="https://www.business-standard.com/markets/news/bse-hits-4-month-low-after-jefferies-nuvama-downgrade-stock-on-cas-risks-126081801046_1.html">Jefferies/Nuvama on CAS volumes</a>; <a href="https://www.business-standard.com/markets/news/first-monthly-expiry-under-cas-sees-marginal-fall-in-derivatives-turnover-126082501264_1.html">first monthly expiry under CAS</a></li>
+    <li>HDFC Sky — <a href="https://hdfcsky.com/news/nse-sees-rs-1276-cr-turnover-in-closing-auction-session-icici-bank-hdfc-bank-among-top-traded-stocks">NSE ₹1,276 cr CAS turnover on day one</a>; Business Today — <a href="https://www.businesstoday.in/markets/stocks/story/sensex-cas-manipulation-thin-liquidity-exposes-vulnerability-whats-ahead-550597-2026-08-21">SENSEX CAS manipulation, thin liquidity</a></li>
+    <li>SEBI FY26 F&amp;O participant study, summarised by <a href="https://openthemagazine.com/business/sebi-fo-loss-study-explained-why-9-in-10-retail-traders-lost-91685-crore-in-fy26">Open</a></li>
+    <li>Data: <a href="https://github.com/sandeepkapri/Nifty50-Minute-Data">Nifty50-Minute-Data</a>, <a href="https://github.com/sandeepkapri/Sensex-Minute-Data">Sensex-Minute-Data</a>, <a href="https://github.com/sandeepkapri/BankNifty-Data">BankNifty-Data</a> (MIT); expiry schedule per <a href="https://www.venturasecurities.com/blog/changes-in-expiry-nse-and-bse/">Ventura</a>; lot sizes per <a href="https://bigul.co/blog/nse-implements-new-lot-sizes-for-nifty-bank-nifty-and-other-index-derivatives">NSE/FAOP/70616</a></li>
+    <li>Context on 0DTE behaviour elsewhere: Rhoads, <a href="https://russellrhoads.substack.com/p/digging-into-1-day-spx-at-the-money">1-day SPX ATM straddles</a>; Beckmeyer, Branger &amp; Gayda, <a href="https://wp.lancs.ac.uk/fofi2024/files/2024/04/FoFI-2024-146-Leander-Gayda.pdf">retail 0DTE trading</a>; Vilkov et al., <a href="https://github.com/vilkovgr/0dte-strategies/blob/main/docs/paper/paper-annotated.md">0DTE strategies</a></li>
+  </ol>
+</section>
+</main>
+</div>
