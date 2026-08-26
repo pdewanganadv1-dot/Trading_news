@@ -1,29 +1,22 @@
 {
-  "n_stock_expiries": 144,
-  "n_symbols": 8,
+  "n_stock_expiries": 216,
+  "n_symbols": 54,
   "approx_close_used": true,
   "note": "Stock F&O is monthly; the first monthly expiry under CAS was 25 Aug 2026. Single-stock auction books are thin, so blasts are larger AND more manipulation-prone than the index. 'crazy returns' are survivorship \u2014 the same OTM strikes expire worthless far more often than they hit.",
   "biggest_auction_movers": [
     {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-05",
-      "auction_move_pct": -2.816,
-      "atm_oi_share": 40.2,
-      "oi_hhi": 0.165
+      "symbol": "PAYTM",
+      "date": "2026-08-25",
+      "auction_move_pct": 2.991,
+      "atm_oi_share": 6.1,
+      "oi_hhi": 0.172
     },
     {
-      "symbol": "IDFCFIRSTB",
-      "date": "2026-08-03",
-      "auction_move_pct": 1.511,
-      "atm_oi_share": 36.9,
-      "oi_hhi": 0.158
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-12",
-      "auction_move_pct": 1.351,
-      "atm_oi_share": 57.7,
-      "oi_hhi": 0.225
+      "symbol": "MAZDOCK",
+      "date": "2026-08-25",
+      "auction_move_pct": 1.359,
+      "atm_oi_share": 23.3,
+      "oi_hhi": 0.136
     },
     {
       "symbol": "TATASTEEL",
@@ -33,67 +26,74 @@
       "oi_hhi": 0.162
     },
     {
-      "symbol": "TATASTEEL",
-      "date": "2026-08-03",
-      "auction_move_pct": 1.026,
-      "atm_oi_share": 31.7,
-      "oi_hhi": 0.182
+      "symbol": "INFY",
+      "date": "2026-08-25",
+      "auction_move_pct": 1.096,
+      "atm_oi_share": 44.3,
+      "oi_hhi": 0.179
     },
     {
-      "symbol": "SBIN",
-      "date": "2026-08-03",
-      "auction_move_pct": 0.995,
-      "atm_oi_share": 21.9,
-      "oi_hhi": 0.144
+      "symbol": "TVSMOTOR",
+      "date": "2026-08-25",
+      "auction_move_pct": 1.054,
+      "atm_oi_share": 17.3,
+      "oi_hhi": 0.143
     },
     {
-      "symbol": "RBLBANK",
-      "date": "2026-08-10",
-      "auction_move_pct": 0.916,
-      "atm_oi_share": 32.4,
-      "oi_hhi": 0.18
+      "symbol": "GRASIM",
+      "date": "2026-08-21",
+      "auction_move_pct": -0.899,
+      "atm_oi_share": 15.3,
+      "oi_hhi": 0.128
     },
     {
-      "symbol": "SBIN",
-      "date": "2026-08-04",
-      "auction_move_pct": 0.89,
-      "atm_oi_share": 24.3,
-      "oi_hhi": 0.151
+      "symbol": "BOSCHLTD",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.891,
+      "atm_oi_share": 11.7,
+      "oi_hhi": 0.306
     },
     {
-      "symbol": "PNB",
-      "date": "2026-08-10",
-      "auction_move_pct": -0.873,
-      "atm_oi_share": 41.6,
-      "oi_hhi": 0.17
+      "symbol": "CUMMINSIND",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.866,
+      "atm_oi_share": 30.1,
+      "oi_hhi": 0.195
     },
     {
-      "symbol": "IDEA",
-      "date": "2026-08-04",
-      "auction_move_pct": 0.86,
-      "atm_oi_share": 41.6,
-      "oi_hhi": 0.227
+      "symbol": "DIXON",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.854,
+      "atm_oi_share": 23.6,
+      "oi_hhi": 0.142
     },
     {
-      "symbol": "RBLBANK",
-      "date": "2026-08-04",
-      "auction_move_pct": 0.835,
-      "atm_oi_share": 26.0,
-      "oi_hhi": 0.149
+      "symbol": "NESTLEIND",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.852,
+      "atm_oi_share": 30.1,
+      "oi_hhi": 0.156
     },
     {
-      "symbol": "YESBANK",
-      "date": "2026-08-03",
-      "auction_move_pct": 0.833,
-      "atm_oi_share": 48.0,
-      "oi_hhi": 0.209
+      "symbol": "DIVISLAB",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.801,
+      "atm_oi_share": 20.9,
+      "oi_hhi": 0.12
     },
     {
-      "symbol": "RBLBANK",
-      "date": "2026-08-06",
-      "auction_move_pct": 0.81,
-      "atm_oi_share": 36.2,
-      "oi_hhi": 0.215
+      "symbol": "NTPC",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.786,
+      "atm_oi_share": 5.6,
+      "oi_hhi": 0.225
+    },
+    {
+      "symbol": "CUMMINSIND",
+      "date": "2026-08-24",
+      "auction_move_pct": 0.777,
+      "atm_oi_share": 22.8,
+      "oi_hhi": 0.168
     },
     {
       "symbol": "SBIN",
@@ -103,259 +103,182 @@
       "oi_hhi": 0.155
     },
     {
-      "symbol": "IDEA",
-      "date": "2026-08-10",
-      "auction_move_pct": 0.701,
-      "atm_oi_share": 40.5,
-      "oi_hhi": 0.229
+      "symbol": "GVT&D",
+      "date": "2026-08-20",
+      "auction_move_pct": -0.733,
+      "atm_oi_share": 29.8,
+      "oi_hhi": 0.155
     },
     {
-      "symbol": "YESBANK",
-      "date": "2026-08-12",
-      "auction_move_pct": 0.657,
-      "atm_oi_share": 47.2,
-      "oi_hhi": 0.21
+      "symbol": "LICI",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.713,
+      "atm_oi_share": 33.7,
+      "oi_hhi": 0.159
     },
     {
-      "symbol": "RBLBANK",
-      "date": "2026-08-14",
-      "auction_move_pct": 0.654,
-      "atm_oi_share": 23.8,
-      "oi_hhi": 0.177
+      "symbol": "NATIONALUM",
+      "date": "2026-08-24",
+      "auction_move_pct": 0.699,
+      "atm_oi_share": 29.4,
+      "oi_hhi": 0.172
     },
     {
-      "symbol": "IDFCFIRSTB",
-      "date": "2026-08-06",
-      "auction_move_pct": 0.649,
-      "atm_oi_share": 41.6,
-      "oi_hhi": 0.182
+      "symbol": "BHARATFORG",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.692,
+      "atm_oi_share": 16.5,
+      "oi_hhi": 0.214
     },
     {
-      "symbol": "TATASTEEL",
-      "date": "2026-08-12",
-      "auction_move_pct": 0.649,
-      "atm_oi_share": 29.3,
-      "oi_hhi": 0.168
+      "symbol": "LT",
+      "date": "2026-08-21",
+      "auction_move_pct": 0.689,
+      "atm_oi_share": 44.8,
+      "oi_hhi": 0.186
     },
     {
-      "symbol": "TATASTEEL",
-      "date": "2026-08-13",
-      "auction_move_pct": 0.615,
-      "atm_oi_share": 29.2,
-      "oi_hhi": 0.22
+      "symbol": "LICI",
+      "date": "2026-08-20",
+      "auction_move_pct": -0.687,
+      "atm_oi_share": 24.7,
+      "oi_hhi": 0.14
     },
     {
-      "symbol": "YESBANK",
-      "date": "2026-08-04",
-      "auction_move_pct": 0.612,
-      "atm_oi_share": 47.6,
-      "oi_hhi": 0.21
-    },
-    {
-      "symbol": "RBLBANK",
-      "date": "2026-08-05",
-      "auction_move_pct": 0.607,
+      "symbol": "HINDALCO",
+      "date": "2026-08-20",
+      "auction_move_pct": 0.67,
       "atm_oi_share": 30.0,
-      "oi_hhi": 0.17
+      "oi_hhi": 0.133
     },
     {
-      "symbol": "RBLBANK",
-      "date": "2026-08-12",
+      "symbol": "HINDZINC",
+      "date": "2026-08-24",
+      "auction_move_pct": -0.658,
+      "atm_oi_share": 29.9,
+      "oi_hhi": 0.125
+    },
+    {
+      "symbol": "HAL",
+      "date": "2026-08-24",
+      "auction_move_pct": 0.636,
+      "atm_oi_share": 14.2,
+      "oi_hhi": 0.142
+    },
+    {
+      "symbol": "GVT&D",
+      "date": "2026-08-24",
+      "auction_move_pct": 0.609,
+      "atm_oi_share": 23.4,
+      "oi_hhi": 0.175
+    },
+    {
+      "symbol": "NYKAA",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.602,
+      "atm_oi_share": 21.4,
+      "oi_hhi": 0.155
+    },
+    {
+      "symbol": "ADANIENT",
+      "date": "2026-08-24",
+      "auction_move_pct": 0.597,
+      "atm_oi_share": 36.6,
+      "oi_hhi": 0.235
+    },
+    {
+      "symbol": "KEI",
+      "date": "2026-08-25",
       "auction_move_pct": 0.594,
-      "atm_oi_share": 33.1,
-      "oi_hhi": 0.18
+      "atm_oi_share": 17.2,
+      "oi_hhi": 0.138
     },
     {
-      "symbol": "RBLBANK",
-      "date": "2026-08-11",
-      "auction_move_pct": 0.581,
-      "atm_oi_share": 32.8,
-      "oi_hhi": 0.181
+      "symbol": "SHRIRAMFIN",
+      "date": "2026-08-20",
+      "auction_move_pct": 0.579,
+      "atm_oi_share": 37.3,
+      "oi_hhi": 0.146
     },
     {
-      "symbol": "YESBANK",
-      "date": "2026-08-11",
-      "auction_move_pct": 0.575,
-      "atm_oi_share": 47.2,
-      "oi_hhi": 0.209
+      "symbol": "APOLLOHOSP",
+      "date": "2026-08-25",
+      "auction_move_pct": 0.554,
+      "atm_oi_share": 27.6,
+      "oi_hhi": 0.153
+    },
+    {
+      "symbol": "CGPOWER",
+      "date": "2026-08-24",
+      "auction_move_pct": 0.544,
+      "atm_oi_share": 30.6,
+      "oi_hhi": 0.161
     }
   ],
   "most_susceptible_by_setup": [
     {
-      "symbol": "YESBANK",
-      "date": "2026-08-26",
-      "blast_score": 0.3909,
-      "oi_hhi": 0.237,
-      "atm_oi_share": 55.9,
-      "mp_dist_pct": -2.724
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-13",
-      "blast_score": 0.3886,
-      "oi_hhi": 0.227,
-      "atm_oi_share": 58.3,
-      "mp_dist_pct": 3.632
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-17",
-      "blast_score": 0.3809,
-      "oi_hhi": 0.229,
-      "atm_oi_share": 56.4,
-      "mp_dist_pct": -2.115
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-12",
-      "blast_score": 0.3804,
-      "oi_hhi": 0.225,
-      "atm_oi_share": 57.7,
-      "mp_dist_pct": 2.402
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-18",
-      "blast_score": 0.3081,
-      "oi_hhi": 0.218,
-      "atm_oi_share": 46.5,
-      "mp_dist_pct": -2.268
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-07",
-      "blast_score": 0.3047,
-      "oi_hhi": 0.236,
-      "atm_oi_share": 41.5,
-      "mp_dist_pct": -2.121
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-11",
-      "blast_score": 0.2987,
-      "oi_hhi": 0.209,
-      "atm_oi_share": 47.2,
-      "mp_dist_pct": -1.68
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-04",
-      "blast_score": 0.2926,
-      "oi_hhi": 0.227,
-      "atm_oi_share": 41.6,
-      "mp_dist_pct": -1.642
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-06",
-      "blast_score": 0.2912,
-      "oi_hhi": 0.23,
-      "atm_oi_share": 40.7,
-      "mp_dist_pct": -2.767
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-07",
-      "blast_score": 0.2874,
-      "oi_hhi": 0.21,
-      "atm_oi_share": 47.8,
-      "mp_dist_pct": -1.366
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-14",
-      "blast_score": 0.2859,
-      "oi_hhi": 0.218,
-      "atm_oi_share": 47.6,
-      "mp_dist_pct": -1.277
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-11",
-      "blast_score": 0.279,
-      "oi_hhi": 0.238,
-      "atm_oi_share": 42.1,
-      "mp_dist_pct": -1.246
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-10",
-      "blast_score": 0.2765,
-      "oi_hhi": 0.212,
-      "atm_oi_share": 48.3,
-      "mp_dist_pct": -1.232
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-10",
-      "blast_score": 0.2691,
-      "oi_hhi": 0.229,
-      "atm_oi_share": 40.5,
-      "mp_dist_pct": -1.325
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-24",
-      "blast_score": 0.2604,
-      "oi_hhi": 0.208,
-      "atm_oi_share": 40.1,
-      "mp_dist_pct": -1.86
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-18",
-      "blast_score": 0.2565,
-      "oi_hhi": 0.222,
-      "atm_oi_share": 54.9,
-      "mp_dist_pct": 0.78
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-14",
-      "blast_score": 0.2553,
-      "oi_hhi": 0.227,
-      "atm_oi_share": 53.2,
-      "mp_dist_pct": 0.78
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-05",
-      "blast_score": 0.255,
-      "oi_hhi": 0.227,
-      "atm_oi_share": 39.9,
-      "mp_dist_pct": -1.246
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-19",
-      "blast_score": 0.2522,
-      "oi_hhi": 0.214,
-      "atm_oi_share": 45.0,
-      "mp_dist_pct": -1.143
-    },
-    {
-      "symbol": "IDEA",
-      "date": "2026-08-03",
-      "blast_score": 0.251,
-      "oi_hhi": 0.227,
-      "atm_oi_share": 41.1,
-      "mp_dist_pct": -1.167
-    },
-    {
-      "symbol": "YESBANK",
-      "date": "2026-08-06",
-      "blast_score": 0.2452,
-      "oi_hhi": 0.21,
-      "atm_oi_share": 48.0,
-      "mp_dist_pct": -1.01
-    },
-    {
-      "symbol": "YESBANK",
+      "symbol": "LT",
       "date": "2026-08-20",
-      "blast_score": 0.2279,
-      "oi_hhi": 0.205,
-      "atm_oi_share": 42.0,
-      "mp_dist_pct": -1.143
+      "blast_score": 0.336,
+      "oi_hhi": 0.217,
+      "atm_oi_share": 52.0,
+      "mp_dist_pct": 1.5
+    },
+    {
+      "symbol": "LT",
+      "date": "2026-08-25",
+      "blast_score": 0.3078,
+      "oi_hhi": 0.22,
+      "atm_oi_share": 46.0,
+      "mp_dist_pct": 1.608
+    },
+    {
+      "symbol": "LT",
+      "date": "2026-08-24",
+      "blast_score": 0.2697,
+      "oi_hhi": 0.216,
+      "atm_oi_share": 51.6,
+      "mp_dist_pct": 1.026
+    },
+    {
+      "symbol": "ETERNAL",
+      "date": "2026-08-25",
+      "blast_score": 0.2687,
+      "oi_hhi": 0.183,
+      "atm_oi_share": 48.8,
+      "mp_dist_pct": 2.913
+    },
+    {
+      "symbol": "LT",
+      "date": "2026-08-21",
+      "blast_score": 0.2545,
+      "oi_hhi": 0.186,
+      "atm_oi_share": 44.8,
+      "mp_dist_pct": 1.599
+    },
+    {
+      "symbol": "ETERNAL",
+      "date": "2026-08-24",
+      "blast_score": 0.2369,
+      "oi_hhi": 0.171,
+      "atm_oi_share": 45.4,
+      "mp_dist_pct": 2.29
+    },
+    {
+      "symbol": "ETERNAL",
+      "date": "2026-08-21",
+      "blast_score": 0.2331,
+      "oi_hhi": 0.17,
+      "atm_oi_share": 44.8,
+      "mp_dist_pct": 2.275
+    },
+    {
+      "symbol": "NTPC",
+      "date": "2026-08-24",
+      "blast_score": 0.2312,
+      "oi_hhi": 0.214,
+      "atm_oi_share": 33.8,
+      "mp_dist_pct": -1.471
     },
     {
       "symbol": "TATASTEEL",
@@ -366,23 +289,193 @@
       "mp_dist_pct": -1.37
     },
     {
-      "symbol": "TATASTEEL",
-      "date": "2026-08-11",
-      "blast_score": 0.2274,
-      "oi_hhi": 0.197,
-      "atm_oi_share": 40.5,
-      "mp_dist_pct": -1.285
+      "symbol": "MAZDOCK",
+      "date": "2026-08-20",
+      "blast_score": 0.22,
+      "oi_hhi": 0.17,
+      "atm_oi_share": 41.8,
+      "mp_dist_pct": 2.534
     },
     {
-      "symbol": "YESBANK",
-      "date": "2026-08-03",
-      "blast_score": 0.2223,
-      "oi_hhi": 0.209,
-      "atm_oi_share": 48.0,
-      "mp_dist_pct": -0.833
+      "symbol": "ETERNAL",
+      "date": "2026-08-20",
+      "blast_score": 0.218,
+      "oi_hhi": 0.171,
+      "atm_oi_share": 41.0,
+      "mp_dist_pct": 2.275
+    },
+    {
+      "symbol": "IDEA",
+      "date": "2026-08-20",
+      "blast_score": 0.2024,
+      "oi_hhi": 0.217,
+      "atm_oi_share": 55.2,
+      "mp_dist_pct": 0.427
+    },
+    {
+      "symbol": "INFY",
+      "date": "2026-08-25",
+      "blast_score": 0.1961,
+      "oi_hhi": 0.179,
+      "atm_oi_share": 44.3,
+      "mp_dist_pct": 1.025
+    },
+    {
+      "symbol": "CUMMINSIND",
+      "date": "2026-08-25",
+      "blast_score": 0.1959,
+      "oi_hhi": 0.195,
+      "atm_oi_share": 30.1,
+      "mp_dist_pct": -2.031
+    },
+    {
+      "symbol": "TECHM",
+      "date": "2026-08-20",
+      "blast_score": 0.1956,
+      "oi_hhi": 0.218,
+      "atm_oi_share": 52.2,
+      "mp_dist_pct": -0.439
+    },
+    {
+      "symbol": "ADANIENT",
+      "date": "2026-08-25",
+      "blast_score": 0.1943,
+      "oi_hhi": 0.158,
+      "atm_oi_share": 40.6,
+      "mp_dist_pct": 1.428
+    },
+    {
+      "symbol": "TVSMOTOR",
+      "date": "2026-08-20",
+      "blast_score": 0.1837,
+      "oi_hhi": 0.165,
+      "atm_oi_share": 34.6,
+      "mp_dist_pct": 1.64
+    },
+    {
+      "symbol": "ITC",
+      "date": "2026-08-21",
+      "blast_score": 0.1816,
+      "oi_hhi": 0.201,
+      "atm_oi_share": 33.1,
+      "mp_dist_pct": -1.094
+    },
+    {
+      "symbol": "HDFCBANK",
+      "date": "2026-08-21",
+      "blast_score": 0.1814,
+      "oi_hhi": 0.185,
+      "atm_oi_share": 29.2,
+      "mp_dist_pct": -1.509
+    },
+    {
+      "symbol": "ADANIENT",
+      "date": "2026-08-24",
+      "blast_score": 0.1796,
+      "oi_hhi": 0.235,
+      "atm_oi_share": 36.6,
+      "mp_dist_pct": -0.644
+    },
+    {
+      "symbol": "PAYTM",
+      "date": "2026-08-24",
+      "blast_score": 0.1781,
+      "oi_hhi": 0.177,
+      "atm_oi_share": 37.7,
+      "mp_dist_pct": 1.112
+    },
+    {
+      "symbol": "CGPOWER",
+      "date": "2026-08-20",
+      "blast_score": 0.1752,
+      "oi_hhi": 0.164,
+      "atm_oi_share": 32.8,
+      "mp_dist_pct": 1.529
+    },
+    {
+      "symbol": "SHRIRAMFIN",
+      "date": "2026-08-20",
+      "blast_score": 0.1732,
+      "oi_hhi": 0.146,
+      "atm_oi_share": 37.3,
+      "mp_dist_pct": 1.935
+    },
+    {
+      "symbol": "KALYANKJIL",
+      "date": "2026-08-20",
+      "blast_score": 0.1729,
+      "oi_hhi": 0.206,
+      "atm_oi_share": 42.8,
+      "mp_dist_pct": -0.587
+    },
+    {
+      "symbol": "TVSMOTOR",
+      "date": "2026-08-21",
+      "blast_score": 0.1726,
+      "oi_hhi": 0.164,
+      "atm_oi_share": 32.3,
+      "mp_dist_pct": 1.489
+    },
+    {
+      "symbol": "CGPOWER",
+      "date": "2026-08-25",
+      "blast_score": 0.1724,
+      "oi_hhi": 0.148,
+      "atm_oi_share": 36.8,
+      "mp_dist_pct": 2.428
+    },
+    {
+      "symbol": "PAYTM",
+      "date": "2026-08-20",
+      "blast_score": 0.1716,
+      "oi_hhi": 0.156,
+      "atm_oi_share": 34.1,
+      "mp_dist_pct": 1.821
+    },
+    {
+      "symbol": "CUMMINSIND",
+      "date": "2026-08-20",
+      "blast_score": 0.1706,
+      "oi_hhi": 0.199,
+      "atm_oi_share": 24.3,
+      "mp_dist_pct": -3.567
+    },
+    {
+      "symbol": "BSE",
+      "date": "2026-08-24",
+      "blast_score": 0.1686,
+      "oi_hhi": 0.163,
+      "atm_oi_share": 31.3,
+      "mp_dist_pct": -2.781
+    },
+    {
+      "symbol": "LICI",
+      "date": "2026-08-25",
+      "blast_score": 0.1682,
+      "oi_hhi": 0.159,
+      "atm_oi_share": 33.7,
+      "mp_dist_pct": 1.425
     }
   ],
   "crazy_option_returns": [
+    {
+      "symbol": "DIVISLAB",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 8700.0,
+      "entry": 0.05,
+      "settle": 44.5,
+      "ret_pct": 88900.0
+    },
+    {
+      "symbol": "MAZDOCK",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 2600.0,
+      "entry": 0.05,
+      "settle": 10.0,
+      "ret_pct": 19900.0
+    },
     {
       "symbol": "TATASTEEL",
       "date": "2026-08-25",
@@ -393,220 +486,247 @@
       "ret_pct": 19300.0
     },
     {
-      "symbol": "PNB",
+      "symbol": "INFY",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 1140.0,
+      "entry": 0.05,
+      "settle": 4.0,
+      "ret_pct": 7900.0
+    },
+    {
+      "symbol": "ADANIPORTS",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 1700.0,
+      "entry": 0.1,
+      "settle": 2.7,
+      "ret_pct": 2600.0
+    },
+    {
+      "symbol": "BHARATFORG",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 2040.0,
+      "entry": 0.5,
+      "settle": 12.5,
+      "ret_pct": 2400.0
+    },
+    {
+      "symbol": "ETERNAL",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 330.0,
+      "entry": 0.05,
+      "settle": 1.0,
+      "ret_pct": 1900.0
+    },
+    {
+      "symbol": "ADANIENT",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 3100.0,
+      "entry": 3.35,
+      "settle": 10.0,
+      "ret_pct": 199.0
+    },
+    {
+      "symbol": "TVSMOTOR",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 4400.0,
+      "entry": 6.95,
+      "settle": 20.0,
+      "ret_pct": 188.0
+    },
+    {
+      "symbol": "BOSCHLTD",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 48500.0,
+      "entry": 139.95,
+      "settle": 180.0,
+      "ret_pct": 29.0
+    },
+    {
+      "symbol": "CUMMINSIND",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 5200.0,
+      "entry": 30.55,
+      "settle": 39.5,
+      "ret_pct": 29.0
+    },
+    {
+      "symbol": "PAYTM",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 1680.0,
+      "entry": 29.75,
+      "settle": 38.0,
+      "ret_pct": 28.0
+    },
+    {
+      "symbol": "HCLTECH",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 1310.0,
+      "entry": 5.55,
+      "settle": 5.8,
+      "ret_pct": 5.0
+    },
+    {
+      "symbol": "BSE",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 3300.0,
+      "entry": 4.0,
+      "settle": 3.0,
+      "ret_pct": -25.0
+    },
+    {
+      "symbol": "NESTLEIND",
+      "date": "2026-08-25",
+      "side": "CE",
+      "strike": 1470.0,
+      "entry": 13.45,
+      "settle": 9.0,
+      "ret_pct": -33.0
+    },
+    {
+      "symbol": "APOLLOHOSP",
+      "date": "2026-08-20",
+      "side": "CE",
+      "strike": 8700.0,
+      "entry": 63.5,
+      "settle": 35.0,
+      "ret_pct": -45.0
+    },
+    {
+      "symbol": "PAYTM",
+      "date": "2026-08-24",
+      "side": "CE",
+      "strike": 1620.0,
+      "entry": 8.6,
+      "settle": 3.5,
+      "ret_pct": -59.0
+    },
+    {
+      "symbol": "CGPOWER",
       "date": "2026-08-25",
       "side": "PE",
-      "strike": 116.0,
-      "entry": 0.02,
-      "settle": 0.07,
-      "ret_pct": 250.0
+      "strike": 880.0,
+      "entry": 3.9,
+      "settle": 1.5,
+      "ret_pct": -62.0
     },
     {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-05",
+      "symbol": "MUTHOOTFIN",
+      "date": "2026-08-24",
+      "side": "CE",
+      "strike": 3200.0,
+      "entry": 23.8,
+      "settle": 9.0,
+      "ret_pct": -62.0
+    },
+    {
+      "symbol": "JIOFIN",
+      "date": "2026-08-24",
       "side": "PE",
-      "strike": 175.0,
-      "entry": 5.56,
-      "settle": 4.54,
-      "ret_pct": -18.0
+      "strike": 242.5,
+      "entry": 1.35,
+      "settle": 0.5,
+      "ret_pct": -63.0
     },
     {
-      "symbol": "IDFCFIRSTB",
-      "date": "2026-08-03",
-      "side": "CE",
-      "strike": 85.0,
-      "entry": 2.05,
-      "settle": 1.0,
-      "ret_pct": -51.0
+      "symbol": "GRASIM",
+      "date": "2026-08-21",
+      "side": "PE",
+      "strike": 3320.0,
+      "entry": 32.95,
+      "settle": 12.0,
+      "ret_pct": -64.0
     },
     {
-      "symbol": "PNB",
-      "date": "2026-08-19",
-      "side": "CE",
-      "strike": 117.0,
-      "entry": 1.44,
-      "settle": 0.48,
+      "symbol": "NESTLEIND",
+      "date": "2026-08-21",
+      "side": "PE",
+      "strike": 1480.0,
+      "entry": 8.7,
+      "settle": 2.9,
       "ret_pct": -67.0
     },
     {
-      "symbol": "TATASTEEL",
-      "date": "2026-08-03",
-      "side": "CE",
-      "strike": 190.0,
-      "entry": 4.49,
+      "symbol": "LICI",
+      "date": "2026-08-20",
+      "side": "PE",
+      "strike": 420.0,
+      "entry": 3.1,
       "settle": 1.0,
+      "ret_pct": -68.0
+    },
+    {
+      "symbol": "MARUTI",
+      "date": "2026-08-24",
+      "side": "CE",
+      "strike": 13600.0,
+      "entry": 64.9,
+      "settle": 20.0,
+      "ret_pct": -69.0
+    },
+    {
+      "symbol": "KAYNES",
+      "date": "2026-08-24",
+      "side": "PE",
+      "strike": 3850.0,
+      "entry": 35.0,
+      "settle": 9.8,
+      "ret_pct": -72.0
+    },
+    {
+      "symbol": "HAL",
+      "date": "2026-08-24",
+      "side": "CE",
+      "strike": 4900.0,
+      "entry": 24.5,
+      "settle": 6.0,
+      "ret_pct": -76.0
+    },
+    {
+      "symbol": "HCLTECH",
+      "date": "2026-08-24",
+      "side": "CE",
+      "strike": 1320.0,
+      "entry": 9.1,
+      "settle": 2.0,
       "ret_pct": -78.0
     },
     {
-      "symbol": "PNB",
-      "date": "2026-08-10",
-      "side": "PE",
-      "strike": 114.0,
-      "entry": 2.47,
-      "settle": 0.5,
-      "ret_pct": -80.0
-    },
-    {
-      "symbol": "RBLBANK",
-      "date": "2026-08-06",
-      "side": "CE",
-      "strike": 390.0,
-      "entry": 10.05,
-      "settle": 2.0,
-      "ret_pct": -80.0
-    },
-    {
-      "symbol": "IDFCFIRSTB",
-      "date": "2026-08-06",
-      "side": "CE",
-      "strike": 85.0,
-      "entry": 1.87,
-      "settle": 0.35,
-      "ret_pct": -81.0
-    },
-    {
-      "symbol": "SBIN",
-      "date": "2026-08-03",
-      "side": "CE",
-      "strike": 1040.0,
-      "entry": 27.65,
-      "settle": 5.0,
-      "ret_pct": -82.0
-    },
-    {
-      "symbol": "SBIN",
-      "date": "2026-08-13",
-      "side": "CE",
-      "strike": 1080.0,
-      "entry": 17.2,
-      "settle": 3.0,
-      "ret_pct": -83.0
-    },
-    {
-      "symbol": "RBLBANK",
-      "date": "2026-08-10",
-      "side": "CE",
-      "strike": 390.0,
-      "entry": 8.75,
-      "settle": 1.0,
-      "ret_pct": -89.0
-    },
-    {
-      "symbol": "SBIN",
-      "date": "2026-08-04",
-      "side": "CE",
-      "strike": 1040.0,
-      "entry": 26.6,
-      "settle": 2.7,
-      "ret_pct": -90.0
-    },
-    {
-      "symbol": "TATASTEEL",
-      "date": "2026-08-05",
-      "side": "CE",
-      "strike": 192.5,
-      "entry": 4.89,
-      "settle": 0.49,
-      "ret_pct": -90.0
-    },
-    {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-06",
-      "side": "PE",
-      "strike": 175.0,
-      "entry": 5.3,
-      "settle": 0.34,
-      "ret_pct": -94.0
-    },
-    {
-      "symbol": "RBLBANK",
-      "date": "2026-08-04",
-      "side": "CE",
-      "strike": 380.0,
-      "entry": 12.1,
-      "settle": 0.55,
-      "ret_pct": -95.0
-    },
-    {
-      "symbol": "BANDHANBNK",
+      "symbol": "NESTLEIND",
       "date": "2026-08-24",
       "side": "CE",
-      "strike": 175.0,
-      "entry": 1.2,
-      "settle": 0.0,
-      "ret_pct": -100.0
+      "strike": 1470.0,
+      "entry": 6.1,
+      "settle": 1.3,
+      "ret_pct": -79.0
     },
     {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-21",
-      "side": "CE",
-      "strike": 180.0,
-      "entry": 0.28,
-      "settle": 0.0,
-      "ret_pct": -100.0
-    },
-    {
-      "symbol": "BANDHANBNK",
+      "symbol": "ICICIBANK",
       "date": "2026-08-20",
       "side": "CE",
-      "strike": 175.0,
-      "entry": 1.8,
-      "settle": 0.0,
-      "ret_pct": -100.0
+      "strike": 1410.0,
+      "entry": 9.35,
+      "settle": 1.9,
+      "ret_pct": -80.0
     },
     {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-19",
-      "side": "CE",
-      "strike": 170.0,
-      "entry": 1.55,
-      "settle": 0.0,
-      "ret_pct": -100.0
-    },
-    {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-18",
-      "side": "CE",
-      "strike": 175.0,
-      "entry": 0.93,
-      "settle": 0.0,
-      "ret_pct": -100.0
-    },
-    {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-17",
-      "side": "CE",
-      "strike": 175.0,
-      "entry": 1.1,
-      "settle": 0.0,
-      "ret_pct": -100.0
-    },
-    {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-14",
-      "side": "CE",
-      "strike": 175.0,
-      "entry": 2.5,
-      "settle": 0.0,
-      "ret_pct": -100.0
-    },
-    {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-13",
-      "side": "CE",
-      "strike": 180.0,
-      "entry": 1.25,
-      "settle": 0.0,
-      "ret_pct": -100.0
-    },
-    {
-      "symbol": "BANDHANBNK",
-      "date": "2026-08-12",
-      "side": "CE",
-      "strike": 180.0,
-      "entry": 0.4,
-      "settle": 0.0,
-      "ret_pct": -100.0
+      "symbol": "HCLTECH",
+      "date": "2026-08-20",
+      "side": "PE",
+      "strike": 1320.0,
+      "entry": 10.75,
+      "settle": 1.6,
+      "ret_pct": -85.0
     }
   ]
 }

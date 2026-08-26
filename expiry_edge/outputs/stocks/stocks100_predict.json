@@ -1,0 +1,174 @@
+{
+  "n_shortlist": 29,
+  "n_all_screened": 54,
+  "max_pain_pull": {
+    "hits": 14,
+    "n": 29,
+    "rate": 0.48,
+    "binom_p": 1.0
+  },
+  "last_hour_momentum": {
+    "hits": 23,
+    "n": 29,
+    "rate": 0.79,
+    "binom_p": 0.002
+  },
+  "both_agree": {
+    "hits": 10,
+    "n": 12,
+    "rate": 0.83,
+    "binom_p": 0.039
+  },
+  "rho_blast_vs_spike": {
+    "rho": -0.13,
+    "p": 0.491,
+    "n": 29
+  },
+  "rho_blast_vs_aug25_CAS_z": {
+    "rho": -0.05,
+    "p": 0.794,
+    "n": 29
+  },
+  "tickets": {
+    "n": 29,
+    "mean_ret_pct": 4888.0,
+    "positive": 12,
+    "leaderboard": [
+      {
+        "symbol": "DIVISLAB",
+        "side": "CE",
+        "strike": 8700.0,
+        "entry": 0.05,
+        "settle": 44.5,
+        "ret_pct": 88900.0,
+        "spike_pct": 0.8
+      },
+      {
+        "symbol": "MAZDOCK",
+        "side": "CE",
+        "strike": 2600.0,
+        "entry": 0.05,
+        "settle": 10.0,
+        "ret_pct": 19900.0,
+        "spike_pct": 0.38
+      },
+      {
+        "symbol": "TATASTEEL",
+        "side": "CE",
+        "strike": 185.0,
+        "entry": 0.01,
+        "settle": 1.94,
+        "ret_pct": 19300.0,
+        "spike_pct": 1.35
+      },
+      {
+        "symbol": "INFY",
+        "side": "CE",
+        "strike": 1140.0,
+        "entry": 0.05,
+        "settle": 4.0,
+        "ret_pct": 7900.0,
+        "spike_pct": 1.1
+      },
+      {
+        "symbol": "ADANIPORTS",
+        "side": "CE",
+        "strike": 1700.0,
+        "entry": 0.1,
+        "settle": 2.7,
+        "ret_pct": 2600.0,
+        "spike_pct": 0.44
+      },
+      {
+        "symbol": "BHARATFORG",
+        "side": "CE",
+        "strike": 2040.0,
+        "entry": 0.5,
+        "settle": 12.5,
+        "ret_pct": 2400.0,
+        "spike_pct": 0.69
+      },
+      {
+        "symbol": "ETERNAL",
+        "side": "CE",
+        "strike": 330.0,
+        "entry": 0.05,
+        "settle": 1.0,
+        "ret_pct": 1900.0,
+        "spike_pct": 0.42
+      },
+      {
+        "symbol": "ADANIENT",
+        "side": "CE",
+        "strike": 3100.0,
+        "entry": 3.35,
+        "settle": 10.0,
+        "ret_pct": 199.0,
+        "spike_pct": 0.51
+      },
+      {
+        "symbol": "TVSMOTOR",
+        "side": "CE",
+        "strike": 4400.0,
+        "entry": 6.95,
+        "settle": 20.0,
+        "ret_pct": 188.0,
+        "spike_pct": 0.54
+      },
+      {
+        "symbol": "BOSCHLTD",
+        "side": "CE",
+        "strike": 48500.0,
+        "entry": 139.95,
+        "settle": 180.0,
+        "ret_pct": 29.0,
+        "spike_pct": 0.58
+      },
+      {
+        "symbol": "CUMMINSIND",
+        "side": "CE",
+        "strike": 5200.0,
+        "entry": 30.55,
+        "settle": 39.5,
+        "ret_pct": 29.0,
+        "spike_pct": 0.87
+      },
+      {
+        "symbol": "HCLTECH",
+        "side": "CE",
+        "strike": 1310.0,
+        "entry": 5.55,
+        "settle": 5.8,
+        "ret_pct": 5.0,
+        "spike_pct": 0.5
+      },
+      {
+        "symbol": "NESTLEIND",
+        "side": "CE",
+        "strike": 1470.0,
+        "entry": 13.45,
+        "settle": 9.0,
+        "ret_pct": -33.0,
+        "spike_pct": 0.85
+      },
+      {
+        "symbol": "CGPOWER",
+        "side": "PE",
+        "strike": 880.0,
+        "entry": 3.9,
+        "settle": 1.5,
+        "ret_pct": -62.0,
+        "spike_pct": -0.33
+      },
+      {
+        "symbol": "NATIONALUM",
+        "side": "CE",
+        "strike": 400.0,
+        "entry": 0.05,
+        "settle": 0.0,
+        "ret_pct": -100.0,
+        "spike_pct": 0.47
+      }
+    ]
+  }
+}
