@@ -1,0 +1,88 @@
+{
+  "n_blast": 13,
+  "n_rest": 41,
+  "auction_pct": {
+    "blast_med": 0.87,
+    "rest_med": 0.32,
+    "p": 0.0
+  },
+  "dist_to_strike_pct": {
+    "blast_med": 0.29,
+    "rest_med": 0.74,
+    "p": 0.0013
+  },
+  "strike_step_pct": {
+    "blast_med": 1.2,
+    "rest_med": 1.27,
+    "p": 0.9919
+  },
+  "lasthr_pct": {
+    "blast_med": 0.45,
+    "rest_med": 0.36,
+    "p": 0.257
+  },
+  "day_to_1510_pct": {
+    "blast_med": 0.3,
+    "rest_med": 0.4,
+    "p": 0.8555
+  },
+  "typical_abs_eod_move": {
+    "blast_med": 0.075,
+    "rest_med": 0.079,
+    "p": 0.6857
+  },
+  "liq_rank": {
+    "blast_med": 58.0,
+    "rest_med": 25.0,
+    "p": 0.0274
+  },
+  "pcr_oi": {
+    "blast_med": 0.74,
+    "rest_med": 0.72,
+    "p": 0.9114
+  },
+  "atm_oi_share": {
+    "blast_med": 20.9,
+    "rest_med": 22.0,
+    "p": 0.9516
+  },
+  "oi_hhi": {
+    "blast_med": 0.162,
+    "rest_med": 0.159,
+    "p": 0.4601
+  },
+  "mp_dist_pct": {
+    "blast_med": 1.025,
+    "rest_med": 0.452,
+    "p": 0.7157
+  },
+  "call_oi_chg_day": {
+    "blast_med": -600975.0,
+    "rest_med": -1198175.0,
+    "p": 0.2658
+  },
+  "put_oi_chg_day": {
+    "blast_med": -279500.0,
+    "rest_med": -703800.0,
+    "p": 0.0892
+  },
+  "doi_near_strike": {
+    "blast_med": -226188.0,
+    "rest_med": -400000.0,
+    "p": 0.1509
+  },
+  "late_vol_share": {
+    "blast_med": 0.09,
+    "rest_med": 0.07,
+    "p": 0.6332
+  },
+  "nifty_spike_210": {
+    "nifty_med": 0.32,
+    "other_med": 0.26,
+    "n": [
+      49,
+      161
+    ],
+    "p": 0.5601
+  }
+}
