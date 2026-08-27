@@ -1,0 +1,36 @@
+{
+  "sig_lasthr": {
+    "hits": 1,
+    "n": 4
+  },
+  "sig_day": {
+    "hits": 2,
+    "n": 5
+  },
+  "sig_last20": {
+    "hits": 2,
+    "n": 5
+  },
+  "sig_pinmig": {
+    "hits": 2,
+    "n": 2
+  },
+  "sig_v1pin": {
+    "hits": 3,
+    "n": 4
+  },
+  "v2_dir": {
+    "hits": 4,
+    "n": 5
+  },
+  "v1": {
+    "pnl_per_1lot_rs": 6146.0,
+    "wins": 2,
+    "traded": 4
+  },
+  "v2": {
+    "pnl_per_1lot_rs": 10500.0,
+    "wins": 3,
+    "traded": 5
+  }
+}
