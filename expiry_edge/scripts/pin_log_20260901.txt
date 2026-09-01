@@ -92,3 +92,6 @@ SUMMARY: BUY NIFTY | spot 23976 pin 24000 | 24000CE @26.10 + 23950PE @17.35 = 0.
   chain OI since 0805: CE +0.5%  PE -25.1%
 
 SUMMARY: BUY NIFTY | spot 23983 pin 24000 | 24000CE @30.65 + 23950PE @11.45 = 0.18% | 7 lots Rs 19,155
+
+===== SETTLEMENT 2026-09-01: 24055.8 (freeze 23980.55, auction +75.25) =====
+recommended 23950 PE: TOTAL LOSS. strangle: +5619. 24000 CE leg: +21235.
