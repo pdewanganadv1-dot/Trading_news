@@ -215,8 +215,10 @@ def live(index):
                 if r.status_code == 429:
                     _time.sleep(3 + 2 * i)
                     continue
-                sys.exit(f"[STOP] HTTP {r.status_code}: {r.text[:150]}\n-> 401/403: token expired/invalid "
-                         "or Data API disabled; regenerate on Dhan.")
+                if r.status_code in (401, 403):
+                    sys.exit(f"[STOP] HTTP {r.status_code}: token expired/invalid or Data API disabled; "
+                             "regenerate on Dhan.")
+                break  # e.g. DH-905 on this expiryCode -> try the next one
             j = r.json()
             for key in ("ce", "pe"):
                 blk = (j.get("data") or {}).get(key)

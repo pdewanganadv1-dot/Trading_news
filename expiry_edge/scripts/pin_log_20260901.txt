@@ -1,0 +1,16 @@
+
+===== snapshot 2026-09-01 13:01 IST =====
+[STOP] HTTP 400: {"errorType":"Input_Exception","errorCode":"DH-905","errorMessage":"expiryCode is required"}
+-> 401/403: token expired/invalid or Data API disabled; regenerate on Dhan.
+
+
+===== snapshot 2026-09-01 13:01 IST =====
+[STOP] no option data returned — is today an expiry/trading day?
+
+NIFTY live snapshot 13:02 IST | expiry 2026-09-01
+  spot 24084.2   FULL-CHAIN max-pain 24100   (pin dist +16 pts)
+  legs: 24100 CE @ 26.90 (OI 324.6L) + 24050 PE @ 18.20 (OI 473.2L)
+  combined 45.10 = 0.187% of spot (cap 0.25%)   breakeven +61/-79 (easier 0.253%, cap 0.35%)
+  STRANGLE VERDICT: BUY — 6 lots each leg = Rs 17,589
+
+SUMMARY: BUY NIFTY | spot 24084 pin 24100 | 24100CE @26.90 + 24050PE @18.20 = 0.19% | 6 lots Rs 17,589
