@@ -4,5 +4,4 @@ date,index,rule,ticket,entry,settle_intrinsic,pnl
 2026-09-01,NIFTY,strangle_leg_CE,24000 CE x7,26.1,55.8,13513
 2026-09-01,NIFTY,strangle_leg_PE,23950 PE x7,17.35,0.0,-7894
 2026-09-01,NIFTY,call_leg_fullbudget,24000 CE x11,26.1,55.8,21235
-2026-09-01,NIFTY,piyush_actual_PE,23900 PE x24 (est entry),6.4,0.0,-9984
-2026-09-01,NIFTY,piyush_actual_CE,24100 CE x24 (est entry),6.35,0.0,-9906
+2026-09-01,NIFTY,piyush_actual_total,23900 PE + 24100 CE (both expired worthless),,0.0,-10000
