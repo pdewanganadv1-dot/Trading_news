@@ -54,3 +54,13 @@ NIFTY live snapshot 14:46 IST | expiry 2026-09-01
   chain OI since 0805: CE +10.0%  PE -26.4%
 
 SUMMARY: BUY NIFTY | spot 23972 pin 24000 | 24000CE @26.60 + 23950PE @20.30 = 0.20% | 6 lots Rs 18,291
+NIFTY live snapshot 14:50 IST | expiry 2026-09-01
+  spot 23976.5   FULL-CHAIN max-pain 24000   (pin dist +23 pts)
+  legs: 24000 CE @ 31.60 (OI 427.3L) + 23950 PE @ 16.50 (OI 267.8L)
+  combined 48.10 = 0.201% of spot (cap 0.25%)   breakeven +72/-75 (easier 0.298%, cap 0.35%)
+  STRANGLE VERDICT: BUY — 6 lots each leg = Rs 18,759
+  vs 0805: pin 24050 -> 24000 (-50), spot 24064.0 -> 23976.5 (-87.4)
+  *** PIN MIGRATING DOWN — that side is the STRONG directional pick ***
+  chain OI since 0805: CE +9.0%  PE -25.6%
+
+SUMMARY: BUY NIFTY | spot 23977 pin 24000 | 24000CE @31.60 + 23950PE @16.50 = 0.20% | 6 lots Rs 18,759
