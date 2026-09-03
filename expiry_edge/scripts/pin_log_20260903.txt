@@ -1,0 +1,7 @@
+SENSEX live snapshot 09:32 IST | expiry 2026-09-03
+  spot 76799.7   FULL-CHAIN max-pain 76800   (pin dist +0 pts)
+  legs: 76800 CE @ 169.40 (OI 50.2L) + 76700 PE @ 106.00 (OI 31.3L)
+  combined 275.40 = 0.359% of spot (cap 0.25%)   breakeven +276/-375 (easier 0.359%, cap 0.35%)
+  STRANGLE VERDICT: SKIP-EXPENSIVE
+
+SUMMARY: SKIP-EXPENSIVE SENSEX | spot 76800 pin 76800 | 76800CE @169.40 + 76700PE @106.00 = 0.36%
