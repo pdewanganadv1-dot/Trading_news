@@ -5,3 +5,12 @@ date,index,rule,ticket,entry,settle_intrinsic,pnl
 2026-09-01,NIFTY,strangle_leg_PE,23950 PE x7,17.35,0.0,-7894
 2026-09-01,NIFTY,call_leg_fullbudget,24000 CE x11,26.1,55.8,21235
 2026-09-01,NIFTY,piyush_actual_total,23900 PE + 24100 CE (both expired worthless),,0.0,-10000
+2026-09-03,SENSEX,strangle_1505_recommended,76600 CE + 76500 PE x5,168.60,347.1,17850
+2026-09-03,SENSEX,strangle_leg_CE,76600 CE x5,89.85,0.0,-8985
+2026-09-03,SENSEX,strangle_leg_PE,76500 PE x5,78.75,347.1,26835
+2026-09-03,SENSEX,snapshot_1506_alt_skipped_expensive,76500 CE + 76400 PE x5,193.15,247.1,5395
+2026-09-03,SENSEX,migration_down_fullbudget,76500 PE x10,78.75,347.1,53670
+2026-09-03,SENSEX,pinpull_up_fullbudget,76600 CE x10,89.85,0.0,-17970
+2026-09-03,SENSEX,prelim_1430_strangle_if_held,76700 CE + 76600 PE x5,178.05,447.1,26905
+2026-09-03,SENSEX,piyush_actual_total,paper only (no position),,,0
+2026-09-03,SENSEX,v2_STRONG_posthoc_tool_failed_live,76400 PE x20,48.30,247.1,79520

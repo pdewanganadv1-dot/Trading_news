@@ -202,24 +202,30 @@ def live(index):
     rows = {}
     for strike in ["ATM-3", "ATM-2", "ATM-1", "ATM", "ATM+1", "ATM+2", "ATM+3"]:
         for side in ("CALL", "PUT"):
-            for i in range(4):
-                r = requests.post("https://api.dhan.co/v2/charts/rollingoption", headers=H, timeout=60,
-                                  json={"exchangeSegment": seg, "interval": "5", "securityId": sid,
-                                        "instrument": "OPTIDX", "expiryCode": 0, "expiryFlag": "WEEK",
-                                        "strike": strike, "drvOptionType": side,
-                                        "requiredData": ["close", "volume", "strike", "oi", "spot"],
-                                        "fromDate": today.isoformat(),
-                                        "toDate": (today + dt.timedelta(days=1)).isoformat()})
-                if r.status_code == 200:
+            j = {}
+            # 3 Sep 2026 lesson: on expiry day expiryCode 0 answered DH-905 ("expiryCode is required")
+            # for the expiring SENSEX weekly while expiryCode 1 carried the data; walk the codes.
+            for ecode in (0, 1, 2):
+                for i in range(4):
+                    r = requests.post("https://api.dhan.co/v2/charts/rollingoption", headers=H, timeout=60,
+                                      json={"exchangeSegment": seg, "interval": "5", "securityId": sid,
+                                            "instrument": "OPTIDX", "expiryCode": ecode, "expiryFlag": "WEEK",
+                                            "strike": strike, "drvOptionType": side,
+                                            "requiredData": ["close", "volume", "strike", "oi", "spot"],
+                                            "fromDate": today.isoformat(),
+                                            "toDate": (today + dt.timedelta(days=1)).isoformat()})
+                    if r.status_code == 200:
+                        break
+                    if r.status_code == 429:
+                        _time.sleep(3 + 2 * i)
+                        continue
+                    if r.status_code in (401, 403):
+                        sys.exit(f"[STOP] HTTP {r.status_code}: token expired/invalid or Data API disabled; "
+                                 "regenerate on Dhan.")
+                    break  # e.g. DH-905 on this expiryCode -> try the next one
+                if r.status_code == 200 and (r.json().get("data") or {}):
+                    j = r.json()
                     break
-                if r.status_code == 429:
-                    _time.sleep(3 + 2 * i)
-                    continue
-                if r.status_code in (401, 403):
-                    sys.exit(f"[STOP] HTTP {r.status_code}: token expired/invalid or Data API disabled; "
-                             "regenerate on Dhan.")
-                break  # e.g. DH-905 on this expiryCode -> try the next one
-            j = r.json()
             for key in ("ce", "pe"):
                 blk = (j.get("data") or {}).get(key)
                 if not blk or not blk.get("timestamp"):

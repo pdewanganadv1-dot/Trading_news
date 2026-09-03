@@ -105,3 +105,20 @@ SUMMARY: BUY SENSEX 76600CE @ 89.85 + 76500PE @ 78.75 x5 lots = Rs 16,860
 Strangle tool (15:05 bar, spot 76506.5): BUY 76600CE @89.85 + 76500PE @78.75 x5 = Rs 16,860 (0.22%, need 0.23%).
 Snapshot 15:06 (spot 76499.1, one tick below the 76500 strike): nearest-OTM flips to 76500CE @132.65 + 76400PE @60.50 = 0.252% -> SKIP-EXPENSIVE by 0.002%. Edge case: spot sitting on a strike.
 Directional: pin migration DOWN (76800->76600, spot -300 since 0935) says PE; v1 pin-pull (spot 101 below pin 76600) says CE; v2 tool returned no rollingoption data. Conflict -> no single-leg override. Rule H verdict = the 15:05 strangle.
+
+===== 16:00 settlement + P&L 2026-09-03 =====
+SENSEX 1-min bars (charts/intraday): 15:05 bar close 76506.5 | 15:15 freeze 76554.2 | CAS print 15:28 -> 76152.9 (held to 16:01)
+Cross-check: rollingoption expiryCode 1, 15:35 bar: spot 76152.86, 76200 PE close 47.2 = intrinsic 47.14 (settlement confirmed)
+Auction move: 76554.2 -> 76152.9 = -401.3 pts (-0.524%)   | from 15:05 entry spot: -353.6 (-0.46%) | day: 76570.4 -> 76152.9 (-0.55%)
+Put-side blast (same shape as SENSEX 27 Aug and BANKEX 27 Aug). Lot 20.
+  A  strangle 76600CE@89.85 + 76500PE@78.75 x5  paid 16,860  received 34,710  net +17,850  (PE leg +26,835, CE leg -8,985)
+  B  alt      76500CE@132.65 + 76400PE@60.50 x5 paid 19,315  received 24,710  net  +5,395  (was SKIP-EXPENSIVE by 0.002%; strike-boundary artifact)
+  C1 migration-DOWN 76500PE@78.75 x10           paid 15,750  received 69,420  net +53,670
+  C2 pin-pull-UP    76600CE@89.85 x10           paid 17,970  received      0  net -17,970
+  ref 14:30 prelim legs 76700CE@100.55 + 76600PE@77.50 x5 if held: net +26,905
+Paper scorecard so far (1 Sep NIFTY + 3 Sep SENSEX): Rule-H strangle +5,619 +17,850 = +23,469 (2/2);
+  migration single-leg -19,172 +53,670 = +34,498 (1/2); pin-pull single-leg +21,235 -17,970 = +3,265 (1/2).
+Tool note: expiry_pick_v2.py returned no data at 15:05 because it hard-coded expiryCode 0 (DH-905 on expiry day);
+  patched to walk expiryCode 0->1->2 like strangle_1505.py.
+v2 post-hoc (patched tool re-run at 16:03 on the day's bars, decision bar 15:05): votes day -1 last20 -1 pinmig -1 -> STRONG 76400 PE @ 48.30;
+  with Rs 20k budget = 20 lots, paid 19,320, received 98,840, net +79,520. NOT a live pick (tool failed at 15:05) - reconstruction only.
