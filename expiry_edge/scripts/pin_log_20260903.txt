@@ -51,3 +51,26 @@ SENSEX live snapshot 13:01 IST | expiry 2026-09-03
 
 SUMMARY: SKIP-EXPENSIVE SENSEX | spot 76641 pin 76700 | 76700CE @111.30 + 76600PE @105.20 = 0.28%
 
+
+===== 14:30 run 2026-09-03 14:31 IST =====
+--- v1 ---
+ spot           : 76610.79
+ max-pain       : 76600    (spot above pin by 11 pts)
+ PCR (OI)       : 0.76
+ call wall      : 77000   (CE OI 12,136,180)
+ put wall       : 76500   (PE OI 8,943,360)
+ PICK : SIT OUT -- spot is within 60 pts of max-pain (the pin is basically here; no edge).
+SUMMARY: SIT-OUT | spot 76611 pin 76600 (11 pts apart)
+--- live snapshot ---
+SENSEX live snapshot 14:31 IST | expiry 2026-09-03
+  spot 76607.6   FULL-CHAIN max-pain 76600   (pin dist -8 pts)
+  legs: 76700 CE @ 100.55 (OI 92.3L) + 76600 PE @ 77.50 (OI 62.4L)
+  deltas: CE 0.40 / PE 0.47  box CENTERED (both legs delta>=0.30: Aug 6/7 wins)
+  combined 178.05 = 0.232% of spot (cap 0.25%)   breakeven +270/-186 (easier 0.242%, cap 0.35%)
+  STRANGLE VERDICT: BUY — 5 lots each leg = Rs 17,805
+  vs 0935: pin 76800 -> 76600 (-200), spot 76799.7 -> 76607.6 (-192.1)
+  *** PIN MIGRATING DOWN — that side is the STRONG directional pick ***
+  chain OI since 0935: CE +68.0%  PE +39.4%   !! growing BOTH sides — blast-fuel flag
+
+SUMMARY: BUY SENSEX | spot 76608 pin 76600 | 76700CE @100.55 + 76600PE @77.50 = 0.23% | 5 lots Rs 17,805
+
