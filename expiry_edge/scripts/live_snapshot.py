@@ -81,7 +81,8 @@ def main(index, budget, tag):
           f"{pe_k:.0f} PE @ {pe_p:.2f} (OI {chain[pe_k]['pe_oi']/1e5:.1f}L)")
     dce, dpe = chain[ce_k]["ce_delta"], chain[pe_k]["pe_delta"]
     lot_flag = "  !! LOTTERY-DELTA (<0.10) — wide-wing risk, Tue-1-Sep lesson" if (dce and dce < 0.10) or (dpe and dpe < 0.10) else ""
-    print(f"  deltas: CE {dce:.2f} / PE {dpe:.2f}  (Aug winners clustered 0.15-0.50; <0.10 = lottery){lot_flag}")
+    box = "CENTERED (both legs delta>=0.30: Aug 6/7 wins)" if dce >= 0.30 and dpe >= 0.30 else "LOPSIDED (a leg <0.30: Aug 1/4 wins) -> provisional SKIP"
+    print(f"  deltas: CE {dce:.2f} / PE {dpe:.2f}  box {box}{lot_flag}")
     print(f"  combined {comb:.2f} = {prem_pct:.3f}% of spot (cap {MAX_PREM_PCT}%)   "
           f"breakeven +{need_up:.0f}/-{need_dn:.0f} (easier {need_pct:.3f}%, cap {MAX_NEED_PCT}%)")
     print(f"  STRANGLE VERDICT: {verdict}" + (f" — {lots} lots each leg = Rs {lots * comb * lot:,.0f}"
