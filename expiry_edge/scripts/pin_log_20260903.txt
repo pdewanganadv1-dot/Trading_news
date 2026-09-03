@@ -74,3 +74,34 @@ SENSEX live snapshot 14:31 IST | expiry 2026-09-03
 
 SUMMARY: BUY SENSEX | spot 76608 pin 76600 | 76700CE @100.55 + 76600PE @77.50 = 0.23% | 5 lots Rs 17,805
 
+
+===== 15:05 run 2026-09-03 15:06 IST =====
+--- live snapshot ---
+SENSEX live snapshot 15:06 IST | expiry 2026-09-03
+  spot 76499.1   FULL-CHAIN max-pain 76600   (pin dist +101 pts)
+  legs: 76500 CE @ 132.65 (OI 32.0L) + 76400 PE @ 60.50 (OI 57.0L)
+  deltas: CE 0.51 / PE 0.34  box CENTERED (both legs delta>=0.30: Aug 6/7 wins)
+  combined 193.15 = 0.252% of spot (cap 0.25%)   breakeven +194/-292 (easier 0.254%, cap 0.35%)
+  STRANGLE VERDICT: SKIP-EXPENSIVE
+  vs 0935: pin 76800 -> 76600 (-200), spot 76799.7 -> 76499.1 (-300.6)
+  *** PIN MIGRATING DOWN — that side is the STRONG directional pick ***
+  chain OI since 0935: CE +49.7%  PE +28.5%   !! growing BOTH sides — blast-fuel flag
+
+SUMMARY: SKIP-EXPENSIVE SENSEX | spot 76499 pin 76600 | 76500CE @132.65 + 76400PE @60.50 = 0.25%
+--- strangle_1505 ---
+==================================================================
+ SENSEX CAS strangle  |  bars to 2026-09-03 15:05:00  |  budget Rs 20,000
+==================================================================
+ spot 76506.5   legs: 76600 CE @ 89.85  +  76500 PE @ 78.75
+ combined 168.60 pts = 0.22% of spot (limit 0.25%)
+ breakeven: +262 up / -175 down; easier side 0.23% (limit 0.35%; Aug median auction 0.25%, max 1.22%)
+------------------------------------------------------------------
+ VERDICT: BUY 5 lot(s) of each leg  (Rs 3,372/strangle-lot, total Rs 16,860) — hold to 15:30 settlement, total-loss sizing.
+
+SUMMARY: BUY SENSEX 76600CE @ 89.85 + 76500PE @ 78.75 x5 lots = Rs 16,860
+--- v2 ---
+[STOP] no option data returned — is today an expiry/trading day?
+--- 15:05 verdict (PAPER) ---
+Strangle tool (15:05 bar, spot 76506.5): BUY 76600CE @89.85 + 76500PE @78.75 x5 = Rs 16,860 (0.22%, need 0.23%).
+Snapshot 15:06 (spot 76499.1, one tick below the 76500 strike): nearest-OTM flips to 76500CE @132.65 + 76400PE @60.50 = 0.252% -> SKIP-EXPENSIVE by 0.002%. Edge case: spot sitting on a strike.
+Directional: pin migration DOWN (76800->76600, spot -300 since 0935) says PE; v1 pin-pull (spot 101 below pin 76600) says CE; v2 tool returned no rollingoption data. Conflict -> no single-leg override. Rule H verdict = the 15:05 strangle.
