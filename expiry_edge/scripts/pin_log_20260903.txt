@@ -5,3 +5,9 @@ SENSEX live snapshot 09:32 IST | expiry 2026-09-03
   STRANGLE VERDICT: SKIP-EXPENSIVE
 
 SUMMARY: SKIP-EXPENSIVE SENSEX | spot 76800 pin 76800 | 76800CE @169.40 + 76700PE @106.00 = 0.36%
+SENSEX live snapshot 09:41 IST | expiry 2026-09-03
+  spot 76881.7   FULL-CHAIN max-pain 76800   (pin dist -82 pts)
+  legs: 76900 CE @ 143.05 (OI 39.2L) + 76800 PE @ 115.20 (OI 51.6L)
+  deltas: CE 0.49 / PE 0.41  (Aug winners clustered 0.15-0.50; <0.10 = lottery)
+  combined 258.25 = 0.336% of spot (cap 0.25%)   breakeven +277/-340 (easier 0.360%, cap 0.35%)
+  STRANGLE VERDICT: SKIP-EXPENSIVE
