@@ -1,0 +1,10 @@
+rule,trades,wins,win%,CI95,LOO_min_win%,pnl,ex_BANKEX,worst,skipped_wins
+A. take every expiry,13,8,62,36-82%,58,134592,33567,-18252,0
+"B. current gates (prem<=.25, need<=.35)",11,7,64,35-85%,60,133549,32524,-18252,1
+C. B + both deltas >= .30,7,6,86,49-97%,83,150031,49006,-15672,2
+D. both deltas >= .30 only,9,7,78,45-94%,75,151074,50049,-15672,1
+E. monthly-expiry days only,6,5,83,44-97%,80,147626,46601,-15672,3
+F. monthly OR first-CAS day,8,6,75,41-93%,71,148669,47644,-15672,2
+G. E + prem<=.25,6,5,83,44-97%,80,147626,46601,-15672,3
+H. (monthly) OR (weekly with both deltas>=.30 and prem<=.25),8,7,88,53-98%,86,181094,80069,-15672,1
+I. H + need<=.35,8,7,88,53-98%,86,181094,80069,-15672,1
