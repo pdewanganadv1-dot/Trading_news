@@ -49,7 +49,9 @@ def main(index, budget, tag):
         chain[k] = {"ce": float((e.get("ce") or {}).get("last_price") or 0),
                     "pe": float((e.get("pe") or {}).get("last_price") or 0),
                     "ce_oi": float((e.get("ce") or {}).get("oi") or 0),
-                    "pe_oi": float((e.get("pe") or {}).get("oi") or 0)}
+                    "pe_oi": float((e.get("pe") or {}).get("oi") or 0),
+                    "ce_delta": abs(float(((e.get("ce") or {}).get("greeks") or {}).get("delta") or 0)),
+                    "pe_delta": abs(float(((e.get("pe") or {}).get("greeks") or {}).get("delta") or 0))}
     strikes = sorted(chain)
     # full-chain max pain
     best, best_pain = None, None
@@ -77,6 +79,9 @@ def main(index, budget, tag):
     print(f"  spot {spot:.1f}   FULL-CHAIN max-pain {mp:.0f}   (pin dist {mp - spot:+.0f} pts)")
     print(f"  legs: {ce_k:.0f} CE @ {ce_p:.2f} (OI {chain[ce_k]['ce_oi']/1e5:.1f}L) + "
           f"{pe_k:.0f} PE @ {pe_p:.2f} (OI {chain[pe_k]['pe_oi']/1e5:.1f}L)")
+    dce, dpe = chain[ce_k]["ce_delta"], chain[pe_k]["pe_delta"]
+    lot_flag = "  !! LOTTERY-DELTA (<0.10) — wide-wing risk, Tue-1-Sep lesson" if (dce and dce < 0.10) or (dpe and dpe < 0.10) else ""
+    print(f"  deltas: CE {dce:.2f} / PE {dpe:.2f}  (Aug winners clustered 0.15-0.50; <0.10 = lottery){lot_flag}")
     print(f"  combined {comb:.2f} = {prem_pct:.3f}% of spot (cap {MAX_PREM_PCT}%)   "
           f"breakeven +{need_up:.0f}/-{need_dn:.0f} (easier {need_pct:.3f}%, cap {MAX_NEED_PCT}%)")
     print(f"  STRANGLE VERDICT: {verdict}" + (f" — {lots} lots each leg = Rs {lots * comb * lot:,.0f}"
