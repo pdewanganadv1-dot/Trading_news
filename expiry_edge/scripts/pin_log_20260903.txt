@@ -11,3 +11,43 @@ SENSEX live snapshot 09:41 IST | expiry 2026-09-03
   deltas: CE 0.49 / PE 0.41  (Aug winners clustered 0.15-0.50; <0.10 = lottery)
   combined 258.25 = 0.336% of spot (cap 0.25%)   breakeven +277/-340 (easier 0.360%, cap 0.35%)
   STRANGLE VERDICT: SKIP-EXPENSIVE
+
+===== 13:00 run 2026-09-03 13:01 IST =====
+--- v1 full-chain pin ---
+==================================================================
+ SENSEX expiry pick  |  2026-09-03 07:31:20
+==================================================================
+ expiry         : 2026-09-03
+ spot           : 76637.31
+ max-pain       : 76700    (spot below pin by 63 pts)
+ PCR (OI)       : 0.73
+ call wall      : 77000   (CE OI 12,424,000)
+ put wall       : 76500   (PE OI 7,321,180)
+ top-2 OI share : 14%     bracketed pin: True
+ clean pin      : no   (heuristic: bracketed + top-2 share >= 30%)
+------------------------------------------------------------------
+ PICK : MARGINAL (no clean pin -> smallest size, or skip)
+        SENSEX 76700 CE   premium (LTP) = Rs 109.85
+        both-sides: 76700 CE (Rs 109.85) + 76600 PE (Rs 106.55) = Rs 216.40
+------------------------------------------------------------------
+ HONEST READ: SENSEX is the weakest version of this trade in your real data --
+ nearest-OTM CALL ticket won 3/8 CAS expiries, PUT 0/8, and one of the 3 (13 Aug)
+ was the SEBI-flagged manipulated one -> clean record ~2/8. Expected value is
+ NEGATIVE. Take it only on a clean pin, only as total-loss lottery money, else sit out.
+ Enter before ~14:55 IST (CAS freeze); hold to the 15:30 settlement.
+==================================================================
+SUMMARY: MARGINAL SENSEX 76700 CE @ Rs 109.85 | spot 76637 pin 76700 | clean_pin=no
+
+--- live snapshot ---
+SENSEX live snapshot 13:01 IST | expiry 2026-09-03
+  spot 76640.8   FULL-CHAIN max-pain 76700   (pin dist +59 pts)
+  legs: 76700 CE @ 111.30 (OI 84.1L) + 76600 PE @ 105.20 (OI 54.4L)
+  deltas: CE 0.44 / PE 0.44  box CENTERED (both legs delta>=0.30: Aug 6/7 wins)
+  combined 216.50 = 0.282% of spot (cap 0.25%)   breakeven +276/-257 (easier 0.336%, cap 0.35%)
+  STRANGLE VERDICT: SKIP-EXPENSIVE
+  vs 0935: pin 76800 -> 76700 (-100), spot 76799.7 -> 76640.8 (-158.9)
+  *** PIN MIGRATING DOWN — that side is the STRONG directional pick ***
+  chain OI since 0935: CE +66.8%  PE +33.0%   !! growing BOTH sides — blast-fuel flag
+
+SUMMARY: SKIP-EXPENSIVE SENSEX | spot 76641 pin 76700 | 76700CE @111.30 + 76600PE @105.20 = 0.28%
+
