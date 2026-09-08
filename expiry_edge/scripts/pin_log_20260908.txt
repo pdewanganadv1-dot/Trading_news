@@ -1,0 +1,8 @@
+===== Tue 8 Sep 2026 — NIFTY weekly expiry (paper expiry 3) =====
+09:20  token probe: 401 (env var still holds the token that expired 4 Sep 08:53 IST)
+09:35  live_snapshot 0935: 401 — no baseline snapshot
+13:00  live_snapshot 1300: 401
+14:30  live_snapshot 1430 + v2 + preopen_day1 (7 Sep): all 401 — PAPER SKIP, no ticket named
+15:05  live_snapshot 1505 + strangle_1505 + v2: all 401 — FINAL: NO TICKET (missed paper expiry, not a skip on evidence)
+Scorecard: no P&L row for 8 Sep; settlement/auction move to be back-filled from 1-min bars at the next working probe (Thu 10 Sep 9:20 run).
+Paper tally after 8 Sep unchanged: strangle 2/2 (+23,469 on 1 Sep + 3 Sep).
