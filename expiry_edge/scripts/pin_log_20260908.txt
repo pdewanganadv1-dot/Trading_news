@@ -6,3 +6,8 @@
 15:05  live_snapshot 1505 + strangle_1505 + v2: all 401 — FINAL: NO TICKET (missed paper expiry, not a skip on evidence)
 Scorecard: no P&L row for 8 Sep; settlement/auction move to be back-filled from 1-min bars at the next working probe (Thu 10 Sep 9:20 run).
 Paper tally after 8 Sep unchanged: strangle 2/2 (+23,469 on 1 Sep + 3 Sep).
+
+===== back-fill (Thu 10 Sep, token refreshed) =====
+NIFTY 2026-09-08: 15:05 close 23640.0 | 15:15 freeze 23640.0 | CAS print 15:29 -> settle 23635.1 (last bar 15:29)
+auction move: -5.0 pts (-0.021%) | from 15:05: -4.9 (-0.021%)
+No ticket was named on 8 Sep (token stale) -> scorecard row missed_no_token, P&L 0.

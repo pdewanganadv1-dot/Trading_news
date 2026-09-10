@@ -14,3 +14,4 @@ date,index,rule,ticket,entry,settle_intrinsic,pnl
 2026-09-03,SENSEX,prelim_1430_strangle_if_held,76700 CE + 76600 PE x5,178.05,447.1,26905
 2026-09-03,SENSEX,piyush_actual_total,paper only (no position),,,0
 2026-09-03,SENSEX,v2_STRONG_posthoc_tool_failed_live,76400 PE x20,48.30,247.1,79520
+2026-09-08,NIFTY,missed_no_token,none,,23635.1,0
