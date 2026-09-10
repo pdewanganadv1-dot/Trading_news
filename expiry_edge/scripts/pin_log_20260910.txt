@@ -68,3 +68,61 @@ SENSEX OI flow, 13:10:00 -> 14:10:00  spot 74715.4
   PE     75100  flat          prem    +0.00  OI   +0.0%
 --- 14:12 preliminary (PAPER) ---
 Strangle SKIP-EXPENSIVE (0.301% > 0.25%); box CENTERED; breakeven easier 0.325% ok. No migration reference before 14:12 (token stale till ~14:00); v2 from 13:00: pinmig 0. v1 MARGINAL CE (pin-pull, no clean pin), v2 OK CE (pin-pull only). OI flow: CE SHORT-BUILDUP 74600-74900, PE SHORT-COVER 74600-75000. No single leg (no migration). Watch: does decay bring the pair under 0.25% by 15:05.
+
+===== 14:30 run 2026-09-10 14:31 IST =====
+--- live snapshot ---
+SENSEX live snapshot 14:31 IST | expiry 2026-09-10
+  spot 74723.6   FULL-CHAIN max-pain 74800   (pin dist +76 pts)
+  legs: 74800 CE @ 92.30 (OI 69.5L) + 74700 PE @ 133.30 (OI 66.3L)
+  deltas: CE 0.41 / PE 0.47  box CENTERED (both legs delta>=0.30: Aug 6/7 wins)
+  combined 225.60 = 0.302% of spot (cap 0.25%)   breakeven +302/-249 (easier 0.333%, cap 0.35%)
+  STRANGLE VERDICT: SKIP-EXPENSIVE
+  vs 1412: pin 74800 -> 74800 (+0), spot 74718.1 -> 74723.6 (+5.4)
+  no pin migration so far
+  chain OI since 1412: CE -1.1%  PE -1.5%
+
+SUMMARY: SKIP-EXPENSIVE SENSEX | spot 74724 pin 74800 | 74800CE @92.30 + 74700PE @133.30 = 0.30%
+--- v1 ---
+==================================================================
+ SENSEX expiry pick  |  2026-09-10 09:01:21
+==================================================================
+ expiry         : 2026-09-10
+ spot           : 74712.62
+ max-pain       : 74800    (spot below pin by 87 pts)
+ PCR (OI)       : 0.90
+ call wall      : 75000   (CE OI 8,623,720)
+ put wall       : 74500   (PE OI 8,402,460)
+ top-2 OI share : 13%     bracketed pin: True
+ clean pin      : no   (heuristic: bracketed + top-2 share >= 30%)
+------------------------------------------------------------------
+ PICK : MARGINAL (no clean pin -> smallest size, or skip)
+        SENSEX 74800 CE   premium (LTP) = Rs 92.25
+        both-sides: 74800 CE (Rs 92.25) + 74700 PE (Rs 133.60) = Rs 225.85
+------------------------------------------------------------------
+ HONEST READ: SENSEX is the weakest version of this trade in your real data --
+ nearest-OTM CALL ticket won 3/8 CAS expiries, PUT 0/8, and one of the 3 (13 Aug)
+ was the SEBI-flagged manipulated one -> clean record ~2/8. Expected value is
+ NEGATIVE. Take it only on a clean pin, only as total-loss lottery money, else sit out.
+ Enter before ~14:55 IST (CAS freeze); hold to the 15:30 settlement.
+==================================================================
+SUMMARY: MARGINAL SENSEX 74800 CE @ Rs 92.25 | spot 74713 pin 74800 | clean_pin=no
+--- v2 ---
+==================================================================
+ SENSEX expiry pick v2 (momentum, not pin)  |  data to 2026-09-10 14:30:00
+==================================================================
+ spot: 74732.0 @ 14:30:00   13:00: 74787.8   14:05: 74724.6   14:45: 74732.0
+ max-pain now: 74800.0   at 13:00: 74800.0   (migration +0 pts)
+ votes  day: -1  last20: +0  pinmig: +0   (old v1 pin-pull would say: +1)
+------------------------------------------------------------------
+ PICK : OK  SENSEX 74800 CE  premium (last) = Rs 97.10
+        strike is 68 pts from spot (0.09%) — Aug auctions median ~0.15% of spot; FAR-STRIKE = needs an outsized auction, treat as pure lottery
+        1 lot (20) = Rs 1,942  — total-loss sizing, enter before 15:15 freeze
+ STRONG = pin migrated intraday (trade its direction); OK = classic pin-pull only.
+
+SUMMARY: OK SENSEX 74800 CE @ Rs 97.10 | spot 74732 | 1 lot Rs 1,942
+
+ Backtest (8 Aug CAS expiries): see outputs/model/pick_v2_backtest.csv — v2 traded with the
+ late trend; v1's pin-pull was a coin flip and lost on 27 Aug (bought the CALL into a put blast).
+--- 14:30 preliminary (PAPER) ---
+PAPER SKIP: 74800CE @92.30 + 74700PE @133.30 = 0.302% (cap 0.25%); zero decay since 14:12 (224.65 -> 225.60); box CENTERED; no migration (pin 74800 flat, spot +5); v1 MARGINAL CE / v2 OK CE (pin-pull only) -> no single leg. BUY at 15:05 needs combined <= ~Rs 187.
+Verification panel (3 adversarial lenses + pre-open critic, repo-only, no API): rule lens NOT refuted (0.88; re-read deltas at 15:05); flow lens NOT refuted (0.85; today's PE-short-cover/CE-short-buildup shape matched 4 prior expiries, nearest PE lost 3/4; 3 Sep's cover came AFTER the break); pre-open critic: baseline CSV open_915 is the 09:15 bar CLOSE and drift spans 09:20-09:35, so gap/drift vs old regime is NOT apples-to-apples (9:15-range comparison is fine) -> fix preopen_day1.py baseline after today's expiry.
