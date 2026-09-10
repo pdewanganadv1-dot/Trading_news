@@ -1,7 +1,12 @@
 """WHEN to close the 15:05 nearest-OTM strangle: mark-to-market at every 5-min bar from 15:05 to
 15:35 on every CAS expiry with option bars, versus holding to the auction settlement (intrinsic).
 
-Index universe: the 15 index expiries (Aug backtest set + 1/3/10 Sep live days).
+Index universe: 14 index expiries (Aug backtest set + 1 Sep and 10 Sep live days; 3 Sep excluded, see below).
+TIME SEMANTICS (bars are labelled by START minute): "entry at the 15:05 bar" = the ~15:09:59 print; the
+15:20 bar = 15:20:00-15:24:59 (the last prints BEFORE the CAS print, which lands at 15:28 NSE / 15:29 BSE);
+the 15:25 bar = 15:25:00-15:29:59 and CLOSES AFTER the print, so v_1525 (and 15:30/15:35) are post-print
+prices pinned to intrinsic. v_1525_open / v_1525_typical / best_close / best_high are LOOK-AHEAD upper
+bounds (the 15:25 bar also trades below intrinsic on the same day), not fillable exits.
 Stock universe : the 25 Aug 2026 monthly stock expiry (every symbol with 5-min option bars in the repo).
 
 Per row: legs at the 15:05 bar (CE = lowest strike > spot, PE = highest strike < spot), entry = sum of
@@ -58,7 +63,7 @@ def evaluate(day, name, date, lot=None):
         return None
     b0 = pre[pre.ts == pre.ts.max()]
     spot = float(b0.spot.iloc[0])
-    ks = sorted(day.strike.unique())
+    ks = sorted(b0.strike.unique())   # strikes present AT the 15:05 bar
     try:
         ce_k = min(k for k in ks if k > spot); pe_k = max(k for k in ks if k < spot)
     except ValueError:
@@ -84,7 +89,7 @@ def evaluate(day, name, date, lot=None):
         col = f"v_{t.strftime('%H%M')}"
         if (ce.empty or pe.empty) and t >= dt.time(15, 25) and not b.empty:
             # leg fell out of the ATM+-3 export window after a big auction (27 Aug): value it at intrinsic on that bar's spot
-            sp = float(b.spot.iloc[0])
+            sp = float(b.spot.mode().iloc[0])   # modal spot of the bar (a stale row can carry the pre-print spot)
             cv = float(ce.close.iloc[0]) if not ce.empty else max(0.0, sp - ce_k)
             pv = float(pe.close.iloc[0]) if not pe.empty else max(0.0, pe_k - sp)
             r[col] = round(cv + pv, 2); r["filled_intrinsic"] = True
@@ -162,7 +167,7 @@ if __name__ == "__main__":
             "settle_val", "best_close_val", "best_close_time", "best_high_val"]
     pd.set_option("display.width", 250)
     print(ti[show].to_string(index=False))
-    summarize(ti, "INDEX (15 CAS expiries)")
+    summarize(ti, "INDEX (14 CAS expiries; v_1525_open/typical, best_close, best_high are look-ahead bounds, not exits)")
 
     srows = []
     files = sorted(glob.glob(str(HERE / "dhan_export_stocks100" / "rolling_options_*.csv"))) + \
