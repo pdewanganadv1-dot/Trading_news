@@ -40,10 +40,10 @@ def load_index(idx):
         idx, [f"rolling_options_{idx}_monthly.csv", f"rolling_options_{idx}.csv"])
     parts = [pd.read_csv(EXP / f, parse_dates=["ts"]) for f in files if (EXP / f).exists()]
     d = pd.concat(parts, ignore_index=True)
-    for c in ("high", "low"):
+    for c in ("open", "high", "low"):
         if c not in d.columns:
             d[c] = np.nan
-    return d[["ts", "side", "strike", "spot", "close", "high", "low"]].drop_duplicates(["ts", "side", "strike"])
+    return d[["ts", "side", "strike", "spot", "open", "close", "high", "low"]].drop_duplicates(["ts", "side", "strike"])
 
 
 def bar(day, t):
@@ -181,13 +181,13 @@ if __name__ == "__main__":
             continue
         d["ts"] = pd.to_datetime(d.ts, errors="coerce")
         d = d.dropna(subset=["ts"])
-        for c in ("high", "low"):
+        for c in ("open", "high", "low"):
             if c not in d.columns:
                 d[c] = np.nan
         day = d[d.ts.dt.date == dt.date(2026, 8, 25)]
         if day.empty:
             continue
-        r = evaluate(day[["ts", "side", "strike", "spot", "close", "high", "low"]].drop_duplicates(["ts", "side", "strike"]), sym, "2026-08-25")
+        r = evaluate(day[["ts", "side", "strike", "spot", "open", "close", "high", "low"]].drop_duplicates(["ts", "side", "strike"]), sym, "2026-08-25")
         if r:
             srows.append(r)
     ts_ = pd.DataFrame(srows)
