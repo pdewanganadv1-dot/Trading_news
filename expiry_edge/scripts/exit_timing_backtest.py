@@ -82,6 +82,15 @@ def evaluate(day, name, date, lot=None):
         b = bar(day, t)
         ce = b[(b.side == "CE") & (b.strike == ce_k)]; pe = b[(b.side == "PE") & (b.strike == pe_k)]
         col = f"v_{t.strftime('%H%M')}"
+        if (ce.empty or pe.empty) and t >= dt.time(15, 25) and not b.empty:
+            # leg fell out of the ATM+-3 export window after a big auction (27 Aug): value it at intrinsic on that bar's spot
+            sp = float(b.spot.iloc[0])
+            cv = float(ce.close.iloc[0]) if not ce.empty else max(0.0, sp - ce_k)
+            pv = float(pe.close.iloc[0]) if not pe.empty else max(0.0, pe_k - sp)
+            r[col] = round(cv + pv, 2); r["filled_intrinsic"] = True
+            if t >= dt.time(15, 15) and r[col] > best_val:
+                best_val, best_t = r[col], t.strftime("%H:%M")
+            continue
         if ce.empty or pe.empty:
             r[col] = np.nan; continue
         v = float(ce.close.iloc[0]) + float(pe.close.iloc[0])
@@ -91,22 +100,33 @@ def evaluate(day, name, date, lot=None):
         hi = float(ce.high.iloc[0]) + float(pe.high.iloc[0]) if (pd.notna(ce.high.iloc[0]) and pd.notna(pe.high.iloc[0])) else np.nan
         if t >= dt.time(15, 15) and pd.notna(hi) and (np.isnan(best_hi) or hi > best_hi):
             best_hi = hi
+    b25 = bar(day, dt.time(15, 25)); b20 = bar(day, dt.time(15, 20))
+    def ohlc(bb, side, k):
+        x = bb[(bb.side == side) & (bb.strike == k)]
+        return x.iloc[0] if len(x) and pd.notna(x.iloc[0].get("high", np.nan)) else None
+    c25, p25, c20, p20 = ohlc(b25, "CE", ce_k), ohlc(b25, "PE", pe_k), ohlc(b20, "CE", ce_k), ohlc(b20, "PE", pe_k)
+    if c25 is not None and p25 is not None:
+        r["v_1525_open"] = round(float(c25.open) + float(p25.open), 2)
+        r["v_1525_typical"] = round(sum((float(x.open) + float(x.high) + float(x.low) + float(x.close)) / 4 for x in (c25, p25)), 2)
+    else:
+        r["v_1525_open"] = np.nan; r["v_1525_typical"] = np.nan
+    r["v_1520_open"] = round(float(c20.open) + float(p20.open), 2) if (c20 is not None and p20 is not None) else np.nan
     r["best_close_val"] = round(best_val, 2) if best_val >= 0 else np.nan
     r["best_close_time"] = best_t
     r["best_high_val"] = round(best_hi, 2) if pd.notna(best_hi) else np.nan
     # ratios vs entry
-    for c in [f"v_{t.strftime('%H%M')}" for t in EXITS] + ["settle_val", "best_close_val", "best_high_val"]:
+    for c in [f"v_{t.strftime('%H%M')}" for t in EXITS] + ["settle_val", "best_close_val", "best_high_val", "v_1520_open", "v_1525_open", "v_1525_typical"]:
         r[c + "_x"] = round(r[c] / entry, 3) if pd.notna(r.get(c)) and entry > 0 else np.nan
     if lot:
         lots = int(BUDGET // (entry * lot))
         r["lots"] = lots
-        for c in ("v_1515", "v_1520", "v_1525", "settle_val", "best_close_val"):
+        for c in ("v_1510", "v_1515", "v_1520", "v_1525", "settle_val", "best_close_val", "v_1525_open", "v_1525_typical"):
             r["pnl_" + c] = round(lots * (r[c] - entry) * lot) if pd.notna(r.get(c)) else np.nan
     return r
 
 
 def summarize(t, label):
-    cols = [f"v_{x.strftime('%H%M')}" for x in EXITS] + ["settle_val", "best_close_val", "best_high_val"]
+    cols = [f"v_{x.strftime('%H%M')}" for x in EXITS] + ["v_1520_open", "v_1525_open", "v_1525_typical", "settle_val", "best_close_val", "best_high_val"]
     print(f"\n=== {label}: value / entry at each exit (n={len(t)}) ===")
     print(f"{'exit':16s} {'n':>3s} {'median x':>9s} {'mean x':>7s} {'win%':>5s}   (win = value > entry)")
     for c in cols:
@@ -117,11 +137,13 @@ def summarize(t, label):
     bt = t.best_close_time.value_counts()
     print("best close-exit bar (>=15:15): " + ", ".join(f"{k} x{v}" for k, v in bt.items()))
     if "pnl_settle_val" in t.columns:
-        for sub, lab in ((t, "all days"), (t[t.rule == "BUY"], "rule-BUY days only")):
+        for sub, lab in ((t, "all days"), (t[t.rule == "BUY"], "rule-BUY days only"), (t[t.name != "BANKEX"], "ex-BANKEX 27 Aug"),
+                         (t[t.filled_intrinsic != True] if "filled_intrinsic" in t.columns else t, "days with complete bars")):
             if len(sub) == 0:
                 continue
-            print(f"Rs at Rs{BUDGET:,} sizing, {lab} (n={len(sub)}): exit 15:15 {sub.pnl_v_1515.sum():+,.0f} | 15:20 {sub.pnl_v_1520.sum():+,.0f} | "
-                  f"15:25 {sub.pnl_v_1525.sum():+,.0f} | settlement {sub.pnl_settle_val.sum():+,.0f} | best-close (hindsight) {sub.pnl_best_close_val.sum():+,.0f}")
+            print(f"Rs at Rs{BUDGET:,} sizing, {lab} (n={len(sub)}): 15:10 {sub.pnl_v_1510.sum():+,.0f} | 15:15 {sub.pnl_v_1515.sum():+,.0f} | 15:20 {sub.pnl_v_1520.sum():+,.0f} | "
+                  f"15:25 {sub.pnl_v_1525.sum():+,.0f} | settlement {sub.pnl_settle_val.sum():+,.0f} | best-close (hindsight) {sub.pnl_best_close_val.sum():+,.0f}"
+                  + (f" | 15:25-open {sub.pnl_v_1525_open.sum():+,.0f} / 15:25-typical {sub.pnl_v_1525_typical.sum():+,.0f} on the {int(sub.pnl_v_1525_open.notna().sum())} OHLC days" if sub.pnl_v_1525_open.notna().any() else ""))
 
 
 if __name__ == "__main__":
