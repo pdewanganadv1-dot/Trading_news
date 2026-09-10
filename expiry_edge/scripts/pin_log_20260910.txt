@@ -321,3 +321,21 @@ SUMMARY: STRONG SENSEX 74600 PE @ Rs 141.90 | spot 74642 | 1 lot Rs 2,838
 --- 15:05 FINAL verdict (PAPER) ---
 FINAL PAPER SKIP SENSEX. Strangle tool (15:00 bar): 74700CE @87.00 + 74600PE @142.30 = 229.30 (0.31%) SKIP-EXPENSIVE; snapshot 0.311%. Pin migrated DOWN 74800->74700 (spot 74718->74626, -92); v2 STRONG 74600 PE @141.90 (votes -1/-1/-1); v1 pin-pull: spot 74 pts BELOW the new pin 74700 -> CE -> CONFLICT with v2 -> no single leg under the rule (3 Sep configuration, but today the strangle fails the price gate). Piyush's 74700C+74600P is now the nearest pair (0.311%), still over cap.
 Alternatives to score at 16:00: migration side 74600 PE @141.90 x7 = Rs 19,866; pin-pull side 74700 CE @91.55 x10 = Rs 18,310; would-be strangle 74700C+74600P @229.30 x4 = Rs 18,344; plus the 14:58-priced put-lean 75000C+74700P (193.40 x5) and call-lean 74800C+74500P (169.20 x5).
+
+===== settlement (checked 15:35 on Piyush's request) =====
+1-min bars: 15:05 close 74642.4 | 15:15 freeze 74629.5 | CAS print 15:29 -> 74902.6 (rollingoption 74900 CE 15:30 close 2.7 = intrinsic 2.59, confirmed)
+Auction: +273.1 pts (+0.366%) from freeze; +260.2 (+0.349%) from 15:05. CALL-side move (Piyush called it).
+SETTLE 74902.6 | freeze 74629.5 | auction +273.1 (+0.366%) | lot 20
+  rule_H_verdict                   SKIP (0.31% > 0.25% cap)   entry         intr        net        +0
+  wouldbe_strangle_1505bar         74700 CE + 74600 PE x4     entry  229.30 intr  202.6 net    -2,136
+  wouldbe_strangle_1505snap        74700 CE + 74600 PE x4     entry  231.95 intr  202.6 net    -2,348
+  migration_v2_STRONG_fullbudget   74600 PE x7                entry  141.90 intr    0.0 net   -19,866
+  pinpull_v1_fullbudget            74700 CE x10               entry   91.55 intr  202.6 net   +22,210
+  alt_putlean_1458                 75000 CE + 74700 PE x5     entry  193.40 intr    0.0 net   -19,340
+  alt_calllean_1458                74800 CE + 74500 PE x5     entry  169.20 intr  102.6 net    -6,660
+  piyush_asked_1458                74700 CE + 74600 PE x4     entry  242.50 intr  202.6 net    -3,192
+  single_74800CE_1458              74800 CE x11               entry   89.40 intr  102.6 net    +2,904
+  single_74700PE_1458              74700 PE x6                entry  151.90 intr    0.0 net   -18,228
+  piyush_actual_total              paper only (no position)   entry         intr        net        +0
+Reads: strangle skip was right (would-be -2,136: +0.37% auction vs 0.31% premium + 58 pts distance, BE +307). v1 pin-pull CE (spot 74 below pin) was right (+22,210 full budget); v2 STRONG PE (migration down) was wrong (-19,866). OI flow: call writers (SHORT-BUILDUP 74600-74900) got run over; the cheap leg paid again.
+Live directional tally: migration 1/3 (1 Sep X, 3 Sep OK, 10 Sep X); pin-pull 2/3 (1 Sep OK, 3 Sep X, 10 Sep OK). Strangle rule: 2/2 taken (+23,469) + 1 correct skip.

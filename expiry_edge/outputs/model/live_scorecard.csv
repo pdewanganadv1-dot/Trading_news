@@ -15,3 +15,14 @@ date,index,rule,ticket,entry,settle_intrinsic,pnl
 2026-09-03,SENSEX,piyush_actual_total,paper only (no position),,,0
 2026-09-03,SENSEX,v2_STRONG_posthoc_tool_failed_live,76400 PE x20,48.30,247.1,79520
 2026-09-08,NIFTY,missed_no_token,none,,23635.1,0
+2026-09-10,SENSEX,rule_H_verdict,SKIP (0.31% > 0.25% cap),,,0
+2026-09-10,SENSEX,wouldbe_strangle_1505bar,74700 CE + 74600 PE x4,229.30,202.6,-2136
+2026-09-10,SENSEX,wouldbe_strangle_1505snap,74700 CE + 74600 PE x4,231.95,202.6,-2348
+2026-09-10,SENSEX,migration_v2_STRONG_fullbudget,74600 PE x7,141.90,0.0,-19866
+2026-09-10,SENSEX,pinpull_v1_fullbudget,74700 CE x10,91.55,202.6,22210
+2026-09-10,SENSEX,alt_putlean_1458,75000 CE + 74700 PE x5,193.40,0.0,-19340
+2026-09-10,SENSEX,alt_calllean_1458,74800 CE + 74500 PE x5,169.20,102.6,-6660
+2026-09-10,SENSEX,piyush_asked_1458,74700 CE + 74600 PE x4,242.50,202.6,-3192
+2026-09-10,SENSEX,single_74800CE_1458,74800 CE x11,89.40,102.6,2904
+2026-09-10,SENSEX,single_74700PE_1458,74700 PE x6,151.90,0.0,-18228
+2026-09-10,SENSEX,piyush_actual_total,paper only (no position),,,0
