@@ -131,3 +131,36 @@ Verification panel (3 adversarial lenses + pre-open critic, repo-only, no API): 
 Cap for 74800CE+74700PE = Rs 186.80 combined at spot 74,718 (0.0025 x spot); 5 lots = Rs 18,680 at the cap; 6 lots only <= 166.67. Premium pass implies box CENTERED and geometry pass automatically here.
 Flip paths missed by the 14:12 wording: (1) pair identity changes if spot < 74,700 (74700C+74600P, 0.314% now) or > 74,800 (74900C+74800P, 0.327% now); cheapest config is spot ~74,750; strangle_1505's 15:05 bar governs. (2) single-leg PE only if 15:05 full-chain max-pain = 74,700 AND spot > 74,760 (v1 PUT) AND v2 pinmig = -1; single-leg CE only if max-pain = 74,900 AND spot < 74,840 AND v2 pinmig = +1. Otherwise strangle-or-SKIP.
 Pre-open critic: baseline CSV mis-specified (open_915 = 09:15 bar CLOSE; drift = 09:20-09:35). Corrected old-regime |gap| medians 0.223/0.273/0.300 (N/S/BN), big-gap continuation ~5/16-5/19 (gaps mostly FADE), |drift| medians 0.131/0.134/0.220. Week-1 corrected |gap| pctiles: d1 p8-p20, d2 p33-p43, d3 p69-p72; 8/9 index drifts negative (p10-p39), consistent with three down days. TODO: regenerate baseline with matching definitions + commit generator; add stock baseline; n=3 is not a verdict.
+
+===== check-now run 2026-09-10 14:47 IST =====
+--- live snapshot ---
+SENSEX live snapshot 14:47 IST | expiry 2026-09-10
+  spot 74732.7   FULL-CHAIN max-pain 74800   (pin dist +67 pts)
+  legs: 74800 CE @ 104.75 (OI 66.4L) + 74700 PE @ 129.80 (OI 60.1L)
+  deltas: CE 0.43 / PE 0.46  box CENTERED (both legs delta>=0.30: Aug 6/7 wins)
+  combined 234.55 = 0.314% of spot (cap 0.25%)   breakeven +302/-267 (easier 0.358%, cap 0.35%)
+  STRANGLE VERDICT: SKIP-EXPENSIVE
+  vs 1412: pin 74800 -> 74800 (+0), spot 74718.1 -> 74732.7 (+14.6)
+  no pin migration so far
+  chain OI since 1412: CE -4.5%  PE -6.3%
+
+SUMMARY: SKIP-EXPENSIVE SENSEX | spot 74733 pin 74800 | 74800CE @104.75 + 74700PE @129.80 = 0.31%
+--- v2 ---
+==================================================================
+ SENSEX expiry pick v2 (momentum, not pin)  |  data to 2026-09-10 14:45:00
+==================================================================
+ spot: 74734.9 @ 14:45:00   13:00: 74787.8   14:05: 74724.6   14:45: 74734.9
+ max-pain now: 74800.0   at 13:00: 74800.0   (migration +0 pts)
+ votes  day: -1  last20: +0  pinmig: +0   (old v1 pin-pull would say: +1)
+------------------------------------------------------------------
+ PICK : OK  SENSEX 74800 CE  premium (last) = Rs 101.15
+        strike is 65 pts from spot (0.09%) — Aug auctions median ~0.15% of spot; FAR-STRIKE = needs an outsized auction, treat as pure lottery
+        1 lot (20) = Rs 2,023  — total-loss sizing, enter before 15:15 freeze
+ STRONG = pin migrated intraday (trade its direction); OK = classic pin-pull only.
+
+SUMMARY: OK SENSEX 74800 CE @ Rs 101.15 | spot 74735 | 1 lot Rs 2,023
+
+ Backtest (8 Aug CAS expiries): see outputs/model/pick_v2_backtest.csv — v2 traded with the
+ late trend; v1's pin-pull was a coin flip and lost on 27 Aug (bought the CALL into a put blast).
+--- 14:47 read (PAPER) ---
+SKIP: pair 0.314% and RISING (0.301 -> 0.302 -> 0.314); geometry gate now also fails (easier 0.358% > 0.35%). Pin 74800 flat, spot +15 since 14:12, chain OI shrinking both sides (CE -4.5% PE -6.3%). v2 pinmig 0, OK CE via pin-pull only. No single leg.
