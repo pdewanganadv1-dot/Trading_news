@@ -362,3 +362,16 @@ Deduced closing window: 15:25:00 to ~15:26:30 for BOTH legs (no direction needed
 - Stocks (25 Aug): option chains essentially dead after 15:15 (0.17-0.31x median volume; 41/62 best-exit bars have zero volume on a leg; last-bar prices off intrinsic on 55/62) -> exit_timing_stocks.csv is NOT a tradable-exit study; ignore its 15:15-15:35 columns.
 - Script fixes applied: strikes taken from the 15:05 bar; modal spot in the intrinsic fill; sep3 file no longer loaded; labels corrected (14 days).
 Standing conclusion: hold to settlement (sell at 15:30) remains the default. The one candidate improvement, a limit-sell on the winning leg during 15:25-15:27 above the likely intrinsic, is testable only with minute data -> 15 Sep logger (now also capturing bid/ask).
+
+===== SEBI consultation paper, 12 Sep 2026 — existential risk to this strategy =====
+SEBI floated a consultation paper reviewing CAS, market timings and DERIVATIVES EXPIRY SETTLEMENT METHODOLOGY (comments to 3 Oct 2026). Two settlement options:
+  Option 1 BLENDED VWAP = VWAP of the last 30 min of continuous trading + the 10-min CAS.
+  Option 2 CTS VWAP ONLY = VWAP of the last 30 min of continuous trading; CAS trades excluded (pre-CAS status quo, "interim arrangement").
+Today settlement = the CAS print (verified in our own data: every option converged to intrinsic vs the CAS print).
+IMPACT MEASURED ON OUR 14 INDEX CAS EXPIRIES (outputs/model/sebi_cas_proposal_impact.csv; CTS average = TWAP proxy of the option files' spot 14:40-15:15):
+  median |CAS print - CTS average| = 87.2 pts = 0.305% of spot; >0.20% on 10/14 days.
+  nearest-OTM strangle finished ITM 12/14 today vs 1/14 under Option 2.
+  Rs at 20k sizing: +130,765 today vs -247,265 under Option 2 (difference -378,030).
+=> Option 2 KILLS the strategy outright (the auction move stops being the payout). Option 1 dilutes it by the CAS share of volume. The edge we measured is an artefact of settling on the auction print.
+Other proposals: market timings Option A (CTS to 15:30, CAS 15:31-15:40, derivatives to 15:45) or Option B (CTS to 15:15, CAS 15:15-15:25, derivatives to 15:30); transition cut to ~1 min; post-CAS derivatives window 10 -> 5 min; stop disseminating the IEP-derived indicative index value; limit orders beyond +-1% of reference price cannot be cancelled (price-improving modifications only); unexecuted iceberg quantity enters CAS as normal limit orders with full disclosure.
+PLAN IMPACT: 24 Sep (BSE) / 29 Sep (NSE) monthlies still run under the CURRENT rule (consultation closes 3 Oct), so they remain the only window for the measured edge. Everything after implementation must be re-tested from scratch. Paper-only status unchanged.
