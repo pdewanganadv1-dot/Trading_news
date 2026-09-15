@@ -1,0 +1,9 @@
+===== Tue 15 Sep 2026 — NIFTY weekly expiry (paper expiry 5) =====
+Token in the environment expired 11 Sep 14:08 IST and was never refreshed.
+09:20 probe 401 | 09:35 live_snapshot 401 | 13:00 live_snapshot 401 | 14:30 live_snapshot 401 | 15:05 live_snapshot 401
+FINAL: NO PAPER TICKET — missed paper expiry (not a skip on evidence).
+Also lost: the 15:14 post-freeze chain-logger EXPERIMENT (30-second optionchain snapshots with bid/ask, 15:14-15:33) designed to
+time the reprice spike from the 10 Sep exit-timing study. This was the highest-value item of the day and needs a live token; it is
+re-armed for Thu 17 Sep SENSEX.
+Paper tally unchanged: 1 Sep +5,619 | 3 Sep +17,850 | 8 Sep missed | 10 Sep correct skip | 15 Sep missed.
+Note: 8 Sep and 15 Sep are now both NIFTY expiries lost to a stale token. Two of five paper expiries missed for the same reason.

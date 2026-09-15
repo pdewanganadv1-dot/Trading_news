@@ -26,3 +26,4 @@ date,index,rule,ticket,entry,settle_intrinsic,pnl
 2026-09-10,SENSEX,single_74800CE_1458,74800 CE x11,89.40,102.6,2904
 2026-09-10,SENSEX,single_74700PE_1458,74700 PE x6,151.90,0.0,-18228
 2026-09-10,SENSEX,piyush_actual_total,paper only (no position),,,0
+2026-09-15,NIFTY,missed_no_token,none,,,0
