@@ -1,0 +1,10 @@
+===== Thu 17 Sep 2026 — SENSEX weekly expiry (paper expiry 6) =====
+Token in the environment expired 11 Sep 14:08 IST; still stale six days later.
+09:20 probe 401 | 09:35 snapshot 401 | 13:00 snapshot 401 | 14:30 snapshot 401 | 15:05 snapshot 401
+FINAL: NO PAPER TICKET — missed paper expiry (not a skip on evidence).
+The 15:14 post-freeze chain-logger EXPERIMENT is at risk again; it probes at 15:14 and stops on 401.
+Paper tally: 1 Sep +5,619 | 3 Sep +17,850 | 8 Sep missed | 10 Sep correct skip | 15 Sep missed | 17 Sep missed.
+STATUS: 4 of 6 paper expiries produced no data, all from a stale token (8, 15, 17 Sep completely; plus the
+15 Sep settlement never back-filled). Scored evidence remains 3 days: two wins and one correct skip.
+The exit-timing experiment has now been missed twice (15 and 17 Sep). Remaining CAS expiries before the
+SEBI consultation closes (3 Oct): Tue 22 Sep NIFTY, Thu 24 Sep BSE monthlies, Tue 29 Sep NSE monthlies + stocks, Thu 1 Oct SENSEX.
